@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>jpg;jpeg;png;bmp;ico</Extensions>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Imgui Files">
+      <UniqueIdentifier>{a610e80d-80e2-4720-bb1e-a7d9e7bc65b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\JSON">
+      <UniqueIdentifier>{52172abe-220b-4017-aab3-9dedbbbec6fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Resource Files\Pictures">
+      <UniqueIdentifier>{6ed04f3a-5121-42ce-9eb7-2fa91ec162cc}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+      <Filter>Imgui Files</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_opengl3.cpp">
+      <Filter>Imgui Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Json_Operators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\pictures\coolyori.jpg">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\pictures\Mushishi.jpg">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\pictures\Skateboard.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="imgui\imgui_impl_opengl3.h">
+      <Filter>Imgui Files</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_glfw.h">
+      <Filter>Imgui Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\Json_Operators.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\includes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\json\Window.json">
+      <Filter>Resource Files\JSON</Filter>
+    </None>
+    <None Include="resources\json\WindowObjects.json">
+      <Filter>Resource Files\JSON</Filter>
+    </None>
+  </ItemGroup>
+</Project>

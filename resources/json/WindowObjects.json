@@ -1,0 +1,129 @@
+{
+    "cameras": [
+        {
+            "id": 0,
+            "projection": 0,
+            "fov": 70.0,
+            "range": {
+                "near": 0.1,
+                "far": 100
+            },
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "angle": 0,
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+            }
+        },
+        {
+            "id": 1,
+            "projection": 1,
+            "fov": 70.0,
+            "range": {
+                "near": 0.1,
+                "far": 100
+            },
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "angle": 0,
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+            }
+        }
+    ],
+    "textures": [
+        {
+            "id": 0,
+            "type": 0,
+            "filepath": "resources/pictures/Mushishi.jpg"
+        },
+        {
+            "id": 1,
+            "type": 0,
+            "filepath": "resources/pictures/Skateboard.png"
+        },
+        {
+            "id": 2,
+            "type": 0,
+            "filepath": "resources/pictures/coolyori.jpg",
+            "todo": "find a way to integrate Text Areas"
+        }
+    ],
+    "planes": [
+        {
+            "id": 0,
+            "texture_id": 0,
+            "hitbox": 0,
+            "scaling": {
+                "x": 2.0,
+                "y": 2.0,
+                "z": 2.0
+            },
+            "rotation": {
+                "angle": 0,
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+            },
+            "translation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -20.0
+            }
+        },
+        {
+            "id": 1,
+            "texture_id": 1,
+            "hitbox": 1,
+            "scaling": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "rotation": {
+                "angle": 0,
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+            },
+            "translation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -19.0
+            },
+            "todo": "find a way to integrate Button Functions"
+        },
+        {
+            "id": 2,
+            "texture_id": 2,
+            "hitbox": 2,
+            "scaling": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            },
+            "rotation": {
+                "angle": 0,
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+            },
+            "translation": {
+                "x": 1.0,
+                "y": 0.5,
+                "z": -2.0
+            },
+            "todo": "find a way to integrate Button Functions"
+        }
+    ]
+}
