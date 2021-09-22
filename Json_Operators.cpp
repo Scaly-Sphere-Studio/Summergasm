@@ -41,7 +41,7 @@ SSS::GL::Window::Shared const& operator<<(SSS::GL::Window::Shared const& window,
         SSS::GL::Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
         texture->setType(static_cast<SSS::GL::Texture::Type>(tex_data["type"]));
         if (tex_data.count("filepath") != 0) {
-            texture->useFile(tex_data["filepath"]);
+            texture->useFile(SSS::PWD + std::string(tex_data["filepath"]));
         }
     }
     // Planes

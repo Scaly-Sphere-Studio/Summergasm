@@ -12,12 +12,12 @@ int main(void) try
 {
     // Create window & set callbacks
     SSS::GL::Window::Args args;
-    args << nlohmann::json::parse(SSS::readFile("resources/json/Window.json"));
+    args << nlohmann::json::parse(SSS::readFile(SSS::PWD + "resources/json/Window.json"));
     SSS::GL::Window::Shared window = SSS::GL::Window::create(args);
     SSS::GL::Window::Objects const& objects = window->getObjects();
     window->setCallback(glfwSetKeyCallback, key_callback);
     // Load objects
-    window << nlohmann::json::parse(SSS::readFile("resources/json/WindowObjects.json"));
+    window << nlohmann::json::parse(SSS::readFile(SSS::PWD + "resources/json/WindowObjects.json"));
     // Manually set renderers, for now
     window->createRenderer<SSS::GL::Plane::Renderer>(0);
     objects.renderers.at(0)->try_emplace(0);
