@@ -34,7 +34,7 @@
     <ClCompile Include="imgui\imgui_impl_opengl3.cpp">
       <Filter>Imgui Files</Filter>
     </ClCompile>
-    <ClCompile Include="Json_Operators.cpp">
+    <ClCompile Include="src\Json_Operators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -68,6 +68,9 @@
       <Filter>Resource Files\JSON</Filter>
     </None>
     <None Include="resources\json\WindowObjects.json">
+      <Filter>Resource Files\JSON</Filter>
+    </None>
+    <None Include="resources\json\Scene1.json">
       <Filter>Resource Files\JSON</Filter>
     </None>
   </ItemGroup>

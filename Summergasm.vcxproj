@@ -21,7 +21,7 @@
   <ItemGroup>
     <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="Json_Operators.cpp" />
+    <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -36,6 +36,7 @@
     <ClInclude Include="inc\Json_Operators.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="resources\json\Scene1.json" />
     <None Include="resources\json\WindowObjects.json" />
     <None Include="resources\json\Window.json" />
   </ItemGroup>
