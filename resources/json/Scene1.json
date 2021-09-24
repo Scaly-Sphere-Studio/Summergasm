@@ -1,0 +1,27 @@
+[
+    {
+        "id": 0,
+        "type": 0,
+        "chunks": [
+            {
+                "id": 0,
+                "camera_id": 0,
+                "use_camera": true,
+                "reset_depth_before": false,
+                "objects": [
+                    0,
+                    1
+                ]
+            },
+            {
+                "id": 1,
+                "camera_id": 1,
+                "use_camera": true,
+                "reset_depth_before": true,
+                "objects": [
+                    2
+                ]
+            }
+        ]
+    }
+]

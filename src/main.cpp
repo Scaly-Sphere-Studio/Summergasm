@@ -11,22 +11,12 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
 int main(void) try
 {
     // Create window & set callbacks
-    SSS::GL::Window::Args args;
-    args << nlohmann::json::parse(SSS::readFile(SSS::PWD + "resources/json/Window.json"));
-    SSS::GL::Window::Shared window = SSS::GL::Window::create(args);
-    SSS::GL::Window::Objects const& objects = window->getObjects();
+    SSS::GL::Window::Shared window = createWindow("resources/json/Window.json");
     window->setCallback(glfwSetKeyCallback, key_callback);
     // Load objects
-    window << nlohmann::json::parse(SSS::readFile(SSS::PWD + "resources/json/WindowObjects.json"));
+    loadWindowObjects(window, "resources/json/WindowObjects.json");
     // Manually set renderers, for now
-    window->createRenderer<SSS::GL::Plane::Renderer>(0);
-    objects.renderers.at(0)->try_emplace(0);
-    objects.renderers.at(0)->at(0).camera_ID = 0;
-    objects.renderers.at(0)->at(0).objects.emplace(0, 0);
-    objects.renderers.at(0)->at(0).objects.emplace(1, 1);
-    objects.renderers.at(0)->try_emplace(1);
-    objects.renderers.at(0)->at(1).camera_ID = 1;
-    objects.renderers.at(0)->at(1).objects.emplace(0, 2);
+    organizeRenderers(window, "resources/json/Scene1.json");
     // Main loop
     while (window && !window->shouldClose()) {
         SSS::GL::Window::pollTextureThreads();

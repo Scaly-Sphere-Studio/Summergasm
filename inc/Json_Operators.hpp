@@ -2,10 +2,10 @@
 
 #include "includes.hpp"
 
-SSS::GL::Window::Args& operator<<(
-    SSS::GL::Window::Args& args, nlohmann::json const& data);
+SSS::GL::Window::Shared createWindow(std::string const& json_path);
 
-glm::vec3& operator<<(glm::vec3& vec, nlohmann::json const& data);
+void loadWindowObjects(SSS::GL::Window::Shared const& window,
+    std::string const& json_path);
 
-SSS::GL::Window::Shared const& operator<<(
-    SSS::GL::Window::Shared const& window, nlohmann::json const& data);
+void organizeRenderers(SSS::GL::Window::Shared const& window,
+    std::string const& json_path);
