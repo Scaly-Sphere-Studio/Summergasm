@@ -1,3 +1,7 @@
+#pragma warning(push, 0)
+#include <nlohmann/json.hpp>
+#pragma warning(pop)
+
 #include "Json_Operators.hpp"
 
 static nlohmann::json relativePathToJson(std::string const& path) {
@@ -45,10 +49,16 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
     for (nlohmann::json const& tex_data : data["textures"]) {
         window->createTexture(tex_data["id"]);
         SSS::GL::Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
-        texture->setType(static_cast<SSS::GL::Texture::Type>(tex_data["type"]));
         if (tex_data.count("filepath") != 0) {
             texture->useFile(SSS::PWD + std::string(tex_data["filepath"]));
         }
+        if (tex_data.count("text_area_id") != 0) {
+            uint32_t const text_area_id = tex_data["text_area_id"];
+            if (g_data->text_areas.count(text_area_id) != 0) {
+                texture->setTextArea(g_data->text_areas.at(text_area_id));
+            }
+        }
+        texture->setType(static_cast<SSS::GL::Texture::Type>(tex_data["type"]));
     }
     // Planes
     for (nlohmann::json const& plane_data : data["planes"]) {
@@ -60,6 +70,10 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
         plane->scale(vec << plane_data["scaling"]);
         plane->rotate(plane_data["rotation"]["angle"], vec << plane_data["rotation"]);
         plane->translate(vec << plane_data["translation"]);
+        uint32_t const func_id = plane_data["button_function_id"];
+        if (func_id < g_data->button_functions.size()) {
+            plane->setFunction(g_data->button_functions.at(func_id));
+        }
     }
 }
 
