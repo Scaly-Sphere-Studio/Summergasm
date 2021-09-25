@@ -15,6 +15,7 @@
     </Filter>
     <Filter Include="Resource Files\JSON">
       <UniqueIdentifier>{52172abe-220b-4017-aab3-9dedbbbec6fe}</UniqueIdentifier>
+      <Extensions>json</Extensions>
     </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
