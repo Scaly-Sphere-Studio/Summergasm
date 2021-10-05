@@ -7,7 +7,7 @@ void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
 
 struct GlobalData {
     std::map<uint32_t, SSS::TR::TextArea::Shared> text_areas;
-    std::map<uint32_t, SSS::TR::Buffer::Shared> buffers;
+    std::vector<std::string> texts;
     static constexpr std::array<SSS::GL::Plane::ButtonFunction, 3> button_functions = {
         nullptr,
         button_func_1,

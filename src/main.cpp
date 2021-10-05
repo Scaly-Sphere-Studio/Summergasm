@@ -17,32 +17,26 @@ void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
 
 void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
 {
-    __LOG_MSG("bar");
+    static uint32_t text_id = 0;
+    if (action == GLFW_PRESS)
+        g_data->text_areas.at(0)->parseString(g_data->texts[++text_id]);
 }
 
 int main(void) try
 {
-    SSS::TR::TextOpt opt(SSS::TR::Font::getShared("arial.ttf"));
-    opt.style.charsize = 100;
-    g_data->buffers[0] = SSS::TR::Buffer::create("", opt);
-    g_data->text_areas[0] = SSS::TR::TextArea::create(300, 120);
-    g_data->text_areas[0]->useBuffer(g_data->buffers[0]);
-
     // Create window & set callbacks
     SSS::GL::Window::Shared window = createWindow("resources/json/Window.json");
     window->setCallback(glfwSetKeyCallback, key_callback);
+    // Load TR
+    loadTextAreas("resources/json/TextRendering.json");
     // Load objects
     loadWindowObjects(window, "resources/json/WindowObjects.json");
     // Manually set renderers, for now
     organizeRenderers(window, "resources/json/Scene1.json");
     // Main loop
-    SSS::FPS_Timer timer;
     while (window && !window->shouldClose()) {
         SSS::GL::Window::pollTextureThreads();
         window->render();
-        if (timer.addFrame()) {
-            g_data->buffers[0]->changeString(std::to_string(timer.get()));
-        }
     }
 }
 __CATCH_AND_LOG_FUNC_EXC
