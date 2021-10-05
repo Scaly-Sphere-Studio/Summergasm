@@ -9,3 +9,5 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
 
 void organizeRenderers(SSS::GL::Window::Shared const& window,
     std::string const& json_path);
+
+void loadTextAreas(std::string const& json_path);

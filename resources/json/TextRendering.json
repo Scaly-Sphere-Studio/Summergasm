@@ -1,0 +1,66 @@
+[
+    {
+        "id": 0,
+        "width": 1280,
+        "height": 720,
+        "typewriter": false,
+        "text_opt": [
+            {
+                "id": 0,
+                "font": "impact.ttf",
+                "style": {
+                    "charsize": 150,
+                    "outline_size": 0,
+                    "has_outline": false,
+                    "has_shadow": false,
+                    "line_spacing": 1.5
+                },
+                "color": {
+                    "text": [ 255, 255, 255 ],
+                    "outline": [ 0, 0, 0 ],
+                    "shadow": [ 64, 64, 64 ],
+                    "alpha": 255
+                },
+                "lng": {
+                    "language": "en",
+                    "script": "Latn",
+                    "direction": "ltr",
+                    "word_dividers": " "
+                }
+            },
+            {
+                "id": 1,
+                "font": "arial.ttf",
+                "style": {
+                    "charsize": 150,
+                    "outline_size": 50,
+                    "has_outline": false,
+                    "has_shadow": true,
+                    "line_spacing": 1.5
+                },
+                "color": {
+                    "text": [ 255, 255, 255 ],
+                    "outline": [ 0, 0, 0 ],
+                    "shadow": [ 64, 64, 64 ],
+                    "alpha": 255
+                },
+                "lng": {
+                    "language": "en",
+                    "script": "Latn",
+                    "direction": "ltr",
+                    "word_dividers": " "
+                }
+            }
+        ],
+        "string_array": [
+            "Lorem ipsum \u001F1\u001F dolor sit amet,",
+            "consectetur adipiscing elit,",
+            "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            "Ut enim ad minim veniam,",
+            "quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+            "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+            "Excepteur sint occaecat cupidatat non proident,",
+            "sunt in culpa qui officia deserunt mollit anim id est laborum."
+        ]
+    }
+]
