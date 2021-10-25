@@ -1,10 +1,10 @@
-#pragma warning(push, 0)
-#include <nlohmann/json.hpp>
-#pragma warning(pop)
+#include "Summergasm.hpp"
 
-#include "Json_Operators.hpp"
-
-static nlohmann::json relativePathToJson(std::string const& path) {
+static nlohmann::json relativePathToJson(std::string const& path)
+{
+    if (SSS::isReg(path)) {
+        return nlohmann::json::parse(SSS::readFile(path));
+    }
     return nlohmann::json::parse(SSS::readFile(SSS::PWD + path));
 }
 
@@ -119,7 +119,7 @@ static SSS::RGB24::s jsonToRGB24s(nlohmann::json const& color)
     return SSS::RGB24(0xFFFFFF);
 }
 
-void loadTextAreas(std::string const& json_path)
+void loadTextAreas(std::string const& json_path) try
 {
     using namespace SSS::TR;
     nlohmann::json const data = relativePathToJson(json_path);
@@ -162,3 +162,4 @@ void loadTextAreas(std::string const& json_path)
         text_area->parseString(g_data->texts[0]);
     }
 }
+__CATCH_AND_LOG_FUNC_EXC
