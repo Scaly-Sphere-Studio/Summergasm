@@ -54,6 +54,8 @@ int main(void) try
 {
     SSS::GL::LOG::internal_callbacks::monitor = true;
     SSS::GL::LOG::internal_callbacks::window_pos = true;
+    //g_data->ui_use_separate_window = true;
+
     // Create window & set callbacks
     g_data->window = createWindow("resources/json/Window.json");
     SSS::GL::Window::Shared& window = g_data->window;
@@ -76,7 +78,7 @@ int main(void) try
     g_data->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
     ImGuiHandle::init();
-    ImGuiHandle::swapContext(window);
+    ImGuiHandle::swapContext(!g_data->ui_use_separate_window ? window : g_data->ui_window);
 
     // Main loop
     while (window) {
