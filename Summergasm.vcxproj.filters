@@ -38,7 +38,7 @@
     <ClCompile Include="src\Json_Operators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ImGUI.cpp">
+    <ClCompile Include="src\ImGUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

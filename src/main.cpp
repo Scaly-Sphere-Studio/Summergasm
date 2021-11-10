@@ -70,7 +70,7 @@ int main(void) try
     SSS::GL::Window::Args args;
     args.title = "Summergasm - ImGUI";
     args.w = 600;
-    args.h = 400;
+    args.h = 600;
     args.monitor_id = 1;
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     g_data->ui_window= SSS::GL::Window::create(args);
