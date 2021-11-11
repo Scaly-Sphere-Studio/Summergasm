@@ -37,7 +37,12 @@ void print_window_options(SSS::GL::Window::Shared window)
     }
 }
 
-void print_window_camera(SSS::GL::Camera::Ptr const& camera)
+// Default, deleted
+template<class _Object>
+void print_window_object(std::unique_ptr<_Object> const& ptr) = delete;
+// Camera
+template<>
+void print_window_object(SSS::GL::Camera::Ptr const& camera)
 {
     if (!camera) {
         return;
@@ -95,19 +100,57 @@ void print_window_camera(SSS::GL::Camera::Ptr const& camera)
         camera->setRotation(rot);
     }
 }
-
-void print_window_cameras(SSS::GL::Window::Shared window,
-    SSS::GL::Window::Objects const& objects)
+// Texture
+template<>
+void print_window_object(SSS::GL::Texture::Ptr const& ptr)
 {
-    auto const& cameras = objects.cameras;
+    // TODO: write logic here
+}
+
+// Default, deleted
+template<typename _Object>
+void create_window_object(SSS::GL::Window::Shared window, uint32_t id) = delete;
+// Camera
+template<>
+void create_window_object<SSS::GL::Camera>(SSS::GL::Window::Shared window, uint32_t id)
+{
+    window->createCamera(id);
+}
+// Texture
+template<>
+void create_window_object<SSS::GL::Texture>(SSS::GL::Window::Shared window, uint32_t id)
+{
+    window->createTexture(id);
+}
+
+// Default, deleted
+template<typename _Object>
+void remove_window_object(SSS::GL::Window::Shared window, uint32_t id) = delete;
+// Camera
+template<>
+void remove_window_object<SSS::GL::Camera>(SSS::GL::Window::Shared window, uint32_t id)
+{
+    window->removeCamera(id);
+}
+// Texture
+template<>
+void remove_window_object<SSS::GL::Texture>(SSS::GL::Window::Shared window, uint32_t id)
+{
+    window->removeTexture(id);
+}
+
+template<class _Object>
+void print_window_objects(SSS::GL::Window::Shared window,
+    std::map<uint32_t, std::unique_ptr<_Object>> const& map)
+{
     // Tabs, used to display a single camera UI, along
     // with creation & deletion of cameras
-    if (ImGui::BeginTabBar("Cameras"))
+    if (ImGui::BeginTabBar("###"))
     {
         // Retrieve all IDs
         std::vector<uint32_t> ids;
-        ids.reserve(cameras.size());
-        for (auto it = cameras.cbegin(); it != cameras.cend(); it++) {
+        ids.reserve(map.size());
+        for (auto it = map.cbegin(); it != map.cend(); it++) {
             ids.push_back(it->first);
         }
         // Display all IDs as tabs
@@ -119,38 +162,38 @@ void print_window_cameras(SSS::GL::Window::Shared window,
             sprintf_s(label, "%04u", ids[n]);
             // Display tab
             if (ImGui::BeginTabItem(label, &open)) {
-                // Tab is active, display camera UI
-                print_window_camera(cameras.at(ids[n]));
+                // Tab is active, display object UI
+                print_window_object(map.at(ids[n]));
                 ImGui::EndTabItem();
             }
             if (!open) {
-                // Tab was closed, delete camera
-                window->removeCamera(ids[n]);
+                // Tab was closed, delete object
+                remove_window_object<_Object>(window, ids[n]);
             }
         }
 
         // Bool to set focus on next popup
         static bool set_focus = false;
-        // + Button to create new Cameras
+        // + Button to create new object
         if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing)) {
-            ImGui::OpenPopup("camera id");
+            ImGui::OpenPopup("###");
             set_focus = true;
         }
-        // Popup to prompt for new Camera ID
-        if (ImGui::BeginPopup("camera id")) {
-            int id = ids.back() + 1;
+        // Popup to prompt for new ID
+        if (ImGui::BeginPopup("###")) {
+            int id = ids.empty() ? 0 : ids.back() + 1;
             if (set_focus) {
                 ImGui::SetKeyboardFocusHere(0);
                 set_focus = false;
             }
             ImGui::SetNextItemWidth(100.f);
             ImGui::InputInt("ID", &id, 0);
-            // If an ID was specified, create camera
+            // If an ID was specified, create object
             if (ImGui::IsItemDeactivated()) {
                 uint32_t uid = static_cast<uint32_t>(id);
                 // Only create if available ID
-                if (cameras.count(uid) == 0)
-                    window->createCamera(uid);
+                if (map.count(uid) == 0)
+                    create_window_object<_Object>(window, uid);
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
@@ -160,13 +203,17 @@ void print_window_cameras(SSS::GL::Window::Shared window,
     }
 }
 
-void print_window_objects(SSS::GL::Window::Shared window)
+void print_all_window_objects(SSS::GL::Window::Shared window)
 {
     SSS::GL::Window::Objects const& objects = window->getObjects();
     
     // Cameras
     if (ImGui::TreeNode("Cameras")) {
-        print_window_cameras(window, objects);
+        print_window_objects(window, objects.cameras);
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Textures")) {
+        print_window_objects(window, objects.textures);
         ImGui::TreePop();
     }
 }
@@ -219,7 +266,7 @@ void print_imgui()
         }
         // Window objects
         if (ImGui::CollapsingHeader("Window objects")) {
-            print_window_objects(window);
+            print_all_window_objects(window);
         }
         ImGui::End();
     }
