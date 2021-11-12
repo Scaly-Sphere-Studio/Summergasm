@@ -31,6 +31,7 @@
     <Image Include="resources\pictures\Skateboard.png" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="imgui\imfilebrowser.h" />
     <ClInclude Include="imgui\imgui_impl_glfw.h" />
     <ClInclude Include="imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="inc\Summergasm.hpp" />

@@ -4,36 +4,39 @@ constexpr bool print_demo = false;
 
 void print_window_options(SSS::GL::Window::Shared window)
 {
-    // Window title
-    char label[512];
-    sprintf_s(label, " Window title (%s)", window->getTitle().c_str());
-    static char title[256];
-    ImGui::InputText(label, title, 256);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setTitle(title);
-    }
-    // Window dimensions
-    static int dim[2]{ 1,1 };
-    int w, h;
-    window->getDimensions(w, h);
-    sprintf_s(label, " Dimensions (%d/%d)", w, h);
-    ImGui::InputInt2(label, dim);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setDimensions(dim[0], dim[1]);
-    }
-    // Window position
-    static int pos[2];
-    int x, y;
-    window->getPosition(x, y);
-    sprintf_s(label, " Position (%d/%d)", x, y);
-    ImGui::InputInt2(label, pos);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setPosition(pos[0], pos[1]);
-    }
     // Fullscreen mode
     bool fullscreen = window->isFullscreen();
     if (ImGui::Checkbox(" Fullscreen", &fullscreen)) {
         window->setFullscreen(fullscreen);
+    }
+    // Window title
+    char title[256];
+    strcpy_s(title, window->getTitle().c_str());
+    ImGui::InputText(" Window title", title, 256);
+    if (ImGui::IsItemDeactivated()) {
+        window->setTitle(title);
+    }
+    // Window dimensions
+    int w, h;
+    window->getDimensions(w, h);
+    ImGui::InputInt(" Window width", &w, 0);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        window->setDimensions(w, h);
+    }
+    ImGui::InputInt(" Window height", &h, 0);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        window->setDimensions(w, h);
+    }
+    // Window position
+    int x, y;
+    window->getPosition(x, y);
+    ImGui::InputInt(" Window X pos", &x, 0);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        window->setPosition(x, y);
+    }
+    ImGui::InputInt(" Window Y pos", &y, 0);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        window->setPosition(x, y);
     }
 }
 
@@ -102,9 +105,75 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
 }
 // Texture
 template<>
-void print_window_object(SSS::GL::Texture::Ptr const& ptr)
+void print_window_object(SSS::GL::Texture::Ptr const& texture)
 {
-    // TODO: write logic here
+    // Display combo to choose Texture Type
+    static const char* tex_types[] = { "Raw", "Text" };
+    SSS::GL::Texture::Type type = texture->getType();
+    int type_id = static_cast<int>(type);
+    if (ImGui::Combo(" Texture type", &type_id, tex_types, 2)) {
+        type = static_cast<SSS::GL::Texture::Type>(type_id);
+        texture->setType(type);
+    }
+    // Depending on Texture Type, display texture options
+    if (type == SSS::GL::Texture::Type::Raw) {
+        // Init filebrowser
+        static ImGui::FileBrowser filebrowser = []() {
+            ImGui::FileBrowser filebrowser;
+            // Remove last '\' from PWD because for some reason
+            // the file browser detects it as an empty directory
+            std::string pwd = SSS::PWD;
+            pwd.resize(pwd.size() - 1);
+            filebrowser.SetPwd(pwd);
+            filebrowser.SetTitle("Select an image");
+            filebrowser.SetTypeFilters({ ".png", ".bmp", ".jpg", ".jpeg" });
+            return filebrowser;
+        }();
+        // Button to display filebrowser
+        if (ImGui::Button("New filepath")) {
+            filebrowser.Open();
+        }
+        // Display if needed
+        filebrowser.Display();
+        // If a file has been selected, update texture
+        if (filebrowser.HasSelected()) {
+            texture->useFile(filebrowser.GetSelected().string());
+            filebrowser.ClearSelected();
+        }
+    }
+    else if (type == SSS::GL::Texture::Type::Text) {
+        static uint32_t current_id = 0;
+        // Display combo to select TextArea ID
+        if (ImGui::BeginCombo("TextArea ID", std::to_string(current_id).c_str())) {
+            // Loop over map to display each ID
+            for (auto it = g_data->text_areas.cbegin(); it != g_data->text_areas.cend(); ++it) {
+                uint32_t const id = it->first;
+                bool is_selected = (current_id == id);
+                // Display selectable ID
+                if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                    current_id = id;
+                    texture->setTextArea(it->second);
+                }
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        
+    }
+    int w, h;
+    texture->getDimensions(w, h);
+    if (w != 0 && h != 0) {
+        float const ratio = static_cast<float>(w) / 300.f;
+        ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
+        // C4312
+#ifdef _WIN64
+        uint64_t const id = texture->getTexID();
+#else
+        uint32_t const id = texture->getTexID();
+#endif // _WIN64
+        ImGui::Image(reinterpret_cast<void*>(id), dim);
+    }
 }
 
 // Default, deleted

@@ -109,7 +109,7 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
             chunk.use_camera            = chunk_data["use_camera"];
             chunk.reset_depth_before    = chunk_data["reset_depth_before"];
             nlohmann::json const& objects_data = chunk_data["objects"];
-            for (int i = 0; i < objects_data.size(); ++i) {
+            for (uint32_t i = 0; i < objects_data.size(); ++i) {
                 chunk.objects.try_emplace(i, objects_data[i]);
             }
         }
@@ -162,12 +162,17 @@ void loadTextAreas(std::string const& json_path) try
             TextOpt opt(font, style, color, lng);
             text_area->setTextOpt(opt_data["id"], opt);
         }
-        g_data->texts.clear();
-        g_data->texts.reserve(text_area_data["string_array"].size());
-        for (std::string const& str : text_area_data["string_array"]) {
-            g_data->texts.push_back(str);
+        if (text_area_data.count("string_array") != 0) {
+            g_data->texts.clear();
+            g_data->texts.reserve(text_area_data["string_array"].size());
+            for (std::string const& str : text_area_data["string_array"]) {
+                g_data->texts.push_back(str);
+            }
+            text_area->parseString(g_data->texts[0]);
         }
-        text_area->parseString(g_data->texts[0]);
+        else {
+            text_area->parseString("This is the second text area");
+        }
     }
 }
 __CATCH_AND_LOG_FUNC_EXC

@@ -1,14 +1,16 @@
 #pragma once
 
+#include <imgui.h>
+#include "../imgui/imgui_impl_glfw.h"
+#include "../imgui/imgui_impl_opengl3.h"
+#include "../imgui/imfilebrowser.h"
+
 #include <SSS/GL.hpp>
 
 #pragma warning(push, 0)
 #include <nlohmann/json.hpp>
 #pragma warning(pop)
 
-#include <imgui.h>
-#include "../imgui/imgui_impl_glfw.h"
-#include "../imgui/imgui_impl_opengl3.h"
 
 // Static data
 

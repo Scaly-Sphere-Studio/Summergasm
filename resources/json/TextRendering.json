@@ -62,5 +62,36 @@
             "Excepteur sint occaecat cupidatat non proident,",
             "sunt in culpa qui officia deserunt mollit anim id est laborum."
         ]
+    },
+    {
+        "id": 1,
+        "width": 600,
+        "height": 600,
+        "typewriter": false,
+        "text_opt": [
+            {
+                "id": 0,
+                "font": "FREESCPT.TTF",
+                "style": {
+                    "charsize": 150,
+                    "outline_size": 0,
+                    "has_outline": false,
+                    "has_shadow": false,
+                    "line_spacing": 1.5
+                },
+                "color": {
+                    "text": [ 255, 255, 255 ],
+                    "outline": [ 0, 0, 0 ],
+                    "shadow": [ 64, 64, 64 ],
+                    "alpha": 255
+                },
+                "lng": {
+                    "language": "en",
+                    "script": "Latn",
+                    "direction": "ltr",
+                    "word_dividers": " "
+                }
+            }
+        ]
     }
 ]
