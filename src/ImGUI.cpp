@@ -1,42 +1,75 @@
 #include "Summergasm.hpp"
 
-constexpr bool print_demo = false;
+constexpr static bool print_demo = false;
+static SSS::GL::Window::Shared ui_window;
 
-void print_window_options(SSS::GL::Window::Shared window)
+void setUIWindow()
+{
+    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
+}
+
+bool InputFloatWasEdited(const char* label, float* v, float step = 0.0f,
+    float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+{
+    char name[128];
+    ImGui::SetNextItemWidth(250.f);
+    sprintf_s(name, "##%s", label);
+    ImGui::InputFloat(name, v, 0, step_fast, format, flags);
+    bool ret = ImGui::IsItemDeactivatedAfterEdit();
+    if (step != 0.f) {
+        ImGui::SameLine();
+        sprintf_s(name, "+##%s", label);
+        if ((ImGui::Button(name) || ImGui::IsItemActive()) && v != nullptr) {
+            *v += step;
+            ret = true;
+        }
+        sprintf_s(name, "-##%s", label);
+        ImGui::SameLine();
+        if ((ImGui::Button(name) || ImGui::IsItemActive()) && v != nullptr) {
+            *v -= step;
+            ret = true;
+        }
+    }
+    ImGui::SameLine();
+    ImGui::Text(label);
+    return (ret);
+}
+
+void print_window_options()
 {
     // Fullscreen mode
-    bool fullscreen = window->isFullscreen();
+    bool fullscreen = g_data->window->isFullscreen();
     if (ImGui::Checkbox(" Fullscreen", &fullscreen)) {
-        window->setFullscreen(fullscreen);
+        g_data->window->setFullscreen(fullscreen);
     }
     // Window title
     char title[256];
-    strcpy_s(title, window->getTitle().c_str());
+    strcpy_s(title, g_data->window->getTitle().c_str());
     ImGui::InputText(" Window title", title, 256);
     if (ImGui::IsItemDeactivated()) {
-        window->setTitle(title);
+        g_data->window->setTitle(title);
     }
     // Window dimensions
     int w, h;
-    window->getDimensions(w, h);
+    g_data->window->getDimensions(w, h);
     ImGui::InputInt(" Window width", &w, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setDimensions(w, h);
+        g_data->window->setDimensions(w, h);
     }
     ImGui::InputInt(" Window height", &h, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setDimensions(w, h);
+        g_data->window->setDimensions(w, h);
     }
     // Window position
     int x, y;
-    window->getPosition(x, y);
+    g_data->window->getPosition(x, y);
     ImGui::InputInt(" Window X pos", &x, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setPosition(x, y);
+        g_data->window->setPosition(x, y);
     }
     ImGui::InputInt(" Window Y pos", &y, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        window->setPosition(x, y);
+        g_data->window->setPosition(x, y);
     }
 }
 
@@ -50,6 +83,7 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
     if (!camera) {
         return;
     }
+    g_data->window;
 
     // ID
     ImGui::Text("Projection:");
@@ -107,6 +141,11 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
 template<>
 void print_window_object(SSS::GL::Texture::Ptr const& texture)
 {
+    if (!texture) {
+        return;
+    }
+    g_data->window;
+
     // Display combo to choose Texture Type
     static const char* tex_types[] = { "Raw", "Text" };
     SSS::GL::Texture::Type type = texture->getType();
@@ -142,9 +181,10 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
         }
     }
     else if (type == SSS::GL::Texture::Type::Text) {
+        // TODO: integrate text area in GL
         static uint32_t current_id = 0;
         // Display combo to select TextArea ID
-        if (ImGui::BeginCombo("TextArea ID", std::to_string(current_id).c_str())) {
+        if (ImGui::BeginCombo(" TextArea ID", std::to_string(current_id).c_str())) {
             // Loop over map to display each ID
             for (auto it = g_data->text_areas.cbegin(); it != g_data->text_areas.cend(); ++it) {
                 uint32_t const id = it->first;
@@ -159,58 +199,162 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
             }
             ImGui::EndCombo();
         }
-        
     }
-    int w, h;
-    texture->getDimensions(w, h);
-    if (w != 0 && h != 0) {
-        float const ratio = static_cast<float>(w) / 300.f;
-        ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
-        // C4312
-#ifdef _WIN64
-        uint64_t const id = texture->getTexID();
-#else
-        uint32_t const id = texture->getTexID();
-#endif // _WIN64
-        ImGui::Image(reinterpret_cast<void*>(id), dim);
+    if (ui_window == g_data->window) {
+        int w, h;
+        texture->getDimensions(w, h);
+        if (w != 0 && h != 0) {
+            float const ratio = static_cast<float>(w) / 300.f;
+            ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
+            // C4312
+    #ifdef _WIN64
+            uint64_t const id = texture->getTexID();
+    #else
+            uint32_t const id = texture->getTexID();
+    #endif // _WIN64
+            ImGui::Image(reinterpret_cast<void*>(id), dim);
+        }
     }
+    else {
+        ImGui::Text("No preview when using a separate window");
+    }
+}
+// Plane
+template<>
+void print_window_object(SSS::GL::Plane::Ptr const& plane)
+{
+    if (!plane) {
+        return;
+    }
+    SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
+
+    // Display combo to select Texture ID
+    uint32_t const current_texture_id = plane->getTextureID();
+    if (ImGui::BeginCombo(" Texture ID", std::to_string(current_texture_id).c_str())) {
+        // Loop over map to display each ID
+        for (auto it = objects.textures.cbegin(); it != objects.textures.cend(); ++it) {
+            uint32_t const id = it->first;
+            bool is_selected = (current_texture_id == id);
+            // Display selectable ID
+            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                plane->setTextureID(id);
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    // Display combo to select Hitbox Type
+    int current_hitbox = static_cast<int>(plane->getHitbox());
+    const char* hitboxes[] = { "None", "Alpha", "Full" };
+    if (ImGui::Combo(" Hitbox Type", &current_hitbox, hitboxes, 3)) {
+        plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(current_hitbox));
+    }
+    // Display combo to select Button Function ID
+    static uint32_t current_function_id = 0;
+    if (ImGui::BeginCombo(" Function ID", std::to_string(current_function_id).c_str())) {
+        // Loop over map to display each ID
+        for (size_t i = 0; i < g_data->button_functions.size(); ++i) {
+            uint32_t const id = static_cast<uint32_t>(i);
+            bool is_selected = (current_function_id == id);
+            // Display selectable ID
+            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                current_function_id = id;
+                plane->setFunction(g_data->button_functions[i]);
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    glm::vec3 scaling, angles, translation;
+    plane->getAllTransformations(scaling, angles, translation);
+
+    // Scaling
+    ImGui::Spacing();
+    ImGui::Text("Plane Scaling:");
+    if (ImGui::Button("Reset Plane Scaling"))
+        plane->setScaling();
+    float scaling_global = 1.f;
+    float step = (scaling.x > scaling.y ? scaling.x : scaling.y) / 100.f;
+    step = step > 0.01f ? 0.01f : step;
+    if (InputFloatWasEdited(" Plane scaling (global)", &scaling_global, step))
+        plane->setScaling(scaling * scaling_global);
+    if (InputFloatWasEdited(" Plane scaling (x)", &scaling.x, 0.01f))
+        plane->setScaling(scaling);
+    if (InputFloatWasEdited(" Plane scaling (y)", &scaling.y, 0.01f))
+        plane->setScaling(scaling);
+    // Rotation
+    ImGui::Spacing();
+    ImGui::Text("Plane Rotation:");
+    glm::vec3 old_angles(angles);
+    if (ImGui::Button("Reset Plane Rotation"))
+        plane->setRotation();
+    if (InputFloatWasEdited(" Plane rotation (x)", &angles.x, 1.f))
+        plane->rotate(angles - old_angles);
+    if (InputFloatWasEdited(" Plane rotation (y)", &angles.y, 1.f))
+        plane->rotate(angles - old_angles);
+    if (InputFloatWasEdited(" Plane rotation (z)", &angles.z, 1.f))
+        plane->rotate(angles - old_angles);
+    // Translation
+    ImGui::Spacing();
+    ImGui::Text("Plane Translation:");
+    if (ImGui::Button("Reset Plane Translation"))
+        plane->setTranslation();
+    if (InputFloatWasEdited(" Plane translation (x)", &translation.x, 0.01f))
+        plane->setTranslation(translation);
+    if (InputFloatWasEdited(" Plane translation (y)", &translation.y, 0.01f))
+        plane->setTranslation(translation);
+    if (InputFloatWasEdited(" Plane translation (z)", &translation.z, 0.01f))
+        plane->setTranslation(translation);
 }
 
 // Default, deleted
 template<typename _Object>
-void create_window_object(SSS::GL::Window::Shared window, uint32_t id) = delete;
+void create_window_object(uint32_t id) = delete;
 // Camera
 template<>
-void create_window_object<SSS::GL::Camera>(SSS::GL::Window::Shared window, uint32_t id)
+void create_window_object<SSS::GL::Camera>(uint32_t id)
 {
-    window->createCamera(id);
+    g_data->window->createCamera(id);
 }
 // Texture
 template<>
-void create_window_object<SSS::GL::Texture>(SSS::GL::Window::Shared window, uint32_t id)
+void create_window_object<SSS::GL::Texture>(uint32_t id)
 {
-    window->createTexture(id);
+    g_data->window->createTexture(id);
+}
+// Plane
+template<>
+void create_window_object<SSS::GL::Plane>(uint32_t id)
+{
+    g_data->window->createModel(id, SSS::GL::ModelType::Plane);
 }
 
 // Default, deleted
 template<typename _Object>
-void remove_window_object(SSS::GL::Window::Shared window, uint32_t id) = delete;
+void remove_window_object(uint32_t id) = delete;
 // Camera
 template<>
-void remove_window_object<SSS::GL::Camera>(SSS::GL::Window::Shared window, uint32_t id)
+void remove_window_object<SSS::GL::Camera>(uint32_t id)
 {
-    window->removeCamera(id);
+    g_data->window->removeCamera(id);
 }
 // Texture
 template<>
-void remove_window_object<SSS::GL::Texture>(SSS::GL::Window::Shared window, uint32_t id)
+void remove_window_object<SSS::GL::Texture>(uint32_t id)
 {
-    window->removeTexture(id);
+    g_data->window->removeTexture(id);
+}
+// Plane
+template<>
+void remove_window_object<SSS::GL::Plane>(uint32_t id)
+{
+    g_data->window->removeModel(id, SSS::GL::ModelType::Plane);
 }
 
 template<class _Object>
-void print_window_objects(SSS::GL::Window::Shared window,
-    std::map<uint32_t, std::unique_ptr<_Object>> const& map)
+void print_window_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
 {
     // Tabs, used to display a single camera UI, along
     // with creation & deletion of cameras
@@ -237,7 +381,7 @@ void print_window_objects(SSS::GL::Window::Shared window,
             }
             if (!open) {
                 // Tab was closed, delete object
-                remove_window_object<_Object>(window, ids[n]);
+                remove_window_object<_Object>(ids[n]);
             }
         }
 
@@ -262,7 +406,7 @@ void print_window_objects(SSS::GL::Window::Shared window,
                 uint32_t uid = static_cast<uint32_t>(id);
                 // Only create if available ID
                 if (map.count(uid) == 0)
-                    create_window_object<_Object>(window, uid);
+                    create_window_object<_Object>(uid);
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
@@ -272,26 +416,30 @@ void print_window_objects(SSS::GL::Window::Shared window,
     }
 }
 
-void print_all_window_objects(SSS::GL::Window::Shared window)
+void print_all_window_objects()
 {
-    SSS::GL::Window::Objects const& objects = window->getObjects();
+    SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
     
     // Cameras
     if (ImGui::TreeNode("Cameras")) {
-        print_window_objects(window, objects.cameras);
+        print_window_objects(objects.cameras);
         ImGui::TreePop();
     }
+    // Textures
     if (ImGui::TreeNode("Textures")) {
-        print_window_objects(window, objects.textures);
+        print_window_objects(objects.textures);
+        ImGui::TreePop();
+    }
+    // Planes
+    if (ImGui::TreeNode("Planes")) {
+        print_window_objects(objects.planes);
         ImGui::TreePop();
     }
 }
 
 void print_imgui()
 {
-    SSS::GL::Window::Shared const& window = g_data->window;
-    SSS::GL::Window::Shared const& ui_window
-        = g_data->ui_use_separate_window ? g_data->ui_window : window;
+    setUIWindow();
     // Bool to swap ImGui context if needed
     static bool swap_windows = false;
     if (swap_windows) {
@@ -302,7 +450,7 @@ void print_imgui()
     SSS::GL::Context const context(ui_window);
     ImGuiHandle::newFrame();
     
-    // ImGui window presets (cropped to GL window)
+    // ImGui g_data->window presets (cropped to GL window)
     int ui_w, ui_h;
     ui_window->getDimensions(ui_w, ui_h);
     ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ui_w), static_cast<float>(ui_h)));
@@ -316,12 +464,12 @@ void print_imgui()
     ImGui::SetNextWindowBgAlpha(bg_alpha);
 
     // Render UI
-    if (ImGui::Begin("Main UI window", nullptr, flags)) {
+    if (ImGui::Begin("Main UI g_data->window", nullptr, flags)) {
         ImGui::PushItemWidth(300.f);
         // UI options
         if (ImGui::CollapsingHeader("UI options")) {
             ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
-            if (ImGui::Checkbox(" Display UI on a separate window", &g_data->ui_use_separate_window)) {
+            if (ImGui::Checkbox(" Display UI on a separate g_data->window", &g_data->ui_use_separate_window)) {
                 swap_windows = true;
                 if (g_data->ui_use_separate_window)
                     glfwShowWindow(g_data->ui_window->getGLFWwindow());
@@ -331,11 +479,11 @@ void print_imgui()
         }
         // Window options
         if (ImGui::CollapsingHeader("Window options")) {
-            print_window_options(window);
+            print_window_options();
         }
         // Window objects
         if (ImGui::CollapsingHeader("Window objects")) {
-            print_all_window_objects(window);
+            print_all_window_objects();
         }
         ImGui::End();
     }
@@ -348,4 +496,5 @@ void print_imgui()
     }
     // Render dear imgui into screen
     ImGuiHandle::render();
+    ui_window.reset();
 }

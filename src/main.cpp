@@ -45,15 +45,16 @@ void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
 
 void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
 {
-    static uint32_t text_id = 0;
-    if (action == GLFW_PRESS)
-        g_data->text_areas.at(0)->parseString(g_data->texts[++text_id]);
+    static uint32_t text_id = 1;
+    if (action == GLFW_PRESS && text_id < g_data->texts.size())
+        g_data->text_areas.at(0)->parseString(g_data->texts[text_id++]);
 }
 
 int main(void) try
 {
     SSS::GL::LOG::internal_callbacks::monitor = true;
     SSS::GL::LOG::internal_callbacks::window_pos = true;
+    SSS::GL::Window::LOG::fps = false;
     //g_data->ui_use_separate_window = true;
 
     // Create window & set callbacks
