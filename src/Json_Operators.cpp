@@ -72,12 +72,11 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
     for (nlohmann::json const& plane_data : data["planes"]) {
         window->createModel(plane_data["id"], SSS::GL::ModelType::Plane);
         SSS::GL::Plane::Ptr const& plane = objects.planes.at(plane_data["id"]);
-        plane->useTexture(plane_data["texture_id"]);
+        plane->setTextureID(plane_data["texture_id"]);
         plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(plane_data["hitbox"]));
-        plane->resetTransformations(SSS::GL::Transformation::All);
-        plane->scale(vec3 << plane_data["scaling"]);
-        plane->rotate(plane_data["rotation"]["angle"], vec3 << plane_data["rotation"]);
-        plane->translate(vec3 << plane_data["translation"]);
+        plane->setScaling(vec3 << plane_data["scaling"]);
+        plane->setRotation(vec3 << plane_data["rotation"]);
+        plane->setTranslation(vec3 << plane_data["translation"]);
         uint32_t const func_id = plane_data["button_function_id"];
         if (func_id < g_data->button_functions.size()) {
             plane->setFunction(g_data->button_functions.at(func_id));
