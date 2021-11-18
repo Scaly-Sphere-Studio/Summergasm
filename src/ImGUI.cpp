@@ -3,11 +3,6 @@
 constexpr static bool print_demo = false;
 static SSS::GL::Window::Shared ui_window;
 
-void setUIWindow()
-{
-    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
-}
-
 bool InputFloatWasEdited(const char* label, float* v, float step = 0.0f,
     float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 {
@@ -83,7 +78,6 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
     if (!camera) {
         return;
     }
-    g_data->window;
 
     // ID
     ImGui::Text("Projection:");
@@ -144,7 +138,6 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
     if (!texture) {
         return;
     }
-    g_data->window;
 
     // Display combo to choose Texture Type
     static const char* tex_types[] = { "Raw", "Text" };
@@ -308,6 +301,132 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     if (InputFloatWasEdited(" Plane translation (z)", &translation.z, 0.01f))
         plane->setTranslation(translation);
 }
+// Renderer
+template<>
+void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
+{
+    if (!renderer) {
+        return;
+    }
+    SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
+
+    // Display title of the Renderer
+    ImGui::Text("Title: \"%s\"", renderer->title.c_str());
+
+    static constexpr ImGuiTableFlags table_flags =
+        ImGuiTableFlags_RowBg
+        | ImGuiTableFlags_Borders
+        | ImGuiTableFlags_NoHostExtendX
+        | ImGuiTableFlags_SizingFixedFit
+    ;
+    // Display chunks in an organizable single column table
+    if (!ImGui::BeginTable("RenderChunks", 1, table_flags)) {
+        return;
+    }
+    // Display each RenderChunk
+    for (size_t i = 0; i < renderer->size(); ++i) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        SSS::GL::RenderChunk& chunk = renderer->at(i);
+        // Open a tree node for each RenderChunk
+        static char tree_title[128];
+        sprintf_s(tree_title, "Chunk: \"%s\"", chunk.title.c_str());
+        bool const tree_open = ImGui::TreeNode(tree_title);
+        // Option to drag ...
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            // Give dragged source value
+            ImGui::SetDragDropPayload("Chunk_swapping", &i, sizeof(size_t));
+            // Drag & Drop preview
+            ImGui::Text("Selected Chunk: \"%s\"", chunk.title.c_str());
+            ImGui::EndDragDropSource();
+        }
+        // ... and drop tree nodes, to move/swap chunks
+        if (ImGui::BeginDragDropTarget()) {
+            // Payload is nullptr until a dragged source has been dropped
+            ImGuiPayload const* payload = ImGui::AcceptDragDropPayload("Chunk_swapping");
+            if (payload != nullptr) {
+                // Retrieve dragged source value
+                IM_ASSERT(payload->DataSize == sizeof(size_t));
+                size_t payload_n = *(const size_t*)payload->Data;
+                // Swap source and target values
+                std::swap(renderer->at(payload_n), chunk);
+            }
+            ImGui::EndDragDropTarget();
+        }
+        // Display Chunk content
+        if (tree_open) {
+            // Display options in tree node, but don't indent
+            ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
+            if (ImGui::TreeNode("Options")) {
+                // Display combo to select Camera ID
+                ImGui::SetNextItemWidth(100.f);
+                if (ImGui::BeginCombo(" Camera ID", std::to_string(chunk.camera_ID).c_str())) {
+                    // Loop over map to display each ID
+                    for (auto it = objects.cameras.cbegin(); it != objects.cameras.cend(); ++it) {
+                        uint32_t const id = it->first;
+                        bool is_selected = (chunk.camera_ID == id);
+                        // Display selectable ID
+                        if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                            chunk.camera_ID = id;
+                        }
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                // Checkboxes for related booleans
+                ImGui::Checkbox(" Use Camera?", &chunk.use_camera);
+                ImGui::Checkbox(" Reset Z-buffer before rendering?", &chunk.reset_depth_before);
+                // End tree content
+                ImGui::TreePop();
+            }
+            // Revert style for further indenting
+            ImGui::PopStyleVar();
+            
+            // Display each chunk object in an organizable single column table
+            if (ImGui::BeginTable("##", 1, table_flags)) {
+                for (size_t j = 0; j < chunk.objects.size(); ++j) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    // Hold pointer when dragging an object to allow for
+                    // cross chunk communication (the data given to ImGui
+                    // is internally copied, which doesn't work for ptrs)
+                    static uint32_t* source_id_ptr = nullptr;
+                    // Current object ID
+                    uint32_t& id = chunk.objects.at(j);
+                    // Title (written on selectable and drag preview)
+                    static char plane_title[128];
+                    sprintf_s(plane_title, "Plane %04u", id);
+                    ImGui::Selectable(plane_title);
+                    // Drag ...
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+                        // Give dragged source value to our static ptr
+                        ImGui::SetDragDropPayload("Plane_swapping", nullptr, 0);
+                        source_id_ptr = &id;
+                        // Drag & Drop preview
+                        ImGui::Text("Selected: \"%s\"", plane_title);
+                        ImGui::EndDragDropSource();
+                    }
+                    // ... and drop
+                    if (ImGui::BeginDragDropTarget()) {
+                        ImGuiPayload const* payload = ImGui::AcceptDragDropPayload(
+                            "Plane_swapping");
+                        if (payload != nullptr && source_id_ptr != nullptr) {
+                            // Swap source and target values
+                            std::swap(*source_id_ptr, id);
+                            source_id_ptr = nullptr;
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                }
+                ImGui::EndTable();
+            }
+
+            ImGui::TreePop();
+        }
+    }
+    ImGui::EndTable();
+}
 
 // Default, deleted
 template<typename _Object>
@@ -330,6 +449,12 @@ void create_window_object<SSS::GL::Plane>(uint32_t id)
 {
     g_data->window->createModel(id, SSS::GL::ModelType::Plane);
 }
+// Renderer
+template<>
+void create_window_object<SSS::GL::Renderer>(uint32_t id)
+{
+    g_data->window->createRenderer<SSS::GL::Plane::Renderer>(id);
+}
 
 // Default, deleted
 template<typename _Object>
@@ -351,6 +476,12 @@ template<>
 void remove_window_object<SSS::GL::Plane>(uint32_t id)
 {
     g_data->window->removeModel(id, SSS::GL::ModelType::Plane);
+}
+// Renderer
+template<>
+void remove_window_object<SSS::GL::Renderer>(uint32_t id)
+{
+    g_data->window->removeRenderer(id);
 }
 
 template<class _Object>
@@ -418,6 +549,11 @@ void print_window_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& ma
 
 void print_all_window_objects()
 {
+    // Button to clean objects
+    if (ImGui::Button(" Clean All Objects ")) {
+        g_data->window->cleanObjects();
+    }
+
     SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
     
     // Cameras
@@ -435,11 +571,16 @@ void print_all_window_objects()
         print_window_objects(objects.planes);
         ImGui::TreePop();
     }
+    // Renderers
+    if (ImGui::TreeNode("Renderers")) {
+        print_window_objects(objects.renderers);
+        ImGui::TreePop();
+    }
 }
 
 void print_imgui()
 {
-    setUIWindow();
+    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
     // Bool to swap ImGui context if needed
     static bool swap_windows = false;
     if (swap_windows) {
@@ -460,7 +601,7 @@ void print_imgui()
         | ImGuiWindowFlags_NoResize
         | ImGuiWindowFlags_NoMove
     ;
-    static float bg_alpha = 0.65f;
+    static float bg_alpha = 0.75f;
     ImGui::SetNextWindowBgAlpha(bg_alpha);
 
     // Render UI
@@ -469,7 +610,8 @@ void print_imgui()
         // UI options
         if (ImGui::CollapsingHeader("UI options")) {
             ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
-            if (ImGui::Checkbox(" Display UI on a separate g_data->window", &g_data->ui_use_separate_window)) {
+            if (ImGui::Checkbox(" Display UI on a separate window",
+                &g_data->ui_use_separate_window)) {
                 swap_windows = true;
                 if (g_data->ui_use_separate_window)
                     glfwShowWindow(g_data->ui_window->getGLFWwindow());
@@ -487,6 +629,7 @@ void print_imgui()
         }
         ImGui::End();
     }
+
     // Render Demo if needed
     if constexpr (print_demo) {
         if (ImGui::Begin("Demo ui_window", nullptr, flags)) {
@@ -494,6 +637,7 @@ void print_imgui()
             ImGui::End();
         }
     }
+
     // Render dear imgui into screen
     ImGuiHandle::render();
     ui_window.reset();

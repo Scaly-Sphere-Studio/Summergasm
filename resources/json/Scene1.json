@@ -2,9 +2,10 @@
     {
         "id": 0,
         "type": 0,
+        "title": "Plane Renderer",
         "chunks": [
             {
-                "id": 0,
+                "title" :  "Scene (background + characters)",
                 "camera_id": 0,
                 "use_camera": true,
                 "reset_depth_before": false,
@@ -14,7 +15,7 @@
                 ]
             },
             {
-                "id": 1,
+                "title" :  "UI (options)",
                 "camera_id": 1,
                 "use_camera": true,
                 "reset_depth_before": true,
