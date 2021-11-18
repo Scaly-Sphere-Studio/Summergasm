@@ -61,6 +61,12 @@ int main(void) try
     g_data->window = createWindow("resources/json/Window.json");
     SSS::GL::Window::Shared& window = g_data->window;
     window->setCallback(glfwSetKeyCallback, key_callback);
+    {
+        SSS::GL::Context const context(window);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
     // Load TR
     loadTextAreas("resources/json/TextRendering.json");
     // Load objects

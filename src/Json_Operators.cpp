@@ -100,16 +100,16 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
             SSS::throw_exc("Unkown type of renderer : " + std::to_string(type));
         }
         SSS::GL::Renderer::Ptr const& renderer = objects.renderers.at(id);
+        renderer->title = renderer_data["title"];
         for (nlohmann::json const& chunk_data : renderer_data["chunks"]) {
-            int const id = chunk_data["id"];
-            renderer->try_emplace(id);
-            SSS::GL::RenderChunk& chunk = renderer->at(id);
-            chunk.camera_ID             = chunk_data["camera_id"];
-            chunk.use_camera            = chunk_data["use_camera"];
-            chunk.reset_depth_before    = chunk_data["reset_depth_before"];
-            nlohmann::json const& objects_data = chunk_data["objects"];
+            SSS::GL::RenderChunk& chunk = renderer->emplace_back();
+            chunk.title                         = chunk_data["title"];
+            chunk.camera_ID                     = chunk_data["camera_id"];
+            chunk.use_camera                    = chunk_data["use_camera"];
+            chunk.reset_depth_before            = chunk_data["reset_depth_before"];
+            nlohmann::json const& objects_data  = chunk_data["objects"];
             for (uint32_t i = 0; i < objects_data.size(); ++i) {
-                chunk.objects.try_emplace(i, objects_data[i]);
+                chunk.objects.emplace_back(objects_data[i]);
             }
         }
     }
