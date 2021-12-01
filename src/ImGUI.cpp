@@ -174,18 +174,18 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
         }
     }
     else if (type == SSS::GL::Texture::Type::Text) {
-        // TODO: integrate text area in GL
         static uint32_t current_id = 0;
         // Display combo to select TextArea ID
         if (ImGui::BeginCombo(" TextArea ID", std::to_string(current_id).c_str())) {
             // Loop over map to display each ID
-            for (auto it = g_data->text_areas.cbegin(); it != g_data->text_areas.cend(); ++it) {
+            SSS::TR::TextArea::Map const& text_areas = SSS::TR::TextArea::getTextAreas();
+            for (auto it = text_areas.cbegin(); it != text_areas.cend(); ++it) {
                 uint32_t const id = it->first;
                 bool is_selected = (current_id == id);
                 // Display selectable ID
                 if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
                     current_id = id;
-                    texture->setTextArea(it->second);
+                    texture->setTextAreaID(id);
                 }
                 if (is_selected)
                     ImGui::SetItemDefaultFocus();
@@ -247,13 +247,13 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     static uint32_t current_function_id = 0;
     if (ImGui::BeginCombo(" Function ID", std::to_string(current_function_id).c_str())) {
         // Loop over map to display each ID
-        for (size_t i = 0; i < g_data->button_functions.size(); ++i) {
+        for (size_t i = 0; i < SSS::GL::Plane::on_click_funcs.size(); ++i) {
             uint32_t const id = static_cast<uint32_t>(i);
             bool is_selected = (current_function_id == id);
             // Display selectable ID
             if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
                 current_function_id = id;
-                plane->setFunction(g_data->button_functions[i]);
+                plane->setOnClickFuncID(id);
             }
             if (is_selected)
                 ImGui::SetItemDefaultFocus();

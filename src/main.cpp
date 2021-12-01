@@ -46,8 +46,41 @@ void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
 void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
 {
     static uint32_t text_id = 1;
-    if (action == GLFW_PRESS && text_id < g_data->texts.size())
-        g_data->text_areas.at(0)->parseString(g_data->texts[text_id++]);
+    if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
+        SSS::TR::TextArea::getTextAreas().at(0)->parseString(g_data->texts[text_id++]);
+    }
+}
+
+void passive_func_1(GLFWwindow* ptr, uint32_t id)
+{
+    SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
+    if (!window) return;
+    SSS::GL::Window::Objects const& objects = window->getObjects();
+    SSS::GL::Plane::Ptr const& plane = objects.planes.at(id);
+
+    plane->rotate(glm::vec3(0.1f));
+}
+
+void passive_func_2(GLFWwindow* ptr, uint32_t id)
+{
+    SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
+    if (!window) return;
+    SSS::GL::Window::Objects const& objects = window->getObjects();
+    SSS::GL::Plane::Ptr const& plane = objects.planes.at(id);
+
+    static std::chrono::steady_clock::time_point time = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::duration diff = now - time;
+    if (diff < std::chrono::seconds(1))
+        plane->translate(glm::vec3(-0.01f, 0, 0));
+    else if (diff < std::chrono::seconds(2))
+        plane->translate(glm::vec3(0, -0.01f, 0));
+    else if (diff < std::chrono::seconds(3))
+        plane->translate(glm::vec3(0.01f, 0, 0));
+    else if (diff < std::chrono::seconds(4))
+        plane->translate(glm::vec3(0, 0.01f, 0));
+    else
+        time = now;
 }
 
 int main(void) try
@@ -57,10 +90,22 @@ int main(void) try
     SSS::GL::Window::LOG::fps = false;
     //g_data->ui_use_separate_window = true;
 
+    SSS::GL::Model::on_click_funcs = {
+        { 0, nullptr },
+        { 1, button_func_1 },
+        { 2, button_func_2 }
+    };
+    SSS::GL::Model::passive_funcs = {
+        { 0, nullptr },
+        { 1, passive_func_1 },
+        { 2, passive_func_2 }
+    };
+
     // Create window & set callbacks
     g_data->window = createWindow("resources/json/Window.json");
     SSS::GL::Window::Shared& window = g_data->window;
     window->setCallback(glfwSetKeyCallback, key_callback);
+    window->setVSYNC(true);
     {
         SSS::GL::Context const context(window);
         glEnable(GL_DEPTH_TEST);
@@ -89,7 +134,7 @@ int main(void) try
 
     // Main loop
     while (window) {
-        SSS::GL::Window::pollTextureThreads();
+        SSS::GL::pollEverything();
         if (window && window->shouldClose()) {
                 window.reset();
                 continue;
@@ -104,5 +149,6 @@ int main(void) try
 
     ImGuiHandle::shutdown();
     g_data.reset();
+    SSS::TR::TextArea::clearInstances();
 }
 __CATCH_AND_LOG_FUNC_EXC
