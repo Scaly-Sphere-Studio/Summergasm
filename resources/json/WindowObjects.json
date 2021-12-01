@@ -59,7 +59,8 @@
             "id": 0,
             "texture_id": 0,
             "hitbox": 0,
-            "button_function_id": 0,
+            "on_click_function_id": 0,
+            "passive_function_id": 0,
             "scaling": {
                 "x": 2.0,
                 "y": 2.0,
@@ -80,7 +81,8 @@
             "id": 1,
             "texture_id": 1,
             "hitbox": 1,
-            "button_function_id": 1,
+            "on_click_function_id": 1,
+            "passive_function_id": 1,
             "scaling": {
                 "x": 1.0,
                 "y": 1.0,
@@ -101,7 +103,8 @@
             "id": 2,
             "texture_id": 2,
             "hitbox": 2,
-            "button_function_id": 2,
+            "on_click_function_id": 2,
+            "passive_function_id": 2,
             "scaling": {
                 "x": 0.5,
                 "y": 0.5,

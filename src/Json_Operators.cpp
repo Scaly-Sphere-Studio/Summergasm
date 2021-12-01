@@ -61,10 +61,7 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
             texture->useFile(SSS::PWD + std::string(tex_data["filepath"]));
         }
         if (tex_data.count("text_area_id") != 0) {
-            uint32_t const text_area_id = tex_data["text_area_id"];
-            if (g_data->text_areas.count(text_area_id) != 0) {
-                texture->setTextArea(g_data->text_areas.at(text_area_id));
-            }
+            texture->setTextAreaID(tex_data["text_area_id"]);
         }
         texture->setType(static_cast<SSS::GL::Texture::Type>(tex_data["type"]));
     }
@@ -77,10 +74,8 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
         plane->setScaling(vec3 << plane_data["scaling"]);
         plane->setRotation(vec3 << plane_data["rotation"]);
         plane->setTranslation(vec3 << plane_data["translation"]);
-        uint32_t const func_id = plane_data["button_function_id"];
-        if (func_id < g_data->button_functions.size()) {
-            plane->setFunction(g_data->button_functions.at(func_id));
-        }
+        plane->setOnClickFuncID(plane_data["on_click_function_id"]);
+        plane->setPassiveFuncID(plane_data["passive_function_id"]);
     }
 }
 
@@ -130,9 +125,11 @@ void loadTextAreas(std::string const& json_path) try
 {
     using namespace SSS::TR;
     nlohmann::json const data = relativePathToJson(json_path);
+    SSS::TR::TextArea::Map const& text_areas = SSS::TR::TextArea::getTextAreas();
     for (nlohmann::json const& text_area_data : data) {
-        TextArea::Shared& text_area = g_data->text_areas[text_area_data["id"]];
-        text_area = TextArea::create(text_area_data["width"], text_area_data["height"]);
+        uint32_t id = text_area_data["id"];
+        TextArea::createInstance(id, text_area_data["width"], text_area_data["height"]);
+        TextArea::Ptr const& text_area = text_areas.at(id);
         text_area->TWset(text_area_data["typewriter"]);
         for (nlohmann::json const& opt_data : text_area_data["text_opt"]) {
             Font::Shared font = Font::getShared(opt_data["font"]);
