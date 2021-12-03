@@ -3,31 +3,106 @@
 constexpr static bool print_demo = false;
 static SSS::GL::Window::Shared ui_window;
 
+void Tooltip(char const* description)
+{
+    if (description == nullptr) return;
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(description);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
+template <typename _Func, typename ...Args>
+bool Tooltip(char const* description, _Func f, Args ...args)
+{
+    bool ret = f(args...);
+    Tooltip(description);
+    return ret;
+}
+
 bool InputFloatWasEdited(const char* label, float* v, float step = 0.0f,
     float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 {
-    char name[128];
+    char name[256];
     ImGui::SetNextItemWidth(250.f);
     sprintf_s(name, "##%s", label);
     ImGui::InputFloat(name, v, 0, step_fast, format, flags);
     bool ret = ImGui::IsItemDeactivatedAfterEdit();
     if (step != 0.f) {
+        ImGui::PushButtonRepeat(true);
         ImGui::SameLine();
-        sprintf_s(name, "+##%s", label);
-        if ((ImGui::Button(name) || ImGui::IsItemActive()) && v != nullptr) {
-            *v += step;
-            ret = true;
-        }
         sprintf_s(name, "-##%s", label);
-        ImGui::SameLine();
-        if ((ImGui::Button(name) || ImGui::IsItemActive()) && v != nullptr) {
+        if (ImGui::Button(name) && v != nullptr) {
             *v -= step;
             ret = true;
         }
+        sprintf_s(name, "+##%s", label);
+        ImGui::SameLine();
+        if (ImGui::Button(name) && v != nullptr) {
+            *v += step;
+            ret = true;
+        }
+        ImGui::PopButtonRepeat();
     }
     ImGui::SameLine();
     ImGui::Text(label);
     return (ret);
+}
+
+bool StringButtonEdit(char const* label, std::string& str)
+{
+    static std::string* ptr = nullptr;
+    static char buff[256];
+    static bool set_focus = false;
+    if (ptr != &str) {
+        if (ImGui::Button(label)) {
+            ptr = &str;
+            strcpy_s(buff, str.c_str());
+            set_focus = true;
+        }
+    }
+    else {
+        if (set_focus) {
+            ImGui::SetKeyboardFocusHere();
+            set_focus = false;
+        }
+        ImGui::SetNextItemWidth(300.f);
+        ImGui::InputText("###", buff, 256);
+        if (ImGui::IsItemDeactivated()) {
+            ptr = nullptr;
+            if (buff[0] != '\0') {
+                str = buff;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+template<typename _T>
+bool MapIDCombo(char const* label, std::map<uint32_t, _T> const& map, uint32_t& current_id)
+{
+    bool ret = false;
+    if (ImGui::BeginCombo(label, std::to_string(current_id).c_str())) {
+        // Loop over map to display each ID
+        for (auto it = map.cbegin(); it != map.cend(); ++it) {
+            uint32_t const id = it->first;
+            bool is_selected = (current_id == id);
+            // Display selectable ID
+            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                current_id = id;
+                ret = true;
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    return ret;
 }
 
 void print_window_options()
@@ -174,23 +249,9 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
         }
     }
     else if (type == SSS::GL::Texture::Type::Text) {
-        static uint32_t current_id = 0;
-        // Display combo to select TextArea ID
-        if (ImGui::BeginCombo(" TextArea ID", std::to_string(current_id).c_str())) {
-            // Loop over map to display each ID
-            SSS::TR::TextArea::Map const& text_areas = SSS::TR::TextArea::getTextAreas();
-            for (auto it = text_areas.cbegin(); it != text_areas.cend(); ++it) {
-                uint32_t const id = it->first;
-                bool is_selected = (current_id == id);
-                // Display selectable ID
-                if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
-                    current_id = id;
-                    texture->setTextAreaID(id);
-                }
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
+        uint32_t current_id = texture->getTextAreaID();
+        if (MapIDCombo(" TextArea ID", SSS::TR::TextArea::getTextAreas(), current_id)) {
+            texture->setTextAreaID(current_id);
         }
     }
     if (ui_window == g_data->window) {
@@ -222,20 +283,9 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
 
     // Display combo to select Texture ID
-    uint32_t const current_texture_id = plane->getTextureID();
-    if (ImGui::BeginCombo(" Texture ID", std::to_string(current_texture_id).c_str())) {
-        // Loop over map to display each ID
-        for (auto it = objects.textures.cbegin(); it != objects.textures.cend(); ++it) {
-            uint32_t const id = it->first;
-            bool is_selected = (current_texture_id == id);
-            // Display selectable ID
-            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
-                plane->setTextureID(id);
-            }
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
+    uint32_t texture_id = plane->getTextureID();
+    if (MapIDCombo(" Texture ID", objects.textures, texture_id)) {
+        plane->setTextureID(texture_id);
     }
     // Display combo to select Hitbox Type
     int current_hitbox = static_cast<int>(plane->getHitbox());
@@ -243,22 +293,15 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     if (ImGui::Combo(" Hitbox Type", &current_hitbox, hitboxes, 3)) {
         plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(current_hitbox));
     }
-    // Display combo to select Button Function ID
-    static uint32_t current_function_id = 0;
-    if (ImGui::BeginCombo(" Function ID", std::to_string(current_function_id).c_str())) {
-        // Loop over map to display each ID
-        for (size_t i = 0; i < SSS::GL::Plane::on_click_funcs.size(); ++i) {
-            uint32_t const id = static_cast<uint32_t>(i);
-            bool is_selected = (current_function_id == id);
-            // Display selectable ID
-            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
-                current_function_id = id;
-                plane->setOnClickFuncID(id);
-            }
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
+    // Display combo to select On Click Function ID
+    uint32_t on_click_func_id = plane->getOnClickFuncID();
+    if (MapIDCombo(" OnClickFuncID", SSS::GL::Model::on_click_funcs, on_click_func_id)) {
+        plane->setOnClickFuncID(on_click_func_id);
+    }
+    // Display combo to select Passive Function ID
+    uint32_t passive_func_id = plane->getPassiveFuncID();
+    if (MapIDCombo(" PassiveFuncID", SSS::GL::Model::passive_funcs, passive_func_id)) {
+        plane->setOnClickFuncID(passive_func_id);
     }
     glm::vec3 scaling, angles, translation;
     plane->getAllTransformations(scaling, angles, translation);
@@ -311,25 +354,37 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
     SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
 
     // Display title of the Renderer
-    ImGui::Text("Title: \"%s\"", renderer->title.c_str());
+    ImGui::Text("Renderer title: \"%s\"", renderer->title.c_str());
+    StringButtonEdit("Edit title", renderer->title);
 
     static constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_RowBg
-        | ImGuiTableFlags_Borders
+        | ImGuiTableFlags_BordersInnerH
+        | ImGuiTableFlags_BordersOuter
         | ImGuiTableFlags_NoHostExtendX
         | ImGuiTableFlags_SizingFixedFit
     ;
     // Display chunks in an organizable single column table
-    if (!ImGui::BeginTable("RenderChunks", 1, table_flags)) {
+    if (!ImGui::BeginTable("RenderChunks", 2, table_flags)) {
         return;
     }
+    // Button to add chunks
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    static std::string new_chunk_title;
+    if (StringButtonEdit("Add chunk", new_chunk_title)) {
+        renderer->emplace_front().title = new_chunk_title;
+        new_chunk_title.clear();
+    }
+    
+    char label[256];
     // Display each RenderChunk
-    for (size_t i = 0; i < renderer->size(); ++i) {
+    for (size_t i = 0; i < renderer->size(); ) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         SSS::GL::RenderChunk& chunk = renderer->at(i);
         // Open a tree node for each RenderChunk
-        static char tree_title[128];
+        static char tree_title[256];
         sprintf_s(tree_title, "Chunk: \"%s\"", chunk.title.c_str());
         bool const tree_open = ImGui::TreeNode(tree_title);
         // Option to drag ...
@@ -358,6 +413,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
             // Display options in tree node, but don't indent
             ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
             if (ImGui::TreeNode("Options")) {
+                StringButtonEdit("Edit chunk title", chunk.title);
                 // Display combo to select Camera ID
                 ImGui::SetNextItemWidth(100.f);
                 if (ImGui::BeginCombo(" Camera ID", std::to_string(chunk.camera_ID).c_str())) {
@@ -382,48 +438,85 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
             }
             // Revert style for further indenting
             ImGui::PopStyleVar();
+            if (objects.planes.empty()) {
+                ImGui::Text("No plane exists.");
+            }
+            else if (ImGui::SmallButton("Add plane")) {
+                uint32_t new_id = 0;
+                for (auto it = objects.planes.cbegin(); it != objects.planes.cend(); ++it) {
+                    bool found_similar = false;
+                    for (uint32_t id : chunk.objects) {
+                        if (it->first == id) {
+                            found_similar = true;
+                        }
+                    }
+                    if (!found_similar) {
+                        new_id = it->first;
+                        break;
+                    }
+                }
+                chunk.objects.push_back(new_id);
+            }
             
             // Display each chunk object in an organizable single column table
-            if (ImGui::BeginTable("##", 1, table_flags)) {
-                for (size_t j = 0; j < chunk.objects.size(); ++j) {
+            if (!chunk.objects.empty() && ImGui::BeginTable("##", 5, table_flags)) {
+                for (size_t j = 0; j < chunk.objects.size(); ) {
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
-                    // Hold pointer when dragging an object to allow for
-                    // cross chunk communication (the data given to ImGui
-                    // is internally copied, which doesn't work for ptrs)
-                    static uint32_t* source_id_ptr = nullptr;
                     // Current object ID
                     uint32_t& id = chunk.objects.at(j);
                     // Title (written on selectable and drag preview)
-                    static char plane_title[128];
-                    sprintf_s(plane_title, "Plane %04u", id);
-                    ImGui::Selectable(plane_title);
-                    // Drag ...
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
-                        // Give dragged source value to our static ptr
-                        ImGui::SetDragDropPayload("Plane_swapping", nullptr, 0);
-                        source_id_ptr = &id;
-                        // Drag & Drop preview
-                        ImGui::Text("Selected: \"%s\"", plane_title);
-                        ImGui::EndDragDropSource();
+                    static char plane_title[256];
+                    sprintf_s(plane_title, "Plane %u ", id);
+                    ImGui::Text(plane_title);
+                    // Edit element
+                    ImGui::TableSetColumnIndex(1);
+                    char popup_map_id[256];
+                    sprintf_s(popup_map_id, "##edit_plane%zu", j);
+                    sprintf_s(label, "*##edit_plane%zu", j);
+                    if (Tooltip("Edit", ImGui::SmallButton, label)) {
+                        ImGui::OpenPopup(popup_map_id);
                     }
-                    // ... and drop
-                    if (ImGui::BeginDragDropTarget()) {
-                        ImGuiPayload const* payload = ImGui::AcceptDragDropPayload(
-                            "Plane_swapping");
-                        if (payload != nullptr && source_id_ptr != nullptr) {
-                            // Swap source and target values
-                            std::swap(*source_id_ptr, id);
-                            source_id_ptr = nullptr;
+                    if (ImGui::BeginPopup(popup_map_id)) {
+                        ImGui::SetNextItemWidth(100.f);
+                        if (MapIDCombo(popup_map_id, objects.planes, id)) {
+                            ImGui::CloseCurrentPopup();
                         }
-                        ImGui::EndDragDropTarget();
+                        ImGui::EndPopup();
                     }
+                    // Move element
+                    ImGui::TableSetColumnIndex(2);
+                    sprintf_s(label, "^##move_plane%zu", j);
+                    if (Tooltip("Move up", ImGui::SmallButton, label)) {
+                        // Move
+                    }
+                    ImGui::TableSetColumnIndex(3);
+                    sprintf_s(label, "v##move_plane%zu", j);
+                    if (Tooltip("Move down", ImGui::SmallButton, label)) {
+                        // Move
+                    }
+                    // Delete element
+                    ImGui::TableSetColumnIndex(4);
+                    sprintf_s(label, "×##delete_plane%zu", j);
+                    if (Tooltip("Delete", ImGui::SmallButton, label)) {
+                        chunk.objects.erase(chunk.objects.begin() + j);
+                    }
+                    else
+                        ++j;
                 }
                 ImGui::EndTable();
             }
 
             ImGui::TreePop();
         }
+        // Destroy chunk
+        ImGui::TableSetColumnIndex(1);
+        sprintf_s(label, "×##chunk%zu", i);
+        if (Tooltip("Delete", ImGui::SmallButton, label)) {
+            renderer->erase(renderer->begin() + i);
+        }
+        else
+            ++i;
     }
     ImGui::EndTable();
 }
