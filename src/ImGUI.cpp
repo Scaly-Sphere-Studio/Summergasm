@@ -3,17 +3,43 @@
 constexpr static bool print_demo = false;
 static SSS::GL::Window::Shared ui_window;
 
+void SetCursor(SSS::GL::Window::Shared window, int shape)
+{
+    using CursorPtr = SSS::C_Ptr<GLFWcursor, void(*)(GLFWcursor*), glfwDestroyCursor>;
+    static std::map<int, CursorPtr> cursors;
+    
+    if (shape == 0) {
+        glfwSetCursor(window->getGLFWwindow(), nullptr);
+        return;
+    }
+    if (cursors.count(shape) == 0) {
+        cursors.try_emplace(shape);
+        cursors.at(shape).reset(glfwCreateStandardCursor(shape));
+    }
+    glfwSetCursor(window->getGLFWwindow(), cursors.at(shape).get());
+}
+
 void Tooltip(char const* description)
 {
     if (description == nullptr) return;
-    if (ImGui::IsItemHovered())
-    {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        ImGui::TextUnformatted(description);
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
+    
+    using clock = std::chrono::steady_clock;
+    static clock::time_point t = clock::now();
+
+    if (!ImGui::IsItemHovered()) {
+        if (!ImGui::IsAnyItemHovered()) {
+            t = clock::now();
+        }
+        return;
     }
+    if (clock::now() - t < std::chrono::milliseconds(350)) {
+        return;
+    }
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+    ImGui::TextUnformatted(description);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
 }
 
 template <typename _Func, typename ...Args>
@@ -377,6 +403,8 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
         new_chunk_title.clear();
     }
     
+    static void* active_item = nullptr;
+    bool is_any_plane_hovered = false;
     char label[256];
     // Display each RenderChunk
     for (size_t i = 0; i < renderer->size(); ) {
@@ -387,10 +415,14 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
         static char tree_title[256];
         sprintf_s(tree_title, "Chunk: \"%s\"", chunk.title.c_str());
         bool const tree_open = ImGui::TreeNode(tree_title);
+        if (ImGui::IsItemHovered()) {
+            SetCursor(ui_window, GLFW_HAND_CURSOR);
+        }
         // Option to drag ...
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
             // Give dragged source value
             ImGui::SetDragDropPayload("Chunk_swapping", &i, sizeof(size_t));
+            SetCursor(ui_window, GLFW_HAND_CURSOR);
             // Drag & Drop preview
             ImGui::Text("Selected Chunk: \"%s\"", chunk.title.c_str());
             ImGui::EndDragDropSource();
@@ -459,16 +491,52 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
             }
             
             // Display each chunk object in an organizable single column table
-            if (!chunk.objects.empty() && ImGui::BeginTable("##", 5, table_flags)) {
+            if (!chunk.objects.empty() && ImGui::BeginTable("##", 3, table_flags)) {
+                static bool hold_state = false;
+                static size_t hold_chunk = 0;
+                static size_t hold_j = 0;
+                if (hold_state && !ImGui::IsMouseDown(0)) {
+                    hold_state = false;
+                }
+                if (hold_state) {
+                    SetCursor(ui_window, GLFW_HAND_CURSOR);
+                }
+
+                char drag_drop_id[256];
+                sprintf_s(drag_drop_id, "Plane_Dragging_%zu", i);
                 for (size_t j = 0; j < chunk.objects.size(); ) {
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     // Current object ID
                     uint32_t& id = chunk.objects.at(j);
-                    // Title (written on selectable and drag preview)
-                    static char plane_title[256];
-                    sprintf_s(plane_title, "Plane %u ", id);
-                    ImGui::Text(plane_title);
+                    // Selectable showing ID
+                    sprintf_s(label, "Plane %u", id);
+                    bool selected = hold_state && hold_chunk == i && hold_j == j;
+                    ImGui::Selectable(label, selected);
+                    if (ImGui::IsItemHovered()) {
+                        SetCursor(ui_window, GLFW_HAND_CURSOR);
+                    }
+                    Tooltip("Drag to reorder");
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip
+                        | ImGuiDragDropFlags_SourceNoDisableHover
+                        | ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
+                    {
+                        // Give dragged source value
+                        ImGui::SetDragDropPayload(drag_drop_id, nullptr, 0);
+                        hold_state = true;
+                        hold_chunk = i;
+                        hold_j = j;
+                        ImGui::EndDragDropSource();
+                    }
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (hold_j < chunk.objects.size()) {
+                            int incr = hold_j < j ? 1 : -1;
+                            for (size_t k = hold_j; k != j; k += incr) {
+                                std::swap(chunk.objects.at(k), chunk.objects.at(k + incr));
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
                     // Edit element
                     ImGui::TableSetColumnIndex(1);
                     char popup_map_id[256];
@@ -484,19 +552,8 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
                         }
                         ImGui::EndPopup();
                     }
-                    // Move element
-                    ImGui::TableSetColumnIndex(2);
-                    sprintf_s(label, "^##move_plane%zu", j);
-                    if (Tooltip("Move up", ImGui::SmallButton, label)) {
-                        // Move
-                    }
-                    ImGui::TableSetColumnIndex(3);
-                    sprintf_s(label, "v##move_plane%zu", j);
-                    if (Tooltip("Move down", ImGui::SmallButton, label)) {
-                        // Move
-                    }
                     // Delete element
-                    ImGui::TableSetColumnIndex(4);
+                    ImGui::TableSetColumnIndex(2);
                     sprintf_s(label, "×##delete_plane%zu", j);
                     if (Tooltip("Delete", ImGui::SmallButton, label)) {
                         chunk.objects.erase(chunk.objects.begin() + j);
@@ -506,7 +563,6 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
                 }
                 ImGui::EndTable();
             }
-
             ImGui::TreePop();
         }
         // Destroy chunk
