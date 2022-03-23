@@ -20,8 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ImGUI.cpp" />
-    <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
@@ -32,8 +30,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imfilebrowser.h" />
-    <ClInclude Include="imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="inc\Summergasm.hpp" />
   </ItemGroup>
   <ItemGroup>

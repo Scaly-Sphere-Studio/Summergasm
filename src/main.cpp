@@ -129,8 +129,9 @@ int main(void) try
     g_data->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g_data->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
-    ImGuiHandle::init();
-    ImGuiHandle::swapContext(!g_data->ui_use_separate_window ? window : g_data->ui_window);
+    SSS::ImGuiH::init();
+    SSS::GL::Window::Shared ui_win = !g_data->ui_use_separate_window ? window : g_data->ui_window;
+    SSS::ImGuiH::setContext(ui_win->getGLFWwindow());
 
     // Main loop
     while (window) {
@@ -147,7 +148,7 @@ int main(void) try
         g_data->ui_window->printFrame();
     }
 
-    ImGuiHandle::shutdown();
+    SSS::ImGuiH::shutdown();
     g_data.reset();
     SSS::TR::TextArea::clearInstances();
 }
