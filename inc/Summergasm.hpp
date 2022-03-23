@@ -1,8 +1,6 @@
 #pragma once
 
-#include <imgui.h>
-#include "../imgui/imgui_impl_glfw.h"
-#include "../imgui/imgui_impl_opengl3.h"
+#include <SSS/ImGuiH.hpp>
 #include "../imgui/imfilebrowser.h"
 
 #include <SSS/GL.hpp>
@@ -34,35 +32,5 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
     std::string const& json_path);
 
 void loadTextAreas(std::string const& json_path);
-
-// ImGUI
-
-namespace ImGuiHandle {
-    inline void init() {
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGui::GetIO().IniFilename = nullptr;
-    }
-    inline void swapContext(SSS::GL::Window::Shared const& window) {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui_ImplGlfw_InitForOpenGL(window->getGLFWwindow(), true);
-        ImGui_ImplOpenGL3_Init("#version 330");
-    }
-    inline void newFrame() {
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-    }
-    inline void render() {
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    }
-    inline void shutdown() {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-    }
-};
 
 void print_imgui();
