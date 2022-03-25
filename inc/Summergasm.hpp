@@ -1,8 +1,6 @@
 #pragma once
 
 #include <SSS/ImGuiH.hpp>
-#include "../imgui/imfilebrowser.h"
-
 #include <SSS/GL.hpp>
 
 #pragma warning(push, 0)
