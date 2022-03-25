@@ -250,28 +250,17 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
     }
     // Depending on Texture Type, display texture options
     if (type == SSS::GL::Texture::Type::Raw) {
-        // Init filebrowser
-        static ImGui::FileBrowser filebrowser = []() {
-            ImGui::FileBrowser filebrowser;
-            // Remove last '\' from PWD because for some reason
-            // the file browser detects it as an empty directory
-            std::string pwd = SSS::PWD;
-            pwd.resize(pwd.size() - 1);
-            filebrowser.SetPwd(pwd);
-            filebrowser.SetTitle("Select an image");
-            filebrowser.SetTypeFilters({ ".png", ".bmp", ".jpg", ".jpeg" });
-            return filebrowser;
-        }();
-        // Button to display filebrowser
+        // Button to display FileBrowser
         if (ImGui::Button("New filepath")) {
-            filebrowser.Open();
+            SSS::ImGuiH::filebrowser.SetTypeFilters({ ".png", ".bmp", ".jpg", ".jpeg" });
+            SSS::ImGuiH::filebrowser.Open();
         }
         // Display if needed
-        filebrowser.Display();
+        SSS::ImGuiH::filebrowser.Display();
         // If a file has been selected, update texture
-        if (filebrowser.HasSelected()) {
-            texture->useFile(filebrowser.GetSelected().string());
-            filebrowser.ClearSelected();
+        if (SSS::ImGuiH::filebrowser.HasSelected()) {
+            texture->useFile(SSS::ImGuiH::filebrowser.GetSelected().string());
+            SSS::ImGuiH::filebrowser.ClearSelected();
         }
     }
     else if (type == SSS::GL::Texture::Type::Text) {
