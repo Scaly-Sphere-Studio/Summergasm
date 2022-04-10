@@ -2,7 +2,7 @@
 
 static nlohmann::json relativePathToJson(std::string const& path)
 {
-    if (SSS::isReg(path)) {
+    if (SSS::pathIsFile(path)) {
         return nlohmann::json::parse(SSS::readFile(path));
     }
     return nlohmann::json::parse(SSS::readFile(SSS::PWD + path));
@@ -110,7 +110,7 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
     }
 }
 
-static SSS::RGB24::s jsonToRGB24s(nlohmann::json const& color)
+static SSS::RGB24 jsonToRGB24(nlohmann::json const& color)
 {
     if (color.is_array()) {
         return SSS::RGB24(color[0], color[1], color[2]);
@@ -123,51 +123,50 @@ static SSS::RGB24::s jsonToRGB24s(nlohmann::json const& color)
 
 void loadTextAreas(std::string const& json_path) try
 {
-    using namespace SSS::TR;
     nlohmann::json const data = relativePathToJson(json_path);
-    SSS::TR::TextArea::Map const& text_areas = SSS::TR::TextArea::getTextAreas();
-    for (nlohmann::json const& text_area_data : data) {
-        uint32_t id = text_area_data["id"];
-        TextArea::createInstance(id, text_area_data["width"], text_area_data["height"]);
-        TextArea::Ptr const& text_area = text_areas.at(id);
-        text_area->TWset(text_area_data["typewriter"]);
-        for (nlohmann::json const& opt_data : text_area_data["text_opt"]) {
-            Font::Shared font = Font::getShared(opt_data["font"]);
-            nlohmann::json const& style_data = opt_data["style"];
-            TextStyle style(
-                style_data["charsize"],
-                style_data["outline_size"],
-                style_data["has_outline"],
-                style_data["has_shadow"],
-                style_data["line_spacing"]
-            );
-            nlohmann::json const& color_data = opt_data["color"];
-            TextColors color(
-                jsonToRGB24s(color_data["text"]),
-                jsonToRGB24s(color_data["outline"]),
-                jsonToRGB24s(color_data["shadow"]),
-                color_data["alpha"]
-            );
-            nlohmann::json const& lng_data = opt_data["lng"];
-            TextLanguage lng(
-                lng_data["language"],
-                lng_data["script"],
-                lng_data["direction"],
-                SSS::strToU32(opt_data["lng"]["word_dividers"])
-            );
-            TextOpt opt(font, style, color, lng);
-            text_area->setTextOpt(opt_data["id"], opt);
+    SSS::TR::Area::Map const& areas = SSS::TR::Area::getMap();
+    for (nlohmann::json const& area_data : data) {
+        uint32_t id = area_data["id"];
+        SSS::TR::Area::create(id, area_data["width"], area_data["height"]);
+        SSS::TR::Area::Ptr const& area = areas.at(id);
+        area->TWset(area_data["typewriter"]);
+        for (nlohmann::json const& format_data : area_data["text_opt"]) {
+            // Font
+            SSS::TR::Format format;
+            format.font = format_data["font"];
+            SSS::TR::loadFont(format.font);
+            // Style
+            nlohmann::json const& style_data = format_data["style"];
+            format.style.charsize      = style_data["charsize"];
+            format.style.has_outline   = style_data["has_outline"];
+            format.style.outline_size  = style_data["outline_size"];
+            format.style.has_shadow    = style_data["has_shadow"];
+            format.style.line_spacing  = style_data["line_spacing"];
+            // Color
+            nlohmann::json const& color_data = format_data["color"];
+            format.color.text.plain     = jsonToRGB24(color_data["text"]);
+            format.color.outline.plain  = jsonToRGB24(color_data["outline"]);
+            format.color.shadow.plain   = jsonToRGB24(color_data["shadow"]);
+            format.color.alpha          = color_data["alpha"];
+            // Language
+            nlohmann::json const& lng_data = format_data["lng"];
+            format.lng.language         = lng_data["language"];
+            format.lng.script           = lng_data["script"];
+            format.lng.direction        = lng_data["direction"];
+            format.lng.word_dividers    = SSS::strToStr32(format_data["lng"]["word_dividers"]);
+            // Set format
+            area->setFormat(format_data["id"], format);
         }
-        if (text_area_data.count("string_array") != 0) {
+        if (area_data.count("string_array") != 0) {
             g_data->texts.clear();
-            g_data->texts.reserve(text_area_data["string_array"].size());
-            for (std::string const& str : text_area_data["string_array"]) {
+            g_data->texts.reserve(area_data["string_array"].size());
+            for (std::string const& str : area_data["string_array"]) {
                 g_data->texts.push_back(str);
             }
-            text_area->parseString(g_data->texts[0]);
+            area->parseString(g_data->texts[0]);
         }
         else {
-            text_area->parseString("This is the second text area");
+            area->parseString("This is the second text area");
         }
     }
 }

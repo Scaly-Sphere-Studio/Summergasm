@@ -47,7 +47,9 @@ void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
 {
     static uint32_t text_id = 1;
     if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
-        SSS::TR::TextArea::getTextAreas().at(0)->parseString(g_data->texts[text_id++]);
+        SSS::TR::Area::getMap().at(0)->parseString(g_data->texts[text_id++]);
+        if (text_id >= g_data->texts.size())
+            text_id = 0;
     }
 }
 
@@ -87,7 +89,8 @@ int main(void) try
 {
     SSS::GL::LOG::internal_callbacks::monitor = true;
     SSS::GL::LOG::internal_callbacks::window_pos = true;
-    SSS::GL::Window::LOG::fps = false;
+    SSS::GL::Window::LOG::fps = true;
+
     //g_data->ui_use_separate_window = true;
 
     SSS::GL::Model::on_click_funcs = {
@@ -101,11 +104,13 @@ int main(void) try
         { 2, passive_func_2 }
     };
 
+    SSS::TR::init();
+
     // Create window & set callbacks
     g_data->window = createWindow("resources/json/Window.json");
     SSS::GL::Window::Shared& window = g_data->window;
     window->setCallback(glfwSetKeyCallback, key_callback);
-    window->setVSYNC(true);
+    window->setVSYNC(false);
     {
         SSS::GL::Context const context(window);
         glEnable(GL_DEPTH_TEST);
@@ -150,6 +155,7 @@ int main(void) try
 
     SSS::ImGuiH::shutdown();
     g_data.reset();
-    SSS::TR::TextArea::clearInstances();
+    SSS::TR::Area::clearMap();
+    SSS::TR::terminate();
 }
 __CATCH_AND_LOG_FUNC_EXC
