@@ -167,6 +167,17 @@ void print_window_options()
     if (ImGui::IsItemDeactivatedAfterEdit()) {
         g_data->window->setPosition(x, y);
     }
+    // VSYNC
+    bool vsync = g_data->window->getVSYNC();
+    if (ImGui::Checkbox(" VSYNC", &vsync)) {
+        g_data->window->setVSYNC(vsync);
+    }
+    // FPS Limit
+    int fps_limit = g_data->window->getFPSLimit();
+    ImGui::InputInt(" FPS limit", &fps_limit);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        g_data->window->setFPSLimit(fps_limit);
+    }
 }
 
 // Default, deleted
@@ -265,7 +276,7 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
     }
     else if (type == SSS::GL::Texture::Type::Text) {
         uint32_t current_id = texture->getTextAreaID();
-        if (MapIDCombo(" TextArea ID", SSS::TR::TextArea::getTextAreas(), current_id)) {
+        if (MapIDCombo(" TextArea ID", SSS::TR::Area::getMap(), current_id)) {
             texture->setTextAreaID(current_id);
         }
     }
@@ -316,7 +327,7 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     // Display combo to select Passive Function ID
     uint32_t passive_func_id = plane->getPassiveFuncID();
     if (MapIDCombo(" PassiveFuncID", SSS::GL::Model::passive_funcs, passive_func_id)) {
-        plane->setOnClickFuncID(passive_func_id);
+        plane->setPassiveFuncID(passive_func_id);
     }
     glm::vec3 scaling, angles, translation;
     plane->getAllTransformations(scaling, angles, translation);

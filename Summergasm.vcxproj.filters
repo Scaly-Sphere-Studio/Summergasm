@@ -10,9 +10,6 @@
       <Extensions>jpg;jpeg;png;bmp;ico</Extensions>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Imgui Files">
-      <UniqueIdentifier>{a610e80d-80e2-4720-bb1e-a7d9e7bc65b4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resource Files\JSON">
       <UniqueIdentifier>{52172abe-220b-4017-aab3-9dedbbbec6fe}</UniqueIdentifier>
       <Extensions>json</Extensions>
@@ -50,9 +47,6 @@
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\imfilebrowser.h">
-      <Filter>Imgui Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
