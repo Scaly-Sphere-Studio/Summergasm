@@ -129,7 +129,7 @@ void loadTextAreas(std::string const& json_path) try
         uint32_t id = area_data["id"];
         SSS::TR::Area::create(id, area_data["width"], area_data["height"]);
         SSS::TR::Area::Ptr const& area = areas.at(id);
-        area->TWset(area_data["typewriter"]);
+        area->twSet(area_data["typewriter"]);
         for (nlohmann::json const& format_data : area_data["text_opt"]) {
             // Font
             SSS::TR::Format format;
@@ -155,7 +155,7 @@ void loadTextAreas(std::string const& json_path) try
             format.lng.direction        = lng_data["direction"];
             format.lng.word_dividers    = SSS::strToStr32(format_data["lng"]["word_dividers"]);
             // Set format
-            area->setFormat(format_data["id"], format);
+            area->setFormat(format, format_data["id"]);
         }
         if (area_data.count("string_array") != 0) {
             g_data->texts.clear();

@@ -9,7 +9,7 @@
                 "id": 0,
                 "font": "impact.ttf",
                 "style": {
-                    "charsize": 150,
+                    "charsize": 50,
                     "outline_size": 0,
                     "has_outline": false,
                     "has_shadow": false,
@@ -32,7 +32,7 @@
                 "id": 1,
                 "font": "arial.ttf",
                 "style": {
-                    "charsize": 150,
+                    "charsize": 50,
                     "outline_size": 50,
                     "has_outline": false,
                     "has_shadow": true,
@@ -53,7 +53,7 @@
             }
         ],
         "string_array": [
-            "Lorem ipsum \u001F1\u001F dolor sit amet,",
+            "Lorem ipsum \u001F1\u001Fdolor sit amet,",
             "consectetur adipiscing elit,",
             "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             "Ut enim ad minim veniam,",
