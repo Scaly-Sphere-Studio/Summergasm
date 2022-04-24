@@ -399,7 +399,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
     ImGui::TableSetColumnIndex(0);
     static std::string new_chunk_title;
     if (StringButtonEdit("Add chunk", new_chunk_title)) {
-        renderer->emplace_front().title = new_chunk_title;
+        renderer->chunks.emplace_front().title = new_chunk_title;
         new_chunk_title.clear();
     }
     
@@ -407,10 +407,10 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
     bool is_any_plane_hovered = false;
     char label[256];
     // Display each RenderChunk
-    for (size_t i = 0; i < renderer->size(); ) {
+    for (size_t i = 0; i < renderer->chunks.size(); ) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        SSS::GL::RenderChunk& chunk = renderer->at(i);
+        SSS::GL::Renderer::Chunk& chunk = renderer->chunks.at(i);
         // Open a tree node for each RenderChunk
         static char tree_title[256];
         sprintf_s(tree_title, "Chunk: \"%s\"", chunk.title.c_str());
@@ -436,7 +436,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
                 IM_ASSERT(payload->DataSize == sizeof(size_t));
                 size_t payload_n = *(const size_t*)payload->Data;
                 // Swap source and target values
-                std::swap(renderer->at(payload_n), chunk);
+                std::swap(renderer->chunks.at(payload_n), chunk);
             }
             ImGui::EndDragDropTarget();
         }
@@ -569,7 +569,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
         ImGui::TableSetColumnIndex(1);
         sprintf_s(label, "×##chunk%zu", i);
         if (Tooltip("Delete", ImGui::SmallButton, label)) {
-            renderer->erase(renderer->begin() + i);
+            renderer->chunks.erase(renderer->chunks.cbegin() + i);
         }
         else
             ++i;

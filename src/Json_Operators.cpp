@@ -89,7 +89,7 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
         int const type  = renderer_data["type"];
         switch (type) {
         case 0:
-            window->createRenderer<SSS::GL::PlaneRenderer>(id);
+            window->createRenderer<SSS::GL::Plane::Renderer>(id);
             break;
         default:
             SSS::throw_exc("Unkown type of renderer : " + std::to_string(type));
@@ -97,7 +97,7 @@ void organizeRenderers(SSS::GL::Window::Shared const& window,
         SSS::GL::Renderer::Ptr const& renderer = objects.renderers.at(id);
         renderer->title = renderer_data["title"];
         for (nlohmann::json const& chunk_data : renderer_data["chunks"]) {
-            SSS::GL::RenderChunk& chunk = renderer->emplace_back();
+            SSS::GL::Renderer::Chunk& chunk = renderer->chunks.emplace_back();
             chunk.title                         = chunk_data["title"];
             chunk.camera_ID                     = chunk_data["camera_id"];
             chunk.use_camera                    = chunk_data["use_camera"];
