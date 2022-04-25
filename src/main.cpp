@@ -168,7 +168,7 @@ int main(void) try
     // Manually set renderers, for now
     organizeRenderers(window, "resources/json/Scene1.json");
 
-    SSS::GL::Window::Args args;
+    SSS::GL::Window::CreateArgs args;
     args.title = "Summergasm - ImGUI";
     args.w = 600;
     args.h = 600;

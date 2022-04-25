@@ -26,7 +26,7 @@ static glm::vec2& operator<<(glm::vec2& vec, nlohmann::json const& data)
 SSS::GL::Window::Shared createWindow(std::string const& json_path)
 {
     nlohmann::json const data = relativePathToJson(json_path);
-    SSS::GL::Window::Args args;
+    SSS::GL::Window::CreateArgs args;
     args.title      = data["title"];
     args.w          = data["width"];
     args.h          = data["height"];
@@ -67,7 +67,7 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
     }
     // Planes
     for (nlohmann::json const& plane_data : data["planes"]) {
-        window->createModel(plane_data["id"], SSS::GL::ModelType::Plane);
+        window->createModel(plane_data["id"], SSS::GL::Model::Type::Plane);
         SSS::GL::Plane::Ptr const& plane = objects.planes.at(plane_data["id"]);
         plane->setTextureID(plane_data["texture_id"]);
         plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(plane_data["hitbox"]));

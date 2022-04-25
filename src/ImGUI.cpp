@@ -596,7 +596,7 @@ void create_window_object<SSS::GL::Texture>(uint32_t id)
 template<>
 void create_window_object<SSS::GL::Plane>(uint32_t id)
 {
-    g_data->window->createModel(id, SSS::GL::ModelType::Plane);
+    g_data->window->createModel(id, SSS::GL::Model::Type::Plane);
 }
 // Renderer
 template<>
@@ -624,7 +624,7 @@ void remove_window_object<SSS::GL::Texture>(uint32_t id)
 template<>
 void remove_window_object<SSS::GL::Plane>(uint32_t id)
 {
-    g_data->window->removeModel(id, SSS::GL::ModelType::Plane);
+    g_data->window->removeModel(id, SSS::GL::Model::Type::Plane);
 }
 // Renderer
 template<>
