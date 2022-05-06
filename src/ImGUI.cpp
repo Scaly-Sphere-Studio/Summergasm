@@ -234,7 +234,7 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
     // Rotation
     ImGui::Text("Rotation:");
     if (ImGui::Button("Reset rotation")) {
-        __LOG_MSG("test")
+        LOG_MSG("test")
             camera->setRotation(glm::vec2(0));
     }
     glm::vec2 rot = camera->getRotation();

@@ -170,4 +170,4 @@ void loadTextAreas(std::string const& json_path) try
         }
     }
 }
-__CATCH_AND_LOG_FUNC_EXC
+CATCH_AND_LOG_FUNC_EXC
