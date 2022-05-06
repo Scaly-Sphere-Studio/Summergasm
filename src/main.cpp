@@ -82,7 +82,7 @@ void close_callback(GLFWwindow* ptr)
 
 void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
 {
-    __LOG_MSG("foo");
+    LOG_MSG("foo");
 }
 
 void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
@@ -154,7 +154,7 @@ int main(void) try
     window->setCallback(glfwSetKeyCallback, key_callback);
     window->setCallback(glfwSetCharCallback, char_callback);
     window->setVSYNC(false);
-    window->setFPSLimit(240);
+    window->setFPSLimit(120);
     {
         SSS::GL::Context const context(window);
         glEnable(GL_DEPTH_TEST);
@@ -202,4 +202,4 @@ int main(void) try
     SSS::TR::Area::clearMap();
     SSS::TR::terminate();
 }
-__CATCH_AND_LOG_FUNC_EXC
+CATCH_AND_LOG_FUNC_EXC

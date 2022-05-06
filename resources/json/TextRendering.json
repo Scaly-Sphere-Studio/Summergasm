@@ -9,7 +9,7 @@
                 "id": 0,
                 "font": "impact.ttf",
                 "style": {
-                    "charsize": 50,
+                    "charsize": 150,
                     "outline_size": 0,
                     "has_outline": false,
                     "has_shadow": false,
@@ -32,7 +32,7 @@
                 "id": 1,
                 "font": "arial.ttf",
                 "style": {
-                    "charsize": 50,
+                    "charsize": 150,
                     "outline_size": 50,
                     "has_outline": false,
                     "has_shadow": true,
