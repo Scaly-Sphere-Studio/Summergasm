@@ -138,6 +138,21 @@ void print_window_options()
     if (ImGui::Checkbox(" Fullscreen", &fullscreen)) {
         g_data->window->setFullscreen(fullscreen);
     }
+    // Maximization mode
+    bool maximized = g_data->window->isMaximized();
+    if (ImGui::Checkbox(" Maximize", &maximized)) {
+        g_data->window->setMaximization(maximized);
+    }
+    // Visibility mode
+    bool show = g_data->window->isVisible();
+    if (ImGui::Checkbox(" Visible", &show)) {
+        g_data->window->setVisibility(show);
+    }
+    // Iconification mode
+    bool iconify = g_data->window->isIconified();
+    if (ImGui::Checkbox(" Iconify", &iconify)) {
+        g_data->window->setIconification(iconify);
+    }
     // Window title
     char title[256];
     strcpy_s(title, g_data->window->getTitle().c_str());

@@ -32,6 +32,9 @@ SSS::GL::Window::Shared createWindow(std::string const& json_path)
     args.h          = data["height"];
     args.monitor_id = data["monitor_id"];
     args.fullscreen = data["fullscreen"];
+    args.maximized = data["maximized"];
+    args.iconified = data["iconified"];
+    args.hidden = data["hidden"];
     return SSS::GL::Window::create(args);
 }
 
