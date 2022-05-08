@@ -3,5 +3,8 @@
     "width": 1280,
     "height": 720,
     "monitor_id": 1,
-    "fullscreen": false
+    "fullscreen": false,
+    "maximized": true,
+    "iconified": false,
+    "hidden": false
 }

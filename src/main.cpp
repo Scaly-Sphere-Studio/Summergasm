@@ -19,12 +19,7 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
             g_data->ui_display = !g_data->ui_display;
             {
                 if (g_data->ui_use_separate_window) {
-                    if (g_data->ui_display) {
-                        glfwShowWindow(g_data->ui_window->getGLFWwindow());
-                    }
-                    else {
-                        glfwHideWindow(g_data->ui_window->getGLFWwindow());
-                    }
+                    g_data->ui_window->setVisibility(g_data->ui_display);
                 }
             }
             break;
@@ -77,7 +72,7 @@ void close_callback(GLFWwindow* ptr)
 {
     g_data->ui_display = false;
     glfwSetWindowShouldClose(ptr, GLFW_FALSE);
-    glfwHideWindow(g_data->ui_window->getGLFWwindow());
+    g_data->ui_window->setVisibility(false);
 }
 
 void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
@@ -129,8 +124,7 @@ void passive_func_2(GLFWwindow* ptr, uint32_t id)
 
 int main(void) try
 {
-    SSS::GL::LOG::internal_callbacks::monitor = true;
-    SSS::GL::LOG::internal_callbacks::window_pos = true;
+    SSS::Log::GL::Shaders::louden(true);
     SSS::GL::Window::LOG::fps = true;
 
     //g_data->ui_use_separate_window = true;
@@ -146,60 +140,59 @@ int main(void) try
         { 2, /*passive_func_2*/ nullptr }
     };
 
+    // Load TR
     SSS::TR::init();
+    loadTextAreas("resources/json/TextRendering.json");
 
     // Create window & set callbacks
     g_data->window = createWindow("resources/json/Window.json");
     SSS::GL::Window::Shared& window = g_data->window;
-    window->setCallback(glfwSetKeyCallback, key_callback);
-    window->setCallback(glfwSetCharCallback, char_callback);
-    window->setVSYNC(false);
-    window->setFPSLimit(120);
     {
         SSS::GL::Context const context(window);
+        window->setCallback(glfwSetKeyCallback, key_callback);
+        window->setCallback(glfwSetCharCallback, char_callback);
+        window->setVSYNC(false);
+        window->setFPSLimit(120);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Load objects
+        loadWindowObjects(window, "resources/json/WindowObjects.json");
+        // Manually set renderers, for now
+        organizeRenderers(window, "resources/json/Scene1.json");
     }
-    // Load TR
-    loadTextAreas("resources/json/TextRendering.json");
-    // Load objects
-    loadWindowObjects(window, "resources/json/WindowObjects.json");
-    // Manually set renderers, for now
-    organizeRenderers(window, "resources/json/Scene1.json");
 
     SSS::GL::Window::CreateArgs args;
     args.title = "Summergasm - ImGUI";
     args.w = 600;
     args.h = 600;
     args.monitor_id = 1;
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    args.hidden = true;
     g_data->ui_window= SSS::GL::Window::create(args);
     g_data->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g_data->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
     SSS::ImGuiH::init();
-    SSS::GL::Window::Shared ui_win = !g_data->ui_use_separate_window ? window : g_data->ui_window;
-    SSS::ImGuiH::setContext(ui_win->getGLFWwindow());
+    SSS::ImGuiH::setContext((!g_data->ui_use_separate_window ?
+        window : g_data->ui_window)->getGLFWwindow());
 
     // Main loop
-    while (window) {
-        SSS::GL::pollEverything();
+    while (SSS::GL::pollEverything()) {
         if (window && window->shouldClose()) {
-                window.reset();
-                continue;
+            window.reset();
+            continue;
         }
         window->drawObjects();
         if (g_data->ui_display) {
             print_imgui();
         }
         window->printFrame();
-        g_data->ui_window->printFrame();
+        if (g_data->ui_window)
+            g_data->ui_window->printFrame();
     }
 
     SSS::ImGuiH::shutdown();
     g_data.reset();
-    SSS::TR::Area::clearMap();
     SSS::TR::terminate();
 }
 CATCH_AND_LOG_FUNC_EXC
