@@ -75,12 +75,14 @@ void close_callback(GLFWwindow* ptr)
     g_data->ui_window->setVisibility(false);
 }
 
-void button_func_1(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
+void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods)
 {
     LOG_MSG("foo");
 }
 
-void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mods)
+void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods)
 {
     static uint32_t text_id = 1;
     if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
@@ -90,22 +92,16 @@ void button_func_2(GLFWwindow* ptr, uint32_t id, int button, int action, int mod
     }
 }
 
-void passive_func_1(GLFWwindow* ptr, uint32_t id)
+void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
 {
-    SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
     if (!window) return;
-    SSS::GL::Window::Objects const& objects = window->getObjects();
-    SSS::GL::Plane::Ptr const& plane = objects.planes.at(id);
-
+    
     plane->rotate(glm::vec3(0.1f));
 }
 
-void passive_func_2(GLFWwindow* ptr, uint32_t id)
+void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
 {
-    SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
     if (!window) return;
-    SSS::GL::Window::Objects const& objects = window->getObjects();
-    SSS::GL::Plane::Ptr const& plane = objects.planes.at(id);
 
     static std::chrono::steady_clock::time_point time = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -124,24 +120,24 @@ void passive_func_2(GLFWwindow* ptr, uint32_t id)
 
 int main(void) try
 {
-    SSS::Log::GL::Shaders::louden(true);
-    SSS::GL::Window::LOG::fps = true;
-
+    //SSS::Log::louden(true);
+    //SSS::Log::GL::Context::silence(true);
     //g_data->ui_use_separate_window = true;
 
-    SSS::GL::Model::on_click_funcs = {
+    SSS::GL::Plane::on_click_funcs = {
         { 0, nullptr },
         { 1, button_func_1 },
         { 2, button_func_2 }
     };
-    SSS::GL::Model::passive_funcs = {
+    SSS::GL::Plane::passive_funcs = {
         { 0, nullptr },
         { 1, passive_func_1 },
-        { 2, /*passive_func_2*/ nullptr }
+        { 2, passive_func_2 /*nullptr*/ }
     };
 
     // Load TR
     SSS::TR::init();
+    SSS::TR::addFontDir("C:/Fonts");
     loadTextAreas("resources/json/TextRendering.json");
 
     // Create window & set callbacks
@@ -179,20 +175,22 @@ int main(void) try
     // Main loop
     while (SSS::GL::pollEverything()) {
         if (window && window->shouldClose()) {
+            window->cleanObjects();
             window.reset();
             continue;
         }
-        window->drawObjects();
-        if (g_data->ui_display) {
+        if (window)
+            window->drawObjects();
+        if (g_data->ui_display)
             print_imgui();
-        }
-        window->printFrame();
+        if (window)
+            window->printFrame();
         if (g_data->ui_window)
             g_data->ui_window->printFrame();
     }
 
     SSS::ImGuiH::shutdown();
-    g_data.reset();
     SSS::TR::terminate();
+    g_data.reset();
 }
 CATCH_AND_LOG_FUNC_EXC
