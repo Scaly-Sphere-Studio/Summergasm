@@ -285,7 +285,7 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
         SSS::ImGuiH::filebrowser.Display();
         // If a file has been selected, update texture
         if (SSS::ImGuiH::filebrowser.HasSelected()) {
-            texture->useFile(SSS::ImGuiH::filebrowser.GetSelected().string());
+            texture->loadImage(SSS::ImGuiH::filebrowser.GetSelected().string());
             SSS::ImGuiH::filebrowser.ClearSelected();
         }
     }
@@ -297,15 +297,15 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
     }
     if (ui_window == g_data->window) {
         int w, h;
-        texture->getDimensions(w, h);
+        texture->getCurrentDimensions(w, h);
         if (w != 0 && h != 0) {
             float const ratio = static_cast<float>(w) / 300.f;
             ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
             // C4312
     #ifdef _WIN64
-            uint64_t const id = texture->getTexID();
+            uint64_t const id = texture->getBasicTextureID();
     #else
-            uint32_t const id = texture->getTexID();
+            uint32_t const id = texture->getBasicTextureID();
     #endif // _WIN64
             ImGui::Image(reinterpret_cast<void*>(id), dim);
         }
@@ -336,12 +336,12 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
     }
     // Display combo to select On Click Function ID
     uint32_t on_click_func_id = plane->getOnClickFuncID();
-    if (MapIDCombo(" OnClickFuncID", SSS::GL::Model::on_click_funcs, on_click_func_id)) {
+    if (MapIDCombo(" OnClickFuncID", SSS::GL::Plane::on_click_funcs, on_click_func_id)) {
         plane->setOnClickFuncID(on_click_func_id);
     }
     // Display combo to select Passive Function ID
     uint32_t passive_func_id = plane->getPassiveFuncID();
-    if (MapIDCombo(" PassiveFuncID", SSS::GL::Model::passive_funcs, passive_func_id)) {
+    if (MapIDCombo(" PassiveFuncID", SSS::GL::Plane::passive_funcs, passive_func_id)) {
         plane->setPassiveFuncID(passive_func_id);
     }
     glm::vec3 scaling, angles, translation;
@@ -611,7 +611,7 @@ void create_window_object<SSS::GL::Texture>(uint32_t id)
 template<>
 void create_window_object<SSS::GL::Plane>(uint32_t id)
 {
-    g_data->window->createModel(id, SSS::GL::Model::Type::Plane);
+    g_data->window->createPlane(id);
 }
 // Renderer
 template<>
@@ -639,7 +639,7 @@ void remove_window_object<SSS::GL::Texture>(uint32_t id)
 template<>
 void remove_window_object<SSS::GL::Plane>(uint32_t id)
 {
-    g_data->window->removeModel(id, SSS::GL::Model::Type::Plane);
+    g_data->window->removePlane(id);
 }
 // Renderer
 template<>

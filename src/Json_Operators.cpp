@@ -2,10 +2,7 @@
 
 static nlohmann::json relativePathToJson(std::string const& path)
 {
-    if (SSS::pathIsFile(path)) {
-        return nlohmann::json::parse(SSS::readFile(path));
-    }
-    return nlohmann::json::parse(SSS::readFile(SSS::PWD + path));
+    return nlohmann::json::parse(SSS::readFile(SSS::pathWhich(path)));
 }
 
 static glm::vec3& operator<<(glm::vec3& vec, nlohmann::json const& data)
@@ -61,7 +58,7 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
         window->createTexture(tex_data["id"]);
         SSS::GL::Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
         if (tex_data.count("filepath") != 0) {
-            texture->useFile(SSS::PWD + std::string(tex_data["filepath"]));
+            texture->loadImage(tex_data["filepath"]);
         }
         if (tex_data.count("text_area_id") != 0) {
             texture->setTextAreaID(tex_data["text_area_id"]);
@@ -70,7 +67,7 @@ void loadWindowObjects(SSS::GL::Window::Shared const& window,
     }
     // Planes
     for (nlohmann::json const& plane_data : data["planes"]) {
-        window->createModel(plane_data["id"], SSS::GL::Model::Type::Plane);
+        window->createPlane(plane_data["id"]);
         SSS::GL::Plane::Ptr const& plane = objects.planes.at(plane_data["id"]);
         plane->setTextureID(plane_data["texture_id"]);
         plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(plane_data["hitbox"]));
