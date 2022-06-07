@@ -1,0 +1,44 @@
+#include "Summergasm.hpp"
+
+void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods)
+{
+    LOG_MSG("foo");
+}
+
+void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods)
+{
+    static uint32_t text_id = 1;
+    if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
+        SSS::TR::Area::getMap().at(0)->parseString(g_data->texts[text_id++]);
+        if (text_id >= g_data->texts.size())
+            text_id = 0;
+    }
+}
+
+void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
+{
+    if (!window) return;
+
+    plane->rotate(glm::vec3(0.1f));
+}
+
+void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
+{
+    if (!window) return;
+
+    static std::chrono::steady_clock::time_point time = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::duration diff = now - time;
+    if (diff < std::chrono::seconds(1))
+        plane->translate(glm::vec3(-0.01f, 0, 0));
+    else if (diff < std::chrono::seconds(2))
+        plane->translate(glm::vec3(0, -0.01f, 0));
+    else if (diff < std::chrono::seconds(3))
+        plane->translate(glm::vec3(0.01f, 0, 0));
+    else if (diff < std::chrono::seconds(4))
+        plane->translate(glm::vec3(0, 0.01f, 0));
+    else
+        time = now;
+}

@@ -19,6 +19,22 @@ struct GlobalData {
 };
 extern std::unique_ptr<GlobalData> g_data;
 
+// Callbacks
+
+void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods);
+void char_callback(GLFWwindow* window, unsigned int codepoint);
+void close_callback(GLFWwindow* ptr);
+
+// Model functions
+
+void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods);
+void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+    int button, int action, int mods);
+
+void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane);
+void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane);
+
 // JSON operations
 
 SSS::GL::Window::Shared createWindow(std::string const& json_path);
