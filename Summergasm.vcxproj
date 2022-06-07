@@ -19,6 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\callbacks.cpp" />
+    <ClCompile Include="src\model_functions.cpp" />
     <ClCompile Include="src\ImGUI.cpp" />
     <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\main.cpp" />

@@ -2,135 +2,17 @@
 
 std::unique_ptr<GlobalData> g_data = std::make_unique<GlobalData>();
 
-void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
-{
-    SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
-    SSS::GL::Window::KeyInputs const& keys = window->getKeyInputs();
-
-    if (action == GLFW_PRESS) {
-        switch (key) {
-        case GLFW_KEY_ESCAPE:
-            glfwSetWindowShouldClose(ptr, GLFW_TRUE);
-            break;
-        case GLFW_KEY_F11:
-            window->setFullscreen(!window->isFullscreen());
-            break;
-        case GLFW_KEY_F1:
-            g_data->ui_display = !g_data->ui_display;
-            {
-                if (g_data->ui_use_separate_window) {
-                    g_data->ui_window->setVisibility(g_data->ui_display);
-                }
-            }
-            break;
-        }
-    }
-
-    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-        bool const ctrl = keys[GLFW_KEY_LEFT_CONTROL] || keys[GLFW_KEY_RIGHT_CONTROL];
-        switch (key) {
-        case GLFW_KEY_LEFT:
-            SSS::TR::Area::getMap().at(0)->cursorMove(
-                ctrl ? SSS::TR::Move::CtrlLeft : SSS::TR::Move::Left);
-            break;
-        case GLFW_KEY_RIGHT:
-            SSS::TR::Area::getMap().at(0)->cursorMove(
-                ctrl ? SSS::TR::Move::CtrlRight : SSS::TR::Move::Right);
-            break;
-        case GLFW_KEY_DOWN:
-            SSS::TR::Area::getMap().at(0)->cursorMove(SSS::TR::Move::Down);
-            break;
-        case GLFW_KEY_UP:
-            SSS::TR::Area::getMap().at(0)->cursorMove(SSS::TR::Move::Up);
-            break;
-        case GLFW_KEY_HOME:
-            SSS::TR::Area::getMap().at(0)->cursorMove(SSS::TR::Move::Start);
-            break;
-        case GLFW_KEY_END:
-            SSS::TR::Area::getMap().at(0)->cursorMove(SSS::TR::Move::End);
-            break;
-        case GLFW_KEY_BACKSPACE:
-            SSS::TR::Area::getMap().at(0)->cursorDeleteText(
-                ctrl ? SSS::TR::Delete::CtrlLeft : SSS::TR::Delete::Left);
-            break;
-        case GLFW_KEY_DELETE:
-            SSS::TR::Area::getMap().at(0)->cursorDeleteText(
-                ctrl ? SSS::TR::Delete::CtrlRight : SSS::TR::Delete::Right);
-            break;
-        }
-    }
-}
-
-void char_callback(GLFWwindow* window, unsigned int codepoint)
-{
-    std::u32string str;
-    str.append(1, static_cast<char32_t>(codepoint));
-    SSS::TR::Area::getMap().at(0)->cursorAddText(str);
-}
-
-void close_callback(GLFWwindow* ptr)
-{
-    g_data->ui_display = false;
-    glfwSetWindowShouldClose(ptr, GLFW_FALSE);
-    g_data->ui_window->setVisibility(false);
-}
-
-void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
-    int button, int action, int mods)
-{
-    LOG_MSG("foo");
-}
-
-void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
-    int button, int action, int mods)
-{
-    static uint32_t text_id = 1;
-    if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
-        SSS::TR::Area::getMap().at(0)->parseString(g_data->texts[text_id++]);
-        if (text_id >= g_data->texts.size())
-            text_id = 0;
-    }
-}
-
-void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
-{
-    if (!window) return;
-    
-    plane->rotate(glm::vec3(0.1f));
-}
-
-void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
-{
-    if (!window) return;
-
-    static std::chrono::steady_clock::time_point time = std::chrono::steady_clock::now();
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    std::chrono::steady_clock::duration diff = now - time;
-    if (diff < std::chrono::seconds(1))
-        plane->translate(glm::vec3(-0.01f, 0, 0));
-    else if (diff < std::chrono::seconds(2))
-        plane->translate(glm::vec3(0, -0.01f, 0));
-    else if (diff < std::chrono::seconds(3))
-        plane->translate(glm::vec3(0.01f, 0, 0));
-    else if (diff < std::chrono::seconds(4))
-        plane->translate(glm::vec3(0, 0.01f, 0));
-    else
-        time = now;
-}
-
 int main(void) try
 {
     //SSS::Log::louden(true);
     //SSS::Log::GL::Context::silence(true);
-    //g_data->ui_use_separate_window = true;
+    //SSS::Log::GL::Callbacks::louden(true);
 
     SSS::GL::Plane::on_click_funcs = {
-        { 0, nullptr },
         { 1, button_func_1 },
         { 2, button_func_2 }
     };
     SSS::GL::Plane::passive_funcs = {
-        { 0, nullptr },
         { 1, passive_func_1 },
         { 2, passive_func_2 /*nullptr*/ }
     };
