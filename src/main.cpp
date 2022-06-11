@@ -8,6 +8,20 @@ int main(void) try
     //SSS::Log::GL::Context::silence(true);
     //SSS::Log::GL::Callbacks::louden(true);
 
+    SSS::Audio::Buffer::Map const& buffers = SSS::Audio::getBuffers();
+    SSS::Audio::createBuffer(0);
+    buffers.at(0)->loadFile("resources/sounds/bat-la-rate.mp3");
+    SSS::Audio::createBuffer(1);
+    buffers.at(1)->loadFile("resources/sounds/ok.mp3");
+
+    SSS::Audio::Source::Array const& sources = SSS::Audio::getSources();
+    SSS::Audio::createSource(0);
+    SSS::Audio::Source::Ptr const& source0 = sources.at(0);
+    source0->setPropertyInt(AL_LOOPING, AL_TRUE);
+    source0->setPropertyFloat(AL_GAIN, 0.7f);
+    source0->queueBuffers({ 0, 1 });
+    source0->play();
+
     SSS::GL::Plane::on_click_funcs = {
         { 1, button_func_1 },
         { 2, button_func_2 }

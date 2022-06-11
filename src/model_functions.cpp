@@ -3,7 +3,24 @@
 void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
     int button, int action, int mods)
 {
-    LOG_MSG("foo");
+    SSS::Audio::Source::Ptr const& source = SSS::Audio::getSources().at(0);
+    if (action == GLFW_PRESS) {
+        if (button == GLFW_MOUSE_BUTTON_1) {
+            if (source->isPlaying()) {
+                source->pause();
+            }
+            else {
+                source->play();
+            }
+        }
+        if (button == GLFW_MOUSE_BUTTON_3) {
+            source->stop();
+            source->play();
+        }
+        if (button == GLFW_MOUSE_BUTTON_2) {
+            LOG_MSG(source->getPropertyInt(AL_SOURCE_TYPE));
+        }
+    }
 }
 
 void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
