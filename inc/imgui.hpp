@@ -56,19 +56,43 @@ void create_object(uint32_t id) = delete;
 template<typename _Object>
 void remove_object(uint32_t id) = delete;
 
-template<class _Object>
-void print_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
+template<typename _Object, class Container>
+std::vector<uint32_t> get_ids(Container const& container) = delete;
+
+template<typename _Object>
+std::vector<uint32_t> get_ids(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
+{
+    // Retrieve all IDs
+    std::vector<uint32_t> ids;
+    ids.reserve(map.size());
+    for (auto it = map.cbegin(); it != map.cend(); it++) {
+        ids.push_back(it->first);
+    }
+    return ids;
+}
+
+template<typename _Object, size_t size>
+std::vector<uint32_t> get_ids(std::array<std::unique_ptr<_Object>, size> const& arr)
+{
+    // Retrieve all IDs
+    std::vector<uint32_t> ids;
+    ids.reserve(arr.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        if (arr[i])
+            ids.push_back(static_cast<uint32_t>(i));
+    }
+    return ids;
+}
+
+template<class _Object, class Container>
+void print_objects(Container const& container)
 {
     // Tabs, used to display a single camera UI, along
     // with creation & deletion of cameras
     if (ImGui::BeginTabBar("###"))
     {
         // Retrieve all IDs
-        std::vector<uint32_t> ids;
-        ids.reserve(map.size());
-        for (auto it = map.cbegin(); it != map.cend(); it++) {
-            ids.push_back(it->first);
-        }
+        std::vector<uint32_t> ids = get_ids(container);
         // Display all IDs as tabs
         for (size_t n = 0; n < ids.size(); n++)
         {
@@ -79,7 +103,7 @@ void print_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
             // Display tab
             if (ImGui::BeginTabItem(label, &open)) {
                 // Tab is active, display object UI
-                print_object(map.at(ids[n]));
+                print_object(container.at(ids[n]));
                 ImGui::EndTabItem();
             }
             if (!open) {
@@ -87,6 +111,7 @@ void print_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
                 remove_object<_Object>(ids[n]);
             }
         }
+
         // Bool to set focus on next popup
         static bool set_focus = false;
         // + Button to create new object
@@ -107,14 +132,15 @@ void print_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
             if (ImGui::IsItemDeactivated()) {
                 uint32_t uid = static_cast<uint32_t>(id);
                 // Only create if available ID
-                if (map.count(uid) == 0)
-                    create_object<_Object>(uid);
+                create_object<_Object>(uid);
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
+
         ImGui::EndTabBar();
     }
 }
 
 void print_window_objects();
+void print_audio();

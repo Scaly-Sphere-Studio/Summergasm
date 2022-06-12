@@ -44,6 +44,9 @@
     <ClCompile Include="src\imgui\window_objects.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\imgui\audio.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\pictures\coolyori.jpg">
