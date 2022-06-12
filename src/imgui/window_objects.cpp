@@ -1,206 +1,8 @@
-#include "Summergasm.hpp"
+#include "imgui.hpp"
 
-constexpr static bool print_demo = false;
-static SSS::GL::Window::Shared ui_window;
-
-void SetCursor(SSS::GL::Window::Shared window, int shape)
-{
-    using CursorPtr = SSS::C_Ptr<GLFWcursor, void(*)(GLFWcursor*), glfwDestroyCursor>;
-    static std::map<int, CursorPtr> cursors;
-    
-    if (shape == 0) {
-        glfwSetCursor(window->getGLFWwindow(), nullptr);
-        return;
-    }
-    if (cursors.count(shape) == 0) {
-        cursors.try_emplace(shape);
-        cursors.at(shape).reset(glfwCreateStandardCursor(shape));
-    }
-    glfwSetCursor(window->getGLFWwindow(), cursors.at(shape).get());
-}
-
-void Tooltip(char const* description)
-{
-    if (description == nullptr) return;
-    
-    using clock = std::chrono::steady_clock;
-    static clock::time_point t = clock::now();
-
-    if (!ImGui::IsItemHovered()) {
-        if (!ImGui::IsAnyItemHovered()) {
-            t = clock::now();
-        }
-        return;
-    }
-    if (clock::now() - t < std::chrono::milliseconds(350)) {
-        return;
-    }
-    ImGui::BeginTooltip();
-    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-    ImGui::TextUnformatted(description);
-    ImGui::PopTextWrapPos();
-    ImGui::EndTooltip();
-}
-
-template <typename _Func, typename ...Args>
-bool Tooltip(char const* description, _Func f, Args ...args)
-{
-    bool ret = f(args...);
-    Tooltip(description);
-    return ret;
-}
-
-bool InputFloatWasEdited(const char* label, float* v, float step = 0.0f,
-    float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
-{
-    char name[256];
-    ImGui::SetNextItemWidth(250.f);
-    sprintf_s(name, "##%s", label);
-    ImGui::InputFloat(name, v, 0, step_fast, format, flags);
-    bool ret = ImGui::IsItemDeactivatedAfterEdit();
-    if (step != 0.f) {
-        ImGui::PushButtonRepeat(true);
-        ImGui::SameLine();
-        sprintf_s(name, "-##%s", label);
-        if (ImGui::Button(name) && v != nullptr) {
-            *v -= step;
-            ret = true;
-        }
-        sprintf_s(name, "+##%s", label);
-        ImGui::SameLine();
-        if (ImGui::Button(name) && v != nullptr) {
-            *v += step;
-            ret = true;
-        }
-        ImGui::PopButtonRepeat();
-    }
-    ImGui::SameLine();
-    ImGui::Text(label);
-    return (ret);
-}
-
-bool StringButtonEdit(char const* label, std::string& str)
-{
-    static std::string* ptr = nullptr;
-    static char buff[256];
-    static bool set_focus = false;
-    if (ptr != &str) {
-        if (ImGui::Button(label)) {
-            ptr = &str;
-            strcpy_s(buff, str.c_str());
-            set_focus = true;
-        }
-    }
-    else {
-        if (set_focus) {
-            ImGui::SetKeyboardFocusHere();
-            set_focus = false;
-        }
-        ImGui::SetNextItemWidth(300.f);
-        ImGui::InputText("###", buff, 256);
-        if (ImGui::IsItemDeactivated()) {
-            ptr = nullptr;
-            if (buff[0] != '\0') {
-                str = buff;
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-template<typename _T>
-bool MapIDCombo(char const* label, std::map<uint32_t, _T> const& map, uint32_t& current_id)
-{
-    bool ret = false;
-    if (ImGui::BeginCombo(label, std::to_string(current_id).c_str())) {
-        // Loop over map to display each ID
-        for (auto it = map.cbegin(); it != map.cend(); ++it) {
-            uint32_t const id = it->first;
-            bool is_selected = (current_id == id);
-            // Display selectable ID
-            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
-                current_id = id;
-                ret = true;
-            }
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-    return ret;
-}
-
-void print_window_options()
-{
-    // Fullscreen mode
-    bool fullscreen = g_data->window->isFullscreen();
-    if (ImGui::Checkbox(" Fullscreen", &fullscreen)) {
-        g_data->window->setFullscreen(fullscreen);
-    }
-    // Maximization mode
-    bool maximized = g_data->window->isMaximized();
-    if (ImGui::Checkbox(" Maximize", &maximized)) {
-        g_data->window->setMaximization(maximized);
-    }
-    // Visibility mode
-    bool show = g_data->window->isVisible();
-    if (ImGui::Checkbox(" Visible", &show)) {
-        g_data->window->setVisibility(show);
-    }
-    // Iconification mode
-    bool iconify = g_data->window->isIconified();
-    if (ImGui::Checkbox(" Iconify", &iconify)) {
-        g_data->window->setIconification(iconify);
-    }
-    // Window title
-    char title[256];
-    strcpy_s(title, g_data->window->getTitle().c_str());
-    ImGui::InputText(" Window title", title, 256);
-    if (ImGui::IsItemDeactivated()) {
-        g_data->window->setTitle(title);
-    }
-    // Window dimensions
-    int w, h;
-    g_data->window->getDimensions(w, h);
-    ImGui::InputInt(" Window width", &w, 0);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setDimensions(w, h);
-    }
-    ImGui::InputInt(" Window height", &h, 0);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setDimensions(w, h);
-    }
-    // Window position
-    int x, y;
-    g_data->window->getPosition(x, y);
-    ImGui::InputInt(" Window X pos", &x, 0);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setPosition(x, y);
-    }
-    ImGui::InputInt(" Window Y pos", &y, 0);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setPosition(x, y);
-    }
-    // VSYNC
-    bool vsync = g_data->window->getVSYNC();
-    if (ImGui::Checkbox(" VSYNC", &vsync)) {
-        g_data->window->setVSYNC(vsync);
-    }
-    // FPS Limit
-    int fps_limit = g_data->window->getFPSLimit();
-    ImGui::InputInt(" FPS limit", &fps_limit);
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setFPSLimit(fps_limit);
-    }
-}
-
-// Default, deleted
-template<class _Object>
-void print_window_object(std::unique_ptr<_Object> const& ptr) = delete;
 // Camera
 template<>
-void print_window_object(SSS::GL::Camera::Ptr const& camera)
+static void print_object(SSS::GL::Camera::Ptr const& camera)
 {
     if (!camera) {
         return;
@@ -260,7 +62,7 @@ void print_window_object(SSS::GL::Camera::Ptr const& camera)
 }
 // Texture
 template<>
-void print_window_object(SSS::GL::Texture::Ptr const& texture)
+static void print_object(SSS::GL::Texture::Ptr const& texture)
 {
     if (!texture) {
         return;
@@ -302,11 +104,11 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
             float const ratio = static_cast<float>(w) / 300.f;
             ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
             // C4312
-    #ifdef _WIN64
+#ifdef _WIN64
             uint64_t const id = texture->getBasicTextureID();
-    #else
+#else
             uint32_t const id = texture->getBasicTextureID();
-    #endif // _WIN64
+#endif // _WIN64
             ImGui::Image(reinterpret_cast<void*>(id), dim);
         }
     }
@@ -316,7 +118,7 @@ void print_window_object(SSS::GL::Texture::Ptr const& texture)
 }
 // Plane
 template<>
-void print_window_object(SSS::GL::Plane::Ptr const& plane)
+static void print_object(SSS::GL::Plane::Ptr const& plane)
 {
     if (!plane) {
         return;
@@ -387,7 +189,7 @@ void print_window_object(SSS::GL::Plane::Ptr const& plane)
 }
 // Renderer
 template<>
-void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
+static void print_object(SSS::GL::Renderer::Ptr const& renderer)
 {
     if (!renderer) {
         return;
@@ -404,7 +206,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
         | ImGuiTableFlags_BordersOuter
         | ImGuiTableFlags_NoHostExtendX
         | ImGuiTableFlags_SizingFixedFit
-    ;
+        ;
     // Display chunks in an organizable single column table
     if (!ImGui::BeginTable("RenderChunks", 2, table_flags)) {
         return;
@@ -417,7 +219,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
         renderer->chunks.emplace_front().title = new_chunk_title;
         new_chunk_title.clear();
     }
-    
+
     static void* active_item = nullptr;
     bool is_any_plane_hovered = false;
     char label[256];
@@ -504,7 +306,7 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
                 }
                 chunk.objects.push_back(new_id);
             }
-            
+
             // Display each chunk object in an organizable single column table
             if (!chunk.objects.empty() && ImGui::BeginTable("##", 3, table_flags)) {
                 static bool hold_state = false;
@@ -592,126 +394,57 @@ void print_window_object(SSS::GL::Renderer::Ptr const& renderer)
     ImGui::EndTable();
 }
 
-// Default, deleted
-template<typename _Object>
-void create_window_object(uint32_t id) = delete;
 // Camera
 template<>
-void create_window_object<SSS::GL::Camera>(uint32_t id)
+static void create_object<SSS::GL::Camera>(uint32_t id)
 {
     g_data->window->createCamera(id);
 }
 // Texture
 template<>
-void create_window_object<SSS::GL::Texture>(uint32_t id)
+static void create_object<SSS::GL::Texture>(uint32_t id)
 {
     g_data->window->createTexture(id);
 }
 // Plane
 template<>
-void create_window_object<SSS::GL::Plane>(uint32_t id)
+static void create_object<SSS::GL::Plane>(uint32_t id)
 {
     g_data->window->createPlane(id);
 }
 // Renderer
 template<>
-void create_window_object<SSS::GL::Renderer>(uint32_t id)
+static void create_object<SSS::GL::Renderer>(uint32_t id)
 {
     g_data->window->createRenderer<SSS::GL::Plane::Renderer>(id);
 }
 
-// Default, deleted
-template<typename _Object>
-void remove_window_object(uint32_t id) = delete;
 // Camera
 template<>
-void remove_window_object<SSS::GL::Camera>(uint32_t id)
+static void remove_object<SSS::GL::Camera>(uint32_t id)
 {
     g_data->window->removeCamera(id);
 }
 // Texture
 template<>
-void remove_window_object<SSS::GL::Texture>(uint32_t id)
+static void remove_object<SSS::GL::Texture>(uint32_t id)
 {
     g_data->window->removeTexture(id);
 }
 // Plane
 template<>
-void remove_window_object<SSS::GL::Plane>(uint32_t id)
+static void remove_object<SSS::GL::Plane>(uint32_t id)
 {
     g_data->window->removePlane(id);
 }
 // Renderer
 template<>
-void remove_window_object<SSS::GL::Renderer>(uint32_t id)
+static void remove_object<SSS::GL::Renderer>(uint32_t id)
 {
     g_data->window->removeRenderer(id);
 }
 
-template<class _Object>
-void print_window_objects(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
-{
-    // Tabs, used to display a single camera UI, along
-    // with creation & deletion of cameras
-    if (ImGui::BeginTabBar("###"))
-    {
-        // Retrieve all IDs
-        std::vector<uint32_t> ids;
-        ids.reserve(map.size());
-        for (auto it = map.cbegin(); it != map.cend(); it++) {
-            ids.push_back(it->first);
-        }
-        // Display all IDs as tabs
-        for (size_t n = 0; n < ids.size(); n++)
-        {
-            // Option to close tab
-            bool open = true;
-            char label[32];
-            sprintf_s(label, "%04u", ids[n]);
-            // Display tab
-            if (ImGui::BeginTabItem(label, &open)) {
-                // Tab is active, display object UI
-                print_window_object(map.at(ids[n]));
-                ImGui::EndTabItem();
-            }
-            if (!open) {
-                // Tab was closed, delete object
-                remove_window_object<_Object>(ids[n]);
-            }
-        }
-
-        // Bool to set focus on next popup
-        static bool set_focus = false;
-        // + Button to create new object
-        if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing)) {
-            ImGui::OpenPopup("###");
-            set_focus = true;
-        }
-        // Popup to prompt for new ID
-        if (ImGui::BeginPopup("###")) {
-            int id = ids.empty() ? 0 : ids.back() + 1;
-            if (set_focus) {
-                ImGui::SetKeyboardFocusHere(0);
-                set_focus = false;
-            }
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputInt("ID", &id, 0);
-            // If an ID was specified, create object
-            if (ImGui::IsItemDeactivated()) {
-                uint32_t uid = static_cast<uint32_t>(id);
-                // Only create if available ID
-                if (map.count(uid) == 0)
-                    create_window_object<_Object>(uid);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
-
-        ImGui::EndTabBar();
-    }
-}
-
-void print_all_window_objects()
+void print_window_objects()
 {
     // Button to clean objects
     if (ImGui::Button(" Clean All Objects ")) {
@@ -719,90 +452,25 @@ void print_all_window_objects()
     }
 
     SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
-    
+
     // Cameras
     if (ImGui::TreeNode("Cameras")) {
-        print_window_objects(objects.cameras);
+        print_objects(objects.cameras);
         ImGui::TreePop();
     }
     // Textures
     if (ImGui::TreeNode("Textures")) {
-        print_window_objects(objects.textures);
+        print_objects(objects.textures);
         ImGui::TreePop();
     }
     // Planes
     if (ImGui::TreeNode("Planes")) {
-        print_window_objects(objects.planes);
+        print_objects(objects.planes);
         ImGui::TreePop();
     }
     // Renderers
     if (ImGui::TreeNode("Renderers")) {
-        print_window_objects(objects.renderers);
+        print_objects(objects.renderers);
         ImGui::TreePop();
     }
-}
-
-void print_imgui()
-{
-    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
-    // Bool to swap ImGui context if needed
-    static bool swap_windows = false;
-    if (swap_windows) {
-        SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
-        swap_windows = false;
-    }
-    // Make context current
-    SSS::GL::Context const context(ui_window);
-    SSS::ImGuiH::newFrame();
-    
-    // ImGui g_data->window presets (cropped to GL window)
-    int ui_w, ui_h;
-    ui_window->getDimensions(ui_w, ui_h);
-    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ui_w), static_cast<float>(ui_h)));
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    constexpr ImGuiWindowFlags flags
-        = ImGuiWindowFlags_NoTitleBar
-        | ImGuiWindowFlags_NoResize
-        | ImGuiWindowFlags_NoMove
-    ;
-    static float bg_alpha = 0.75f;
-    ImGui::SetNextWindowBgAlpha(bg_alpha);
-
-    // Render UI
-    if (ImGui::Begin("Main UI g_data->window", nullptr, flags)) {
-        ImGui::PushItemWidth(300.f);
-        // UI options
-        if (ImGui::CollapsingHeader("UI options")) {
-            ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
-            if (ImGui::Checkbox(" Display UI on a separate window",
-                &g_data->ui_use_separate_window)) {
-                swap_windows = true;
-                if (g_data->ui_use_separate_window)
-                    glfwShowWindow(g_data->ui_window->getGLFWwindow());
-                else
-                    glfwHideWindow(g_data->ui_window->getGLFWwindow());
-            }
-        }
-        // Window options
-        if (ImGui::CollapsingHeader("Window options")) {
-            print_window_options();
-        }
-        // Window objects
-        if (ImGui::CollapsingHeader("Window objects")) {
-            print_all_window_objects();
-        }
-        ImGui::End();
-    }
-
-    // Render Demo if needed
-    if constexpr (print_demo) {
-        if (ImGui::Begin("Demo ui_window", nullptr, flags)) {
-            ImGui::ShowDemoWindow();
-            ImGui::End();
-        }
-    }
-
-    // Render dear imgui into screen
-    SSS::ImGuiH::render();
-    ui_window.reset();
 }
