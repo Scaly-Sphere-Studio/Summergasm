@@ -21,6 +21,9 @@
     <Filter Include="Resource Files\Pictures">
       <UniqueIdentifier>{6ed04f3a-5121-42ce-9eb7-2fa91ec162cc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\imgui">
+      <UniqueIdentifier>{f1c8dbce-a9eb-4afc-90f3-c77e8e4039e8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -29,14 +32,17 @@
     <ClCompile Include="src\Json_Operators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ImGUI.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\callbacks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\model_functions.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imgui\imgui.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imgui\window_objects.cpp">
+      <Filter>Source Files\imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -52,6 +58,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\imgui.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

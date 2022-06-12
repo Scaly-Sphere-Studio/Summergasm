@@ -20,8 +20,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
+    <ClCompile Include="src\imgui\imgui.cpp" />
+    <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\model_functions.cpp" />
-    <ClCompile Include="src\ImGUI.cpp" />
     <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
@@ -31,6 +32,7 @@
     <Image Include="resources\pictures\Skateboard.png" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
   </ItemGroup>
   <ItemGroup>
