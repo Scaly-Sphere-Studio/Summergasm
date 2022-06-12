@@ -17,10 +17,10 @@ int main(void) try
     SSS::Audio::Source::Array const& sources = SSS::Audio::getSources();
     SSS::Audio::createSource(0);
     SSS::Audio::Source::Ptr const& source0 = sources.at(0);
-    source0->setPropertyInt(AL_LOOPING, AL_TRUE);
-    source0->setPropertyFloat(AL_GAIN, 0.7f);
+    source0->setLooping(true);
+    source0->setVolume(100);
     source0->queueBuffers({ 0, 1 });
-    source0->play();
+    //source0->play();
 
     SSS::GL::Plane::on_click_funcs = {
         { 1, button_func_1 },

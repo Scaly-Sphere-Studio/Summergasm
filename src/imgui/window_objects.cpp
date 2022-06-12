@@ -455,22 +455,22 @@ void print_window_objects()
 
     // Cameras
     if (ImGui::TreeNode("Cameras")) {
-        print_objects(objects.cameras);
+        print_objects<SSS::GL::Camera>(objects.cameras);
         ImGui::TreePop();
     }
     // Textures
     if (ImGui::TreeNode("Textures")) {
-        print_objects(objects.textures);
+        print_objects<SSS::GL::Texture>(objects.textures);
         ImGui::TreePop();
     }
     // Planes
     if (ImGui::TreeNode("Planes")) {
-        print_objects(objects.planes);
+        print_objects<SSS::GL::Plane>(objects.planes);
         ImGui::TreePop();
     }
     // Renderers
     if (ImGui::TreeNode("Renderers")) {
-        print_objects(objects.renderers);
+        print_objects<SSS::GL::Renderer>(objects.renderers);
         ImGui::TreePop();
     }
 }

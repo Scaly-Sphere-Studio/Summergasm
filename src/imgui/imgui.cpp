@@ -205,7 +205,6 @@ void print_imgui()
                     glfwHideWindow(g_data->ui_window->getGLFWwindow());
             }
         }
-
         // Window options
         if (ImGui::CollapsingHeader("Window options")) {
             print_window_options();
@@ -213,6 +212,10 @@ void print_imgui()
         // Window objects
         if (ImGui::CollapsingHeader("Window objects")) {
             print_window_objects();
+        }
+        // Audio
+        if (ImGui::CollapsingHeader("Audio")) {
+            print_audio();
         }
         ImGui::End();
     }

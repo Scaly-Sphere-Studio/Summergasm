@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
+    <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\model_functions.cpp" />
