@@ -6,7 +6,24 @@ static void print_object(SSS::Audio::Buffer::Ptr const& buffer)
     if (!buffer) {
         return;
     }
+    // Load new file
+    if (ImGui::Button("Load sound file")) {
+        SSS::ImGuiH::filebrowser.SetTypeFilters({ ".wav", ".mp3", ".flac", ".aiff" });
+        SSS::ImGuiH::filebrowser.Open();
+    }
+    // Display if needed
+    SSS::ImGuiH::filebrowser.Display();
+    // If a file has been selected, update buffer
+    if (SSS::ImGuiH::filebrowser.HasSelected()) {
+        buffer->loadFile(SSS::ImGuiH::filebrowser.GetSelected().string());
+        SSS::ImGuiH::filebrowser.ClearSelected();
+    }
 
+    // Display properties
+    ImGui::Text("%d Ko.", buffer->getProperty(AL_SIZE) / 1000);
+    ImGui::Text("%d Hz.", buffer->getProperty(AL_FREQUENCY));
+    ImGui::Text("%d bits.", buffer->getProperty(AL_BITS));
+    ImGui::Text("%d channel(s).", buffer->getProperty(AL_CHANNELS));
 }
 
 template<>
