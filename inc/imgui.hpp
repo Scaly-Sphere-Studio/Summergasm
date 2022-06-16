@@ -2,7 +2,6 @@
 
 #include "Summergasm.hpp"
 
-constexpr extern bool print_demo = false;
 extern SSS::GL::Window::Shared ui_window;
 
 void SetCursor(SSS::GL::Window::Shared window, int shape);
