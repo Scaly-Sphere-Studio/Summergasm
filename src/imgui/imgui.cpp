@@ -1,6 +1,7 @@
 #include "imgui.hpp"
 
 SSS::GL::Window::Shared ui_window = nullptr;
+static constexpr bool print_demo = false;
 
 void SetCursor(SSS::GL::Window::Shared window, int shape)
 {
