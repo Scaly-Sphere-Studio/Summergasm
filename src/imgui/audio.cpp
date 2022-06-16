@@ -196,6 +196,14 @@ static void remove_object<SSS::Audio::Buffer>(uint32_t id)
 
 void print_audio()
 {
+    int volume = SSS::Audio::getMainVolume();
+    if (ImGui::SliderInt(" Volume", &volume, 0, 100)) {
+        SSS::Audio::setMainVolume(volume);
+    }
+    if (ImGui::Button("Clean sources & buffers")) {
+        SSS::Audio::cleanSources();
+        SSS::Audio::cleanBuffers();
+    }
     if (ImGui::TreeNode("Sources")) {
         print_objects<SSS::Audio::Source>(SSS::Audio::getSources());
         ImGui::TreePop();
