@@ -69,20 +69,13 @@ int main(void) try
         window : g_data->ui_window)->getGLFWwindow());
 
     // Main loop
-    while (SSS::GL::pollEverything()) {
-        if (window && window->shouldClose()) {
-            window->cleanObjects();
-            window.reset();
-            continue;
-        }
-        if (window)
-            window->drawObjects();
+    while (!window->shouldClose()) {
+        SSS::GL::pollEverything();
+        window->drawObjects();
         if (g_data->ui_display)
             print_imgui();
-        if (window)
-            window->printFrame();
-        if (g_data->ui_window)
-            g_data->ui_window->printFrame();
+        window->printFrame();
+        g_data->ui_window->printFrame();
     }
 
     SSS::ImGuiH::shutdown();
