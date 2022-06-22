@@ -10,6 +10,9 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
         case GLFW_KEY_ESCAPE:
             glfwSetWindowShouldClose(ptr, GLFW_TRUE);
             break;
+        case GLFW_KEY_F10:
+            window->saveScreenshot();
+            break;
         case GLFW_KEY_F11:
             window->setFullscreen(!window->isFullscreen());
             break;
