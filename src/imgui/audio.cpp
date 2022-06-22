@@ -200,6 +200,19 @@ void print_audio()
     if (ImGui::SliderInt(" Volume", &volume, 0, 100)) {
         SSS::Audio::setMainVolume(volume);
     }
+    std::vector<std::string> const devices = SSS::Audio::getDevices();
+    std::string const current = SSS::Audio::getCurrentDevice();
+    if (ImGui::BeginCombo(" Audio device", current.c_str())) {
+        for (std::string const& name : devices) {
+            bool is_selected = (name == current);
+            if (ImGui::Selectable(name.c_str(), is_selected) && !is_selected) {
+                SSS::Audio::selectDevice(name);
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
     if (ImGui::Button("Clean sources & buffers")) {
         SSS::Audio::cleanSources();
         SSS::Audio::cleanBuffers();
