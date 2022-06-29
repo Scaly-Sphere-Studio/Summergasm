@@ -32,8 +32,6 @@ int main(void) try
     };
 
     // Load TR
-    SSS::TR::init();
-    SSS::TR::addFontDir("C:/Fonts");
     loadTextAreas("resources/json/TextRendering.json");
 
     // Create window & set callbacks
@@ -79,7 +77,6 @@ int main(void) try
     }
 
     SSS::ImGuiH::shutdown();
-    SSS::TR::terminate();
     g_data.reset();
 }
 CATCH_AND_LOG_FUNC_EXC
