@@ -169,14 +169,16 @@ void print_imgui()
 {
     ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
     // Bool to swap ImGui context if needed
-    static bool swap_windows = false;
+    static bool swap_windows = true;
     if (swap_windows) {
         SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
         swap_windows = false;
     }
     // Make context current
     SSS::GL::Context const context(ui_window);
-    SSS::ImGuiH::newFrame();
+    if (!SSS::ImGuiH::newFrame()) {
+        return;
+    }
     
     // ImGui g_data->window presets (cropped to GL window)
     int ui_w, ui_h;
