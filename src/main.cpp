@@ -62,10 +62,6 @@ int main(void) try
     g_data->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g_data->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
-    SSS::ImGuiH::init();
-    SSS::ImGuiH::setContext((!g_data->ui_use_separate_window ?
-        window : g_data->ui_window)->getGLFWwindow());
-
     // Main loop
     while (!window->shouldClose()) {
         SSS::GL::pollEverything();
@@ -76,7 +72,6 @@ int main(void) try
         g_data->ui_window->printFrame();
     }
 
-    SSS::ImGuiH::shutdown();
     g_data.reset();
 }
 CATCH_AND_LOG_FUNC_EXC

@@ -78,17 +78,18 @@ static void print_object(SSS::GL::Texture::Ptr const& texture)
     }
     // Depending on Texture Type, display texture options
     if (type == SSS::GL::Texture::Type::Raw) {
+        ImGui::FileBrowser& filebrowser = SSS::ImGuiH::getFilebrowser();
         // Button to display FileBrowser
         if (ImGui::Button("New filepath")) {
-            SSS::ImGuiH::filebrowser.SetTypeFilters({ ".png", ".bmp", ".jpg", ".jpeg" });
-            SSS::ImGuiH::filebrowser.Open();
+            filebrowser.SetTypeFilters({ ".png", ".bmp", ".jpg", ".jpeg" });
+            filebrowser.Open();
         }
         // Display if needed
-        SSS::ImGuiH::filebrowser.Display();
+        filebrowser.Display();
         // If a file has been selected, update texture
-        if (SSS::ImGuiH::filebrowser.HasSelected()) {
-            texture->loadImage(SSS::ImGuiH::filebrowser.GetSelected().string());
-            SSS::ImGuiH::filebrowser.ClearSelected();
+        if (filebrowser.HasSelected()) {
+            texture->loadImage(filebrowser.GetSelected().string());
+            filebrowser.ClearSelected();
         }
     }
     else if (type == SSS::GL::Texture::Type::Text) {

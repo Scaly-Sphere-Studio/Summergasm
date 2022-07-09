@@ -150,17 +150,18 @@ static void print_object(SSS::Audio::Buffer::Ptr const& buffer)
     if (!buffer) {
         return;
     }
+    ImGui::FileBrowser& filebrowser = SSS::ImGuiH::getFilebrowser();
     // Load new file
     if (ImGui::Button("Load sound file")) {
-        SSS::ImGuiH::filebrowser.SetTypeFilters({ ".wav", ".mp3", ".flac", ".aiff" });
-        SSS::ImGuiH::filebrowser.Open();
+        filebrowser.SetTypeFilters({ ".wav", ".mp3", ".flac", ".aiff" });
+        filebrowser.Open();
     }
     // Display if needed
-    SSS::ImGuiH::filebrowser.Display();
+    filebrowser.Display();
     // If a file has been selected, update buffer
-    if (SSS::ImGuiH::filebrowser.HasSelected()) {
-        buffer->loadFile(SSS::ImGuiH::filebrowser.GetSelected().string());
-        SSS::ImGuiH::filebrowser.ClearSelected();
+    if (filebrowser.HasSelected()) {
+        buffer->loadFile(filebrowser.GetSelected().string());
+        filebrowser.ClearSelected();
     }
 
     // Display properties
