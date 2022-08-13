@@ -28,22 +28,22 @@ void close_callback(GLFWwindow* ptr);
 
 // Model functions
 
-void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods);
-void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods);
 
-void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane);
-void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane);
+void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
+void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
 
 // JSON operations
 
 SSS::GL::Window::Shared createWindow(std::string const& json_path);
 
-void loadWindowObjects(SSS::GL::Window::Shared const& window,
+void loadStaticObjects(SSS::GL::Window::Shared const& window,
     std::string const& json_path);
 
-void organizeRenderers(SSS::GL::Window::Shared const& window,
+void loadScene(SSS::GL::Window::Shared const& window,
     std::string const& json_path);
 
 void loadTextAreas(std::string const& json_path);
