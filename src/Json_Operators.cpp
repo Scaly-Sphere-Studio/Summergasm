@@ -1,5 +1,10 @@
 #include "Summergasm.hpp"
 
+using namespace SSS::GL;
+
+static std::vector<Camera::Shared> cameras;
+static std::vector<Plane::Shared> planes;
+
 static nlohmann::json relativePathToJson(std::string const& path)
 {
     return nlohmann::json::parse(SSS::readFile(SSS::pathWhich(path)));
@@ -20,10 +25,10 @@ static glm::vec2& operator<<(glm::vec2& vec, nlohmann::json const& data)
     return vec;
 }
 
-SSS::GL::Window::Shared createWindow(std::string const& json_path)
+Window::Shared createWindow(std::string const& json_path)
 {
     nlohmann::json const data = relativePathToJson(json_path);
-    SSS::GL::Window::CreateArgs args;
+    Window::CreateArgs args;
     args.title      = data["title"];
     args.w          = data["width"];
     args.h          = data["height"];
@@ -32,82 +37,134 @@ SSS::GL::Window::Shared createWindow(std::string const& json_path)
     args.maximized = data["maximized"];
     args.iconified = data["iconified"];
     args.hidden = data["hidden"];
-    return SSS::GL::Window::create(args);
+    return Window::create(args);
 }
 
-void loadWindowObjects(SSS::GL::Window::Shared const& window,
-    std::string const& json_path)
+static void loadRenderer(Window::Shared const& window, nlohmann::json const& data)
+{
+    Window::Objects const& objects = window->getObjects();
+    
+    int const id = data["id"];
+    int const type_id = data["type"];
+
+    // Ensure that if a renderer already exists, it is the corresponding type
+    if (objects.renderers.count(id) != 0) {
+        try {
+            switch (type_id) {
+            case 0:
+                objects.renderers.at(id)->castAs<PlaneRenderer>();
+                break;
+            case 1:
+                objects.renderers.at(id)->castAs<LineRenderer>();
+                break;
+            }
+        }
+        catch (...) {
+            window->removeRenderer(id);
+        }
+    }
+
+    // Create the renderer if needed
+    if (objects.renderers.count(id) == 0) {
+        switch (type_id) {
+        case 0:
+            window->createRenderer<PlaneRenderer>(id);
+            break;
+        case 1:
+            window->createRenderer<LineRenderer>(id);
+            break;
+        default:
+            SSS::throw_exc("Unkown type_id of renderer : " + std::to_string(type_id));
+        }
+    }
+
+    // Fill renderer infos
+    Renderer::Ptr const& renderer_ptr = objects.renderers.at(id);
+    renderer_ptr->title = data["title"];
+    switch (type_id) {
+    case 0: {
+        auto& renderer = renderer_ptr->castAs<PlaneRenderer>();
+        renderer.chunks.clear();
+        for (nlohmann::json const& chunk_data : data["chunks"]) {
+            PlaneRenderer::Chunk& chunk = renderer.chunks.emplace_back();
+            chunk.title = chunk_data["title"];
+            int const cam_id = chunk_data["camera"];
+            if (cameras.size() > cam_id)
+                chunk.camera = cameras.at(cam_id);
+            chunk.reset_depth_before = chunk_data["reset_depth_before"];
+            nlohmann::json const& plane_ids = chunk_data["planes"];
+            for (uint32_t i = 0; i < plane_ids.size(); ++i) {
+                chunk.planes.emplace_back(planes.at(plane_ids[i]));
+            }
+        }
+
+    }   break;
+    case 1: {
+    }   break;
+    default:
+        SSS::throw_exc("Unkown type_id of renderer : " + std::to_string(type_id));
+    }
+}
+
+void loadStaticObjects(Window::Shared const& window, std::string const& json_path)
 {
     nlohmann::json const data = relativePathToJson(json_path);
-    SSS::GL::Window::Objects const& objects = window->getObjects();
-    glm::vec3 vec3;
-    glm::vec2 vec2;
-    // Cameras
-    for (nlohmann::json const& cam_data : data["cameras"]) {
-        window->createCamera(cam_data["id"]);
-        SSS::GL::Camera::Ptr const& camera = objects.cameras.at(cam_data["id"]);
-        camera->setProjectionType(static_cast<SSS::GL::Camera::Projection>
-            (cam_data["projection"]));
-        camera->setFOV(cam_data["fov"]);
-        camera->setRange(cam_data["range"]["near"], cam_data["range"]["far"]);
-        camera->setPosition(vec3 << cam_data["position"]);
-        camera->setRotation(vec2 << cam_data["rotation"]);
-    }
+    Window::Objects const& objects = window->getObjects();
+
     // Textures
     for (nlohmann::json const& tex_data : data["textures"]) {
         window->createTexture(tex_data["id"]);
-        SSS::GL::Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
+        Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
         if (tex_data.count("filepath") != 0) {
             texture->loadImage(tex_data["filepath"]);
         }
         if (tex_data.count("text_area_id") != 0) {
             texture->setTextAreaID(tex_data["text_area_id"]);
         }
-        texture->setType(static_cast<SSS::GL::Texture::Type>(tex_data["type"]));
+        texture->setType(static_cast<Texture::Type>(tex_data["type"]));
+    }
+    // Renderers
+    for (nlohmann::json const& renderer_data : data["renderers"]) {
+        loadRenderer(window, renderer_data);
+    }
+}
+
+void loadScene(Window::Shared const& window, std::string const& json_path)
+{
+    nlohmann::json const data = relativePathToJson(json_path);
+    Window::Objects const& objects = window->getObjects();
+    glm::vec3 vec3;
+    glm::vec2 vec2;
+
+    // Cameras
+    for (nlohmann::json const& cam_data : data["cameras"]) {
+        Camera::Shared const& camera = cameras.emplace_back(Camera::create());
+        camera->setProjectionType(static_cast<Camera::Projection>(cam_data["projection"]));
+        camera->setFOV(cam_data["fov"]);
+        camera->setRange(cam_data["range"]["near"], cam_data["range"]["far"]);
+        camera->setPosition(vec3 << cam_data["position"]);
+        camera->setRotation(vec2 << cam_data["rotation"]);
     }
     // Planes
     for (nlohmann::json const& plane_data : data["planes"]) {
-        window->createPlane(plane_data["id"]);
-        SSS::GL::Plane::Ptr const& plane = objects.planes.at(plane_data["id"]);
+        Plane::Shared const& plane = planes.emplace_back(Plane::create());
         plane->setTextureID(plane_data["texture_id"]);
-        plane->setHitbox(static_cast<SSS::GL::Plane::Hitbox>(plane_data["hitbox"]));
+        plane->setHitbox(static_cast<Plane::Hitbox>(plane_data["hitbox"]));
         plane->setScaling(vec3 << plane_data["scaling"]);
         plane->setRotation(vec3 << plane_data["rotation"]);
         plane->setTranslation(vec3 << plane_data["translation"]);
         plane->setOnClickFuncID(plane_data["on_click_function_id"]);
         plane->setPassiveFuncID(plane_data["passive_function_id"]);
     }
-}
 
-void organizeRenderers(SSS::GL::Window::Shared const& window,
-    std::string const& json_path)
-{
-    nlohmann::json const data = relativePathToJson(json_path);
-    SSS::GL::Window::Objects const& objects = window->getObjects();
-    for (nlohmann::json const& renderer_data : data) {
-        int const id    = renderer_data["id"];
-        int const type  = renderer_data["type"];
-        switch (type) {
-        case 0:
-            window->createRenderer<SSS::GL::Plane::Renderer>(id);
-            break;
-        default:
-            SSS::throw_exc("Unkown type of renderer : " + std::to_string(type));
-        }
-        SSS::GL::Renderer::Ptr const& renderer = objects.renderers.at(id);
-        renderer->title = renderer_data["title"];
-        for (nlohmann::json const& chunk_data : renderer_data["chunks"]) {
-            SSS::GL::Renderer::Chunk& chunk = renderer->chunks.emplace_back();
-            chunk.title                         = chunk_data["title"];
-            chunk.camera_ID                     = chunk_data["camera_id"];
-            chunk.use_camera                    = chunk_data["use_camera"];
-            chunk.reset_depth_before            = chunk_data["reset_depth_before"];
-            nlohmann::json const& objects_data  = chunk_data["objects"];
-            for (uint32_t i = 0; i < objects_data.size(); ++i) {
-                chunk.objects.emplace_back(objects_data[i]);
-            }
-        }
+    // Renderers
+    for (nlohmann::json const& renderer_data : data["renderers"]) {
+        loadRenderer(window, renderer_data);
     }
+
+    // Clear static vectors
+    cameras.clear();
+    planes.clear();
 }
 
 static SSS::RGB24 jsonToRGB24(nlohmann::json const& color)
@@ -123,18 +180,20 @@ static SSS::RGB24 jsonToRGB24(nlohmann::json const& color)
 
 void loadTextAreas(std::string const& json_path) try
 {
+    using namespace SSS::TR;
+
     nlohmann::json const data = relativePathToJson(json_path);
-    SSS::TR::Area::Map const& areas = SSS::TR::Area::getMap();
+    Area::Map const& areas = Area::getMap();
     for (nlohmann::json const& area_data : data) {
         uint32_t id = area_data["id"];
-        SSS::TR::Area::create(id, area_data["width"], area_data["height"]);
-        SSS::TR::Area::Ptr const& area = areas.at(id);
-        area->twSet(area_data["typewriter"]);
+        Area::create(id, area_data["width"], area_data["height"]);
+        Area::Ptr const& area = areas.at(id);
+        area->setPrintMode(static_cast<Area::PrintMode>(area_data["print_mode"]));
         for (nlohmann::json const& format_data : area_data["text_opt"]) {
             // Font
-            SSS::TR::Format format;
+            Format format;
             format.font = format_data["font"];
-            SSS::TR::loadFont(format.font);
+            loadFont(format.font);
             // Style
             nlohmann::json const& style_data = format_data["style"];
             format.style.charsize      = style_data["charsize"];

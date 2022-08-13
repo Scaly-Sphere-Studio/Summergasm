@@ -47,9 +47,9 @@ int main(void) try
         glDepthFunc(GL_LESS);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         // Load objects
-        loadWindowObjects(window, "resources/json/WindowObjects.json");
+        loadStaticObjects(window, "resources/json/StaticObjects.json");
         // Manually set renderers, for now
-        organizeRenderers(window, "resources/json/Scene1.json");
+        loadScene(window, "resources/json/Scene1.json");
     }
 
     SSS::GL::Window::CreateArgs args;

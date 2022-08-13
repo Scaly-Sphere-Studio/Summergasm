@@ -1,0 +1,19 @@
+{
+  "textures": [
+    {
+      "id": 0,
+      "type": 0,
+      "filepath": "resources/pictures/Mushishi.jpg"
+    },
+    {
+      "id": 1,
+      "type": 0,
+      "filepath": "resources/pictures/Skateboard.png"
+    },
+    {
+      "id": 2,
+      "type": 1,
+      "text_area_id": 0
+    }
+  ]
+}

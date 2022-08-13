@@ -1,6 +1,6 @@
 #include "Summergasm.hpp"
 
-void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods)
 {
     SSS::Audio::Source::Ptr const& source = SSS::Audio::getSources().at(0);
@@ -23,7 +23,7 @@ void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& pl
     }
 }
 
-void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane,
+void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods)
 {
     static uint32_t text_id = 1;
@@ -34,14 +34,14 @@ void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& pl
     }
 }
 
-void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
+void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane)
 {
     if (!window) return;
 
     plane->rotate(glm::vec3(0.1f));
 }
 
-void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Ptr const& plane)
+void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane)
 {
     if (!window) return;
 

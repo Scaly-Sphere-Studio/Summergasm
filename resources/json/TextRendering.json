@@ -3,7 +3,7 @@
         "id": 0,
         "width": 1280,
         "height": 720,
-        "typewriter": false,
+        "print_mode": 0,
         "text_opt": [
             {
                 "id": 0,
@@ -67,7 +67,7 @@
         "id": 1,
         "width": 600,
         "height": 600,
-        "typewriter": false,
+        "print_mode": 0,
         "text_opt": [
             {
                 "id": 0,
