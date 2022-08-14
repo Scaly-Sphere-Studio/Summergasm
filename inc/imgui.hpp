@@ -45,7 +45,7 @@ bool MapIDCombo(char const* label, std::map<uint32_t, _T> const& map, uint32_t& 
 
 // Default, deleted
 template<class _Object>
-void print_object(std::unique_ptr<_Object> const& ptr) = delete;
+void print_object(_Object const& ptr) = delete;
 
 // Default, deleted
 template<typename _Object>
@@ -79,6 +79,18 @@ std::vector<uint32_t> get_ids(std::array<std::unique_ptr<_Object>, size> const& 
     for (size_t i = 0; i < arr.size(); ++i) {
         if (arr[i])
             ids.push_back(static_cast<uint32_t>(i));
+    }
+    return ids;
+}
+
+template<typename _Object>
+std::vector<uint32_t> get_ids(std::vector<std::shared_ptr<_Object>> const& vec)
+{
+    // Retrieve all IDs
+    std::vector<uint32_t> ids;
+    ids.reserve(vec.size());
+    for (size_t i = 0; i < vec.size(); ++i) {
+        ids.push_back(static_cast<uint32_t>(i));
     }
     return ids;
 }
