@@ -46,9 +46,9 @@ int main(void) try
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        // Load objects
-        loadStaticObjects(window, "resources/json/StaticObjects.json");
-        // Manually set renderers, for now
+        // Load static objects
+        loadScene(window, "resources/json/StaticObjects.json");
+        // Load scene
         loadScene(window, "resources/json/Scene1.json");
     }
 

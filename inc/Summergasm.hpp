@@ -40,11 +40,7 @@ void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane
 
 SSS::GL::Window::Shared createWindow(std::string const& json_path);
 
-void loadStaticObjects(SSS::GL::Window::Shared const& window,
-    std::string const& json_path);
-
-void loadScene(SSS::GL::Window::Shared const& window,
-    std::string const& json_path);
+void loadScene(SSS::GL::Window::Shared const& window, std::string const& json_path);
 
 void loadTextAreas(std::string const& json_path);
 

@@ -5,7 +5,7 @@ using namespace SSS::GL;
 static std::vector<Camera::Shared> cameras;
 static std::vector<Plane::Shared> planes;
 
-static nlohmann::json relativePathToJson(std::string const& path)
+static nlohmann::json filepathToJson(std::string const& path)
 {
     return nlohmann::json::parse(SSS::readFile(SSS::pathWhich(path)));
 }
@@ -27,7 +27,7 @@ static glm::vec2& operator<<(glm::vec2& vec, nlohmann::json const& data)
 
 Window::Shared createWindow(std::string const& json_path)
 {
-    nlohmann::json const data = relativePathToJson(json_path);
+    nlohmann::json const data = filepathToJson(json_path);
     Window::CreateArgs args;
     args.title      = data["title"];
     args.w          = data["width"];
@@ -40,50 +40,70 @@ Window::Shared createWindow(std::string const& json_path)
     return Window::create(args);
 }
 
-static void loadRenderer(Window::Shared const& window, nlohmann::json const& data)
+static void loadTexture(Window::Shared const& window, nlohmann::json const& data) noexcept try
 {
-    Window::Objects const& objects = window->getObjects();
-    
+    if (!data.is_object())
+        return;
+
+    Texture::Ptr const& texture = window->createTexture(data["id"]);
+    if (data.count("filepath") != 0) {
+        texture->loadImage(data["filepath"]);
+    }
+    if (data.count("text_area_id") != 0) {
+        texture->setTextAreaID(data["text_area_id"]);
+    }
+    texture->setType(static_cast<Texture::Type>(data["type"]));
+}
+CATCH_AND_LOG_FUNC_EXC;
+
+static void loadCamera(Window::Shared const& window, nlohmann::json const& data) noexcept try
+{
+    if (!data.is_object())
+        return;
+
+    glm::vec2 vec2;
+    glm::vec3 vec3;
+
+    Camera::Shared const& camera = cameras.emplace_back(Camera::create(window));
+    camera->setProjectionType(static_cast<Camera::Projection>(data["projection"]));
+    camera->setFOV(data["fov"]);
+    camera->setRange(data["range"]["near"], data["range"]["far"]);
+    camera->setPosition(vec3 << data["position"]);
+    camera->setRotation(vec2 << data["rotation"]);
+}
+CATCH_AND_LOG_FUNC_EXC;
+
+static void loadPlane(Window::Shared const& window, nlohmann::json const& data) noexcept try
+{
+    if (!data.is_object())
+        return;
+
+    glm::vec3 vec3;
+
+    Plane::Shared const& plane = planes.emplace_back(Plane::create(window));
+    plane->setTextureID(data["texture_id"]);
+    plane->setHitbox(static_cast<Plane::Hitbox>(data["hitbox"]));
+    plane->setScaling(vec3 << data["scaling"]);
+    plane->setRotation(vec3 << data["rotation"]);
+    plane->setTranslation(vec3 << data["translation"]);
+    plane->setOnClickFuncID(data["on_click_function_id"]);
+    plane->setPassiveFuncID(data["passive_function_id"]);
+}
+CATCH_AND_LOG_FUNC_EXC;
+
+static void loadRenderer(Window::Shared const& window, nlohmann::json const& data) noexcept try
+{
+    if (!data.is_object())
+        return;
+
     int const id = data["id"];
     int const type_id = data["type"];
 
-    // Ensure that if a renderer already exists, it is the corresponding type
-    if (objects.renderers.count(id) != 0) {
-        try {
-            switch (type_id) {
-            case 0:
-                objects.renderers.at(id)->castAs<PlaneRenderer>();
-                break;
-            case 1:
-                objects.renderers.at(id)->castAs<LineRenderer>();
-                break;
-            }
-        }
-        catch (...) {
-            window->removeRenderer(id);
-        }
-    }
-
     // Create the renderer if needed
-    if (objects.renderers.count(id) == 0) {
-        switch (type_id) {
-        case 0:
-            window->createRenderer<PlaneRenderer>(id);
-            break;
-        case 1:
-            window->createRenderer<LineRenderer>(id);
-            break;
-        default:
-            SSS::throw_exc("Unkown type_id of renderer : " + std::to_string(type_id));
-        }
-    }
-
-    // Fill renderer infos
-    Renderer::Ptr const& renderer_ptr = objects.renderers.at(id);
-    renderer_ptr->title = data["title"];
     switch (type_id) {
     case 0: {
-        auto& renderer = renderer_ptr->castAs<PlaneRenderer>();
+        auto& renderer = window->createRenderer<PlaneRenderer>(id)->castAs<PlaneRenderer>();
+        renderer.title = data["title"];
         renderer.chunks.clear();
         for (nlohmann::json const& chunk_data : data["chunks"]) {
             PlaneRenderer::Chunk& chunk = renderer.chunks.emplace_back();
@@ -97,66 +117,33 @@ static void loadRenderer(Window::Shared const& window, nlohmann::json const& dat
                 chunk.planes.emplace_back(planes.at(plane_ids[i]));
             }
         }
-
     }   break;
     case 1: {
+        window->createRenderer<LineRenderer>(id);
     }   break;
     default:
         SSS::throw_exc("Unkown type_id of renderer : " + std::to_string(type_id));
     }
 }
+CATCH_AND_LOG_FUNC_EXC;
 
-void loadStaticObjects(Window::Shared const& window, std::string const& json_path)
+void loadScene(Window::Shared const& window, std::string const& json_path) try
 {
-    nlohmann::json const data = relativePathToJson(json_path);
+    nlohmann::json const data = filepathToJson(json_path);
     Window::Objects const& objects = window->getObjects();
 
     // Textures
     for (nlohmann::json const& tex_data : data["textures"]) {
-        window->createTexture(tex_data["id"]);
-        Texture::Ptr const& texture = objects.textures.at(tex_data["id"]);
-        if (tex_data.count("filepath") != 0) {
-            texture->loadImage(tex_data["filepath"]);
-        }
-        if (tex_data.count("text_area_id") != 0) {
-            texture->setTextAreaID(tex_data["text_area_id"]);
-        }
-        texture->setType(static_cast<Texture::Type>(tex_data["type"]));
+        loadTexture(window, tex_data);
     }
-    // Renderers
-    for (nlohmann::json const& renderer_data : data["renderers"]) {
-        loadRenderer(window, renderer_data);
-    }
-}
-
-void loadScene(Window::Shared const& window, std::string const& json_path)
-{
-    nlohmann::json const data = relativePathToJson(json_path);
-    Window::Objects const& objects = window->getObjects();
-    glm::vec3 vec3;
-    glm::vec2 vec2;
-
     // Cameras
     for (nlohmann::json const& cam_data : data["cameras"]) {
-        Camera::Shared const& camera = cameras.emplace_back(Camera::create());
-        camera->setProjectionType(static_cast<Camera::Projection>(cam_data["projection"]));
-        camera->setFOV(cam_data["fov"]);
-        camera->setRange(cam_data["range"]["near"], cam_data["range"]["far"]);
-        camera->setPosition(vec3 << cam_data["position"]);
-        camera->setRotation(vec2 << cam_data["rotation"]);
+        loadCamera(window, cam_data);
     }
     // Planes
     for (nlohmann::json const& plane_data : data["planes"]) {
-        Plane::Shared const& plane = planes.emplace_back(Plane::create());
-        plane->setTextureID(plane_data["texture_id"]);
-        plane->setHitbox(static_cast<Plane::Hitbox>(plane_data["hitbox"]));
-        plane->setScaling(vec3 << plane_data["scaling"]);
-        plane->setRotation(vec3 << plane_data["rotation"]);
-        plane->setTranslation(vec3 << plane_data["translation"]);
-        plane->setOnClickFuncID(plane_data["on_click_function_id"]);
-        plane->setPassiveFuncID(plane_data["passive_function_id"]);
+        loadPlane(window, plane_data);
     }
-
     // Renderers
     for (nlohmann::json const& renderer_data : data["renderers"]) {
         loadRenderer(window, renderer_data);
@@ -166,8 +153,9 @@ void loadScene(Window::Shared const& window, std::string const& json_path)
     cameras.clear();
     planes.clear();
 }
+CATCH_AND_LOG_FUNC_EXC;
 
-static SSS::RGB24 jsonToRGB24(nlohmann::json const& color)
+static SSS::RGB24 jsonToRGB24(nlohmann::json const& color) noexcept
 {
     if (color.is_array()) {
         return SSS::RGB24(color[0], color[1], color[2]);
@@ -182,7 +170,7 @@ void loadTextAreas(std::string const& json_path) try
 {
     using namespace SSS::TR;
 
-    nlohmann::json const data = relativePathToJson(json_path);
+    nlohmann::json const data = filepathToJson(json_path);
     Area::Map const& areas = Area::getMap();
     for (nlohmann::json const& area_data : data) {
         uint32_t id = area_data["id"];
@@ -229,4 +217,4 @@ void loadTextAreas(std::string const& json_path) try
         }
     }
 }
-CATCH_AND_LOG_FUNC_EXC
+CATCH_AND_LOG_FUNC_EXC;
