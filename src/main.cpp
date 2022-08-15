@@ -41,7 +41,7 @@ int main(void) try
         SSS::GL::Context const context(window);
         window->setCallback(glfwSetKeyCallback, key_callback);
         window->setCallback(glfwSetCharCallback, char_callback);
-        window->setVSYNC(false);
+        window->setVSYNC(true);
         window->setFPSLimit(120);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);

@@ -6,6 +6,18 @@ extern SSS::GL::Window::Shared ui_window;
 
 void SetCursor(SSS::GL::Window::Shared window, int shape);
 
+template <typename ...Args>
+void TextCentered(char const* text, Args ...args)
+{
+    float windowWidth = ImGui::GetWindowSize().x;
+    char buff[4096];
+    sprintf_s(buff, text, args...);
+    float textWidth = ImGui::CalcTextSize(buff).x;
+
+    ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
+    ImGui::Text(buff);
+}
+
 void Tooltip(char const* description);
 
 template <typename _Func, typename ...Args>

@@ -46,7 +46,7 @@ bool InputFloatWasEdited(const char* label, float* v, float step,
     float step_fast, const char* format, ImGuiInputTextFlags flags)
 {
     char name[256];
-    ImGui::SetNextItemWidth(250.f);
+    ImGui::SetNextItemWidth(160.f);
     sprintf_s(name, "##%s", label);
     ImGui::InputFloat(name, v, 0, step_fast, format, flags);
     bool ret = ImGui::IsItemDeactivatedAfterEdit();

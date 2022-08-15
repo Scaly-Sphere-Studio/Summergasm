@@ -8,6 +8,9 @@ static void print_object(SSS::GL::Camera::Shared const& camera)
         return;
     }
 
+    TextCentered("Camera");
+    ImGui::Text("");
+    
     // ID
     ImGui::Text("Projection:");
     // Projection type
@@ -18,7 +21,7 @@ static void print_object(SSS::GL::Camera::Shared const& camera)
     }
     // Projection fov
     float fov = camera->getFOV();
-    if (ImGui::InputFloat(" FOV", &fov, 1.0f, 1.0f, "%.0f")) {
+    if (InputFloatWasEdited(" FOV", &fov, 1.0f, 1.0f, "%.0f")) {
         if (fov < 1.f)
             fov = 1.f;
         if (fov > 179.f)
@@ -28,13 +31,13 @@ static void print_object(SSS::GL::Camera::Shared const& camera)
     // Projection z_near / z_far
     float z_near, z_far;
     camera->getRange(z_near, z_far);
-    if (ImGui::InputFloat(" Range (z_near)", &z_near, 0.001f, 0.001f, "%0.6f")
-        || ImGui::InputFloat(" Range (z_far)", &z_far, 1.f)) {
-        if (z_near < 0.f) {
+    if (InputFloatWasEdited(" Range (z_near)", &z_near, 0.001f, 0.001f, "%0.6f")) {
+        if (z_near < 0.f)
             z_near = 0.001f;
-        }
         camera->setRange(z_near, z_far);
     }
+    if (InputFloatWasEdited(" Range (z_far)", &z_far, 1.f))
+        camera->setRange(z_near, z_far);
     ImGui::Spacing();
     // Position
     ImGui::Text("Position:");
@@ -42,11 +45,12 @@ static void print_object(SSS::GL::Camera::Shared const& camera)
         camera->setPosition(glm::vec3(0));
     }
     glm::vec3 pos = camera->getPosition();
-    if (ImGui::InputFloat(" Position (x)", &pos.x, 0.2f)
-        || ImGui::InputFloat(" Position (y)", &pos.y, 0.2f)
-        || ImGui::InputFloat(" Position (z)", &pos.z, 0.2f)) {
+    if (InputFloatWasEdited(" Position (x)", &pos.x, 0.2f))
         camera->setPosition(pos);
-    }
+    if (InputFloatWasEdited(" Position (y)", &pos.y, 0.2f))
+        camera->setPosition(pos);
+    if (InputFloatWasEdited(" Position (z)", &pos.z, 0.2f))
+        camera->setPosition(pos);
     ImGui::Spacing();
     // Rotation
     ImGui::Text("Rotation:");
@@ -55,10 +59,13 @@ static void print_object(SSS::GL::Camera::Shared const& camera)
             camera->setRotation(glm::vec2(0));
     }
     glm::vec2 rot = camera->getRotation();
-    if (ImGui::InputFloat(" Rotation (x)", &rot.x, 0.4f)
-        || ImGui::InputFloat(" Rotation (y)", &rot.y, 0.4f)) {
+    if (InputFloatWasEdited(" Rotation (x)", &rot.x, 0.4f))
         camera->setRotation(rot);
-    }
+    if (InputFloatWasEdited(" Rotation (y)", &rot.y, 0.4f))
+        camera->setRotation(rot);
+
+    ImGui::Text("");
+    TextCentered("(ADDR: 0x%p)", static_cast<void*>(&*camera));
 }
 // Texture
 template<>
@@ -126,6 +133,9 @@ static void print_object(SSS::GL::Plane::Shared const& plane)
     }
     SSS::GL::Window::Objects const& objects = g_data->window->getObjects();
 
+    TextCentered("Plane");
+    ImGui::Text("");
+
     // Display combo to select Texture ID
     uint32_t texture_id = plane->getTextureID();
     if (MapIDCombo(" Texture ID", objects.textures, texture_id)) {
@@ -187,6 +197,9 @@ static void print_object(SSS::GL::Plane::Shared const& plane)
         plane->setTranslation(translation);
     if (InputFloatWasEdited(" Plane translation (z)", &translation.z, 0.01f))
         plane->setTranslation(translation);
+
+    ImGui::Text("");
+    TextCentered("(ADDR: 0x%p)", static_cast<void*>(&*plane));
 }
 // Renderer
 template<>
@@ -222,8 +235,6 @@ static void print_object(SSS::GL::Renderer::Ptr const& renderer_ptr)
         new_chunk_title.clear();
     }
 
-    static void* active_item = nullptr;
-    bool is_any_plane_hovered = false;
     char label[256];
     // Display each RenderChunk
     for (size_t i = 0; i < renderer.chunks.size(); ) {
@@ -261,94 +272,126 @@ static void print_object(SSS::GL::Renderer::Ptr const& renderer_ptr)
         }
         // Display Chunk content
         if (tree_open) {
-            // Display options in tree node, but don't indent
-            ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
-            if (ImGui::TreeNode("Options")) {
-                StringButtonEdit("Edit chunk title", chunk.title);
-                // Display camera
-                print_object(chunk.camera);
-                // Checkboxes for related booleans
-                ImGui::Checkbox(" Reset Z-buffer before rendering?", &chunk.reset_depth_before);
-                // End tree content
-                ImGui::TreePop();
+            StringButtonEdit("Edit chunk title", chunk.title);
+            // Checkboxes for related booleans
+            ImGui::Checkbox(" Reset Z-buffer before rendering?", &chunk.reset_depth_before);
+            // Display camera
+            ImGui::Text("Camera:");
+            ImGui::SameLine();
+            if (chunk.camera) {
+                char popup_id[256];
+                sprintf_s(popup_id, "##edit_camera%zu", i);
+                sprintf_s(label, "Edit##edit_camera%zu", i);
+                if (ImGui::SmallButton(label)) {
+                    ImGui::OpenPopup(popup_id);
+                }
+                if (ImGui::BeginPopup(popup_id)) {
+                    print_object(chunk.camera);
+                    ImGui::EndPopup();
+                }
+                ImGui::SameLine();
+                sprintf_s(label, "Delete##delete_camera%zu", i);
+                if (ImGui::SmallButton(label)) {
+                    chunk.camera.reset();
+                }
             }
-            // Revert style for further indenting
-            ImGui::PopStyleVar();
-            print_objects<SSS::GL::Plane>(chunk.planes);
-
+            else {
+                sprintf_s(label, "Create##create_camera%zu", i);
+                if (ImGui::SmallButton(label)) {
+                    chunk.camera = SSS::GL::Camera::create(g_data->window);
+                }
+            }
+            ImGui::Text("Planes:");
             // Display each chunk object in an organizable single column table
-            //if (!chunk.objects.empty() && ImGui::BeginTable("##", 3, table_flags)) {
-            //    static bool hold_state = false;
-            //    static size_t hold_chunk = 0;
-            //    static size_t hold_j = 0;
-            //    if (hold_state && !ImGui::IsMouseDown(0)) {
-            //        hold_state = false;
-            //    }
-            //    if (hold_state) {
-            //        SetCursor(ui_window, GLFW_HAND_CURSOR);
-            //    }
-
-            //    char drag_drop_id[256];
-            //    sprintf_s(drag_drop_id, "Plane_Dragging_%zu", i);
-            //    for (size_t j = 0; j < chunk.objects.size(); ) {
-            //        ImGui::TableNextRow();
-            //        ImGui::TableSetColumnIndex(0);
-            //        // Current object ID
-            //        uint32_t& id = chunk.objects.at(j);
-            //        // Selectable showing ID
-            //        sprintf_s(label, "Plane %u", id);
-            //        bool selected = hold_state && hold_chunk == i && hold_j == j;
-            //        ImGui::Selectable(label, selected);
-            //        if (ImGui::IsItemHovered()) {
-            //            SetCursor(ui_window, GLFW_HAND_CURSOR);
-            //        }
-            //        Tooltip("Drag to reorder");
-            //        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip
-            //            | ImGuiDragDropFlags_SourceNoDisableHover
-            //            | ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
-            //        {
-            //            // Give dragged source value
-            //            ImGui::SetDragDropPayload(drag_drop_id, nullptr, 0);
-            //            hold_state = true;
-            //            hold_chunk = i;
-            //            hold_j = j;
-            //            ImGui::EndDragDropSource();
-            //        }
-            //        if (ImGui::BeginDragDropTarget()) {
-            //            if (hold_j < chunk.objects.size()) {
-            //                int incr = hold_j < j ? 1 : -1;
-            //                for (size_t k = hold_j; k != j; k += incr) {
-            //                    std::swap(chunk.objects.at(k), chunk.objects.at(k + incr));
-            //                }
-            //            }
-            //            ImGui::EndDragDropTarget();
-            //        }
-            //        // Edit element
-            //        ImGui::TableSetColumnIndex(1);
-            //        char popup_map_id[256];
-            //        sprintf_s(popup_map_id, "##edit_plane%zu", j);
-            //        sprintf_s(label, "*##edit_plane%zu", j);
-            //        if (Tooltip("Edit", ImGui::SmallButton, label)) {
-            //            ImGui::OpenPopup(popup_map_id);
-            //        }
-            //        if (ImGui::BeginPopup(popup_map_id)) {
-            //            ImGui::SetNextItemWidth(100.f);
-            //            if (MapIDCombo(popup_map_id, objects.planes, id)) {
-            //                ImGui::CloseCurrentPopup();
-            //            }
-            //            ImGui::EndPopup();
-            //        }
-            //        // Delete element
-            //        ImGui::TableSetColumnIndex(2);
-            //        sprintf_s(label, "×##delete_plane%zu", j);
-            //        if (Tooltip("Delete", ImGui::SmallButton, label)) {
-            //            chunk.objects.erase(chunk.objects.begin() + j);
-            //        }
-            //        else
-            //            ++j;
-            //    }
-            //    ImGui::EndTable();
-            //}
+            if (ImGui::BeginTable("##", 3, table_flags)) {
+                auto& planes = chunk.planes;
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                if (ImGui::SmallButton("Create plane")) {
+                    planes.insert(planes.cbegin(), SSS::GL::Plane::create(g_data->window));
+                }
+                ImGui::TableSetColumnIndex(2);
+                sprintf_s(label, "×##delete_all_plane%zu", i);
+                if (Tooltip("Delete all planes", ImGui::SmallButton, label)) {
+                    planes.clear();
+                }
+                static bool hold_state = false;
+                static size_t hold_chunk = 0;
+                static size_t hold_j = 0;
+                if (hold_state && !ImGui::IsMouseDown(0)) {
+                    hold_state = false;
+                }
+                if (hold_state) {
+                    SetCursor(ui_window, GLFW_HAND_CURSOR);
+                }
+                char drag_drop_id[256];
+                sprintf_s(drag_drop_id, "Plane_Dragging_%zu", i);
+                for (size_t j = 0; j < planes.size(); ) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    // Selectable showing ID
+                    sprintf_s(label, "0x%p", static_cast<void*>(&*planes.at(j)));
+                    bool selected = hold_state && hold_chunk == i && hold_j == j;
+                    ImGui::Selectable(label, selected);
+                    if (ImGui::IsItemHovered()) {
+                        SetCursor(ui_window, GLFW_HAND_CURSOR);
+                    }
+                    Tooltip("Drag to reorder");
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip
+                        | ImGuiDragDropFlags_SourceNoDisableHover
+                        | ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
+                    {
+                        // Give dragged source value
+                        ImGui::SetDragDropPayload(drag_drop_id, nullptr, 0);
+                        hold_state = true;
+                        hold_chunk = i;
+                        hold_j = j;
+                        ImGui::EndDragDropSource();
+                    }
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (hold_chunk == i && hold_j < planes.size()) {
+                            int incr = hold_j < j ? 1 : -1;
+                            for (size_t k = hold_j; k != j; k += incr) {
+                                std::swap(planes.at(k), planes.at(k + incr));
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    // Edit element
+                    ImGui::TableSetColumnIndex(1);
+                    char popup_map_id[256];
+                    sprintf_s(popup_map_id, "##edit_plane%zu", j);
+                    sprintf_s(label, "*##edit_plane%zu", j);
+                    if (Tooltip("Edit", ImGui::SmallButton, label)) {
+                        ImGui::OpenPopup(popup_map_id);
+                    }
+                    if (ImGui::BeginPopup(popup_map_id)) {
+                        print_object(planes.at(j));
+                        ImGui::EndPopup();
+                    }
+                    // Delete element
+                    ImGui::TableSetColumnIndex(2);
+                    sprintf_s(label, "×##delete_plane%zu", j);
+                    if (Tooltip("Delete", ImGui::SmallButton, label)) {
+                        planes.erase(planes.begin() + j);
+                    }
+                    else
+                        ++j;
+                }
+                if (!planes.empty()) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    if (ImGui::SmallButton("Create plane##end")) {
+                        planes.insert(planes.cend(), SSS::GL::Plane::create(g_data->window));
+                    }
+                    ImGui::TableSetColumnIndex(2);
+                    sprintf_s(label, "×##delete_all_plane_end%zu", i);
+                    if (Tooltip("Delete all planes", ImGui::SmallButton, label)) {
+                        planes.clear();
+                    }
+                }
+                ImGui::EndTable();
+            }
             ImGui::TreePop();
         }
         // Destroy chunk
