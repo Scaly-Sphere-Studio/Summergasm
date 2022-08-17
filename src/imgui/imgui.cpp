@@ -19,6 +19,45 @@ void SetCursor(SSS::GL::Window::Shared window, int shape)
     glfwSetCursor(window->getGLFWwindow(), cursors.at(shape).get());
 }
 
+bool SmallColoredButton(char const* label, ImVec4 const& col, ImVec4 const& hover, ImVec4 const& active)
+{
+    ImGui::PushStyleColor(ImGuiCol_Button, col);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
+    bool const ret = ImGui::SmallButton(label);
+    ImGui::PopStyleColor(3);
+    return ret;
+}
+
+bool EditButton(char const* label)
+{
+    ImVec4 const col(0.6f, 0.2f, 0.6f, 1);
+    ImVec4 const hover(0.8f, 0.f, 0.8f, 1);
+    ImVec4 const active(0.7f, 0.f, 0.7f, 1);
+    return SmallColoredButton(label, col, hover, active);
+}
+bool DeleteButton(char const* label)
+{
+    ImVec4 const col(0.7f, 0.f, 0.f, 1);
+    ImVec4 const hover(0.85f, 0.f, 0.f, 1);
+    ImVec4 const active(0.8f, 0.f, 0.f, 1);
+    return SmallColoredButton(label, col, hover, active);
+}
+bool CreateButton(char const* label)
+{
+    ImVec4 const col(0.f, 0.6f, 0.2f, 1);
+    ImVec4 const hover(0.f, 0.8f, 0.3f, 1);
+    ImVec4 const active(0.f, 0.7f, 0.25f, 1);
+    return SmallColoredButton(label, col, hover, active);
+}
+bool CopyButton(char const* label)
+{
+    ImVec4 const col(0.6f, 0.6f, 0.f, 1);
+    ImVec4 const hover(.8f, .8f, 0.f, 1);
+    ImVec4 const active(0.7f, 0.7f, 0.f, 1);
+    return SmallColoredButton(label, col, hover, active);
+}
+
 void Tooltip(char const* description)
 {
     if (description == nullptr) return;

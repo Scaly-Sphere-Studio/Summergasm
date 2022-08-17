@@ -6,6 +6,13 @@ extern SSS::GL::Window::Shared ui_window;
 
 void SetCursor(SSS::GL::Window::Shared window, int shape);
 
+bool SmallColoredButton(char const* label, ImVec4 const& col,
+    ImVec4 const& hover, ImVec4 const& active);
+bool EditButton(char const* label);
+bool DeleteButton(char const* label);
+bool CreateButton(char const* label);
+bool CopyButton(char const* label);
+
 template <typename ...Args>
 void TextCentered(char const* text, Args ...args)
 {
