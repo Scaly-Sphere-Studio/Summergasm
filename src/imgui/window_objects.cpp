@@ -303,12 +303,18 @@ static void print_object(SSS::GL::Renderer::Ptr const& renderer_ptr)
                 ImGui::SameLine();
                 char popup_id[256];
                 sprintf_s(popup_id, "##copy_camera%zu", i);
-                sprintf_s(label, "Copy &##copy_camera%zu", i);
+                sprintf_s(label, "Use existing &##copy_camera%zu", i);
+                static uint32_t cam_id = 0;
                 if (CopyButton(label)) {
                     ImGui::OpenPopup(popup_id);
+                    cam_id = 0;
                 }
                 if (ImGui::BeginPopup(popup_id)) {
-                    //SSS::GL::Camera::Vector vec = SSS::GL::Camera::getInstances(g_data->window);
+                    SSS::GL::Camera::Vector const vec = SSS::GL::Camera::getInstances(g_data->window);
+                    if (selectVectorElement(vec, cam_id)) {
+                        chunk.camera = vec.at(cam_id);
+                        ImGui::CloseCurrentPopup();
+                    }
                     ImGui::EndPopup();
                 }
             }
