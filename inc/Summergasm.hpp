@@ -23,7 +23,6 @@ extern std::unique_ptr<GlobalData> g_data;
 // Callbacks
 
 void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods);
-void char_callback(GLFWwindow* window, unsigned int codepoint);
 void close_callback(GLFWwindow* ptr);
 
 // Model functions
