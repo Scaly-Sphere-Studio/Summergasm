@@ -62,6 +62,27 @@ bool MapIDCombo(char const* label, std::map<uint32_t, _T> const& map, uint32_t& 
     return ret;
 }
 
+template<typename _T>
+bool VectorCombo(char const* label, std::vector<_T> const& vec, uint32_t& current_id)
+{
+    bool ret = false;
+    if (ImGui::BeginCombo(label, std::to_string(current_id).c_str())) {
+        // Loop over vec to display each ID
+        for (uint32_t id = 0; id < vec.size(); ++id) {
+            bool is_selected = (current_id == id);
+            // Display selectable ID
+            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+                current_id = id;
+                ret = true;
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    return ret;
+}
+
 // Default, deleted
 template<class _Object>
 void print_object(_Object const& ptr) = delete;
@@ -170,6 +191,36 @@ void print_objects(Container const& container)
 
         ImGui::EndTabBar();
     }
+}
+
+template<typename _Object>
+bool selectVectorElement(std::vector<_Object> const& vec, uint32_t& id)
+{
+    if (vec.empty()) {
+        ImGui::Text("No instance of corresponding class exists");
+        return false;
+    }
+    if (id >= vec.size())
+        return false;
+    if (ImGui::Button("<") && id != 0) {
+        --id;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(125.f);
+    VectorCombo("##vector_element_combo", vec, id);
+    ImGui::SameLine();
+    if (ImGui::Button(">") && id != (vec.size() - 1)) {
+        ++id;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Confirm selection", ImVec2(-1, 0))) {
+        return true;
+    }
+    ImGui::Text("");
+    ImGui::BeginDisabled();
+    print_object<_Object>(vec.at(id));
+    ImGui::EndDisabled();
+    return false;
 }
 
 void print_window_objects();
