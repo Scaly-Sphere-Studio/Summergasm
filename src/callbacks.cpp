@@ -29,13 +29,6 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
     }
 }
 
-void char_callback(GLFWwindow* window, unsigned int codepoint)
-{
-    std::u32string str;
-    str.append(1, static_cast<char32_t>(codepoint));
-    SSS::TR::Area::cursorAddText(str);
-}
-
 void close_callback(GLFWwindow* ptr)
 {
     g_data->ui_display = false;
