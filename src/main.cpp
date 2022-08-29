@@ -23,10 +23,12 @@ int main(void) try
     //source0->play();
 
     SSS::GL::Plane::on_click_funcs = {
+        { 0, nullptr },
         { 1, button_func_1 },
         { 2, button_func_2 }
     };
     SSS::GL::Plane::passive_funcs = {
+        { 0, nullptr },
         { 1, passive_func_1 },
         { 2, passive_func_2 /*nullptr*/ }
     };
