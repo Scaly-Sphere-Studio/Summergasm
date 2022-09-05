@@ -20,11 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
+    <ClCompile Include="src\model_functions.cpp" />
+    <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
-    <ClCompile Include="src\model_functions.cpp" />
-    <ClCompile Include="src\Json_Operators.cpp" />
+    <ClCompile Include="src\imgui\console.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -41,6 +42,7 @@
     <None Include="resources\json\TextRendering.json" />
     <None Include="resources\json\Window.json" />
     <None Include="resources\json\StaticObjects.json" />
+    <None Include="resources\lua\audio.lua" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -206,13 +206,17 @@ void print_window_options()
 
 void print_imgui()
 {
-    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
-    // Bool to swap ImGui context if needed
-    static bool swap_windows = true;
-    if (swap_windows) {
-        SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
-        swap_windows = false;
+    if (!g_data->ui_use_separate_window &&
+        glfwGetKey(g_data->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
+        g_data->ui_display = false;
+        g_data->window->unblockInputs();
+        return;
     }
+
+    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
+    SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
+
     // Make context current
     SSS::GL::Context const context(ui_window);
     if (!SSS::ImGuiH::newFrame()) {
@@ -240,11 +244,14 @@ void print_imgui()
             ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
             if (ImGui::Checkbox(" Display UI on a separate window",
                 &g_data->ui_use_separate_window)) {
-                swap_windows = true;
-                if (g_data->ui_use_separate_window)
+                if (g_data->ui_use_separate_window) {
                     glfwShowWindow(g_data->ui_window->getGLFWwindow());
-                else
+                    g_data->window->unblockInputs();
+                }
+                else {
                     glfwHideWindow(g_data->ui_window->getGLFWwindow());
+                    g_data->window->blockInputs(GLFW_KEY_F1);
+                }
             }
         }
         // Window options

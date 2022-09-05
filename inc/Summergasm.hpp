@@ -8,6 +8,8 @@
 #include <nlohmann/json.hpp>
 #pragma warning(pop)
 
+#define SOL_ALL_SAFETIES_ON 1
+#include <sol/sol.hpp>
 
 // Static data
 
@@ -16,6 +18,8 @@ struct GlobalData {
     SSS::GL::Window::Shared ui_window;
     bool ui_display{ false };
     bool ui_use_separate_window{ false };
+    bool console_display{ false };
+    sol::state lua;
     std::vector<std::string> texts;
 };
 extern std::unique_ptr<GlobalData> g_data;
@@ -43,4 +47,5 @@ void loadScene(SSS::GL::Window::Shared const& window, std::string const& json_pa
 
 void loadTextAreas(std::string const& json_path);
 
+void print_console();
 void print_imgui();

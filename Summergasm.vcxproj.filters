@@ -24,6 +24,9 @@
     <Filter Include="Source Files\imgui">
       <UniqueIdentifier>{f1c8dbce-a9eb-4afc-90f3-c77e8e4039e8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Lua">
+      <UniqueIdentifier>{e1afe9a0-7d1d-4b31-ad6e-7a276e62a0fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -45,6 +48,9 @@
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
     <ClCompile Include="src\imgui\audio.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imgui\console.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
   </ItemGroup>
@@ -79,6 +85,9 @@
     </None>
     <None Include="resources\json\StaticObjects.json">
       <Filter>Resource Files\JSON</Filter>
+    </None>
+    <None Include="resources\lua\audio.lua">
+      <Filter>Resource Files\Lua</Filter>
     </None>
   </ItemGroup>
 </Project>
