@@ -17,14 +17,21 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
         case GLFW_KEY_F11:
             window->setFullscreen(!window->isFullscreen());
             break;
-        case GLFW_KEY_F1:
+        case GLFW_KEY_F1: {
             g_data->ui_display = !g_data->ui_display;
-            {
-                if (g_data->ui_use_separate_window) {
-                    g_data->ui_window->setVisibility(g_data->ui_display);
-                }
+            if (g_data->ui_use_separate_window) {
+                g_data->ui_window->setVisibility(g_data->ui_display);
             }
-            break;
+            else if (g_data->ui_display) {
+                g_data->window->blockInputs(key);
+            }
+        }   break;
+        case GLFW_KEY_F2: {
+            g_data->console_display = !g_data->console_display;
+            if (g_data->console_display) {
+                window->blockInputs(key);
+            }
+        }   break;
         }
     }
 }

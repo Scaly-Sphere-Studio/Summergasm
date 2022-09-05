@@ -2,25 +2,70 @@
 
 std::unique_ptr<GlobalData> g_data = std::make_unique<GlobalData>();
 
+void lua_load_log_functions(sol::state& lua)
+{
+    lua["log_msg"] = SSS::log_msg<std::string>;
+    lua["log_wrn"] = SSS::log_wrn<std::string>;
+    lua["log_err"] = SSS::log_err<std::string>;
+}
+
+void lua_load_audio_functions(sol::state& lua)
+{
+    using namespace SSS::Audio;
+
+    // Buffer
+    lua.new_usertype<Buffer>(
+        "Audio_Buffer",
+        // Properties
+        "loadFile", &Buffer::loadFile,
+        "getProperty", &Buffer::getProperty,
+        // Get
+        "get", ([](uint32_t id) { return getBuffers().at(id); }),
+        "clean", &cleanBuffers,
+        "create", &createBuffer,
+        "remove", &removeBuffer
+        );
+
+    // Source
+    lua.new_usertype<Source>(
+        "Audio_Source",
+        // Settings
+        "useBuffer", &Source::useBuffer,
+        "queueBuffers", &Source::queueBuffers,
+        "detachBuffers", &Source::detachBuffers,
+        // Commands
+        "play", &Source::play,
+        "pause", &Source::pause,
+        "stop", &Source::stop,
+        // Variables
+        "volume", sol::property(&Source::getVolume, &Source::setVolume),
+        "loop", sol::property(&Source::isLooping, &Source::setLooping),
+        // Get
+        "get", ([](uint32_t id) { return getSources().at(id); }),
+        "clean", &cleanSources,
+        "create", &createSource,
+        "remove", &removeSource
+        );
+
+    // Static functions
+    lua["getAllAudioDevices"] = &getDevices;
+    lua["getAudioDevice"] = &getCurrentDevice;
+    lua["setAudioDevice"] = &selectDevice;
+    lua["setMainVolume"] = &setMainVolume;
+    lua["getMainVolume"] = &getMainVolume;
+}
+
 int main(void) try
 {
     //SSS::Log::louden(true);
     //SSS::Log::GL::Context::silence(true);
     //SSS::Log::GL::Callbacks::louden(true);
+    //SSS::Log::GL::Callbacks::get().mouse_button = true;
 
-    SSS::Audio::Buffer::Map const& buffers = SSS::Audio::getBuffers();
-    SSS::Audio::createBuffer(0);
-    buffers.at(0)->loadFile("resources/sounds/bat-la-rate.mp3");
-    SSS::Audio::createBuffer(1);
-    buffers.at(1)->loadFile("resources/sounds/ok.mp3");
+    lua_load_log_functions(g_data->lua);
+    lua_load_audio_functions(g_data->lua);
 
-    SSS::Audio::Source::Array const& sources = SSS::Audio::getSources();
-    SSS::Audio::createSource(0);
-    SSS::Audio::Source::Ptr const& source0 = sources.at(0);
-    source0->setLooping(true);
-    source0->setVolume(100);
-    source0->queueBuffers({ 0, 1 });
-    //source0->play();
+    g_data->lua.script_file("resources/Lua/audio.lua");
 
     SSS::GL::Plane::on_click_funcs = {
         { 0, nullptr },
@@ -67,6 +112,8 @@ int main(void) try
     while (!window->shouldClose()) {
         SSS::GL::pollEverything();
         window->drawObjects();
+        if (g_data->console_display)
+            print_console();
         if (g_data->ui_display)
             print_imgui();
         window->printFrame();

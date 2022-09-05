@@ -99,7 +99,7 @@ template<typename _Object, class Container>
 std::vector<uint32_t> get_ids(Container const& container) = delete;
 
 template<typename _Object>
-std::vector<uint32_t> get_ids(std::map<uint32_t, std::unique_ptr<_Object>> const& map)
+std::vector<uint32_t> get_ids(std::map<uint32_t, _Object> const& map)
 {
     // Retrieve all IDs
     std::vector<uint32_t> ids;
@@ -111,7 +111,7 @@ std::vector<uint32_t> get_ids(std::map<uint32_t, std::unique_ptr<_Object>> const
 }
 
 template<typename _Object, size_t size>
-std::vector<uint32_t> get_ids(std::array<std::unique_ptr<_Object>, size> const& arr)
+std::vector<uint32_t> get_ids(std::array<_Object, size> const& arr)
 {
     // Retrieve all IDs
     std::vector<uint32_t> ids;
@@ -124,7 +124,7 @@ std::vector<uint32_t> get_ids(std::array<std::unique_ptr<_Object>, size> const& 
 }
 
 template<typename _Object>
-std::vector<uint32_t> get_ids(std::vector<std::shared_ptr<_Object>> const& vec)
+std::vector<uint32_t> get_ids(std::vector<_Object> const& vec)
 {
     // Retrieve all IDs
     std::vector<uint32_t> ids;
