@@ -20,7 +20,7 @@ void print_console() {
     ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ui_w), static_cast<float>(300)));
     ImGui::SetNextWindowPos(ImVec2(0, ui_h - 300));
     constexpr ImGuiWindowFlags flags = 0
-        | ImGuiWindowFlags_NoCollapse
+        | ImGuiWindowFlags_NoTitleBar
         | ImGuiWindowFlags_NoResize
         | ImGuiWindowFlags_NoMove
     ;
@@ -35,16 +35,25 @@ void print_console() {
             ImVec4 color{ 1, 1, 1, 1 };
         };
         static std::vector<CmdMemory> memory;
-        for (CmdMemory const& cmd : memory) {
-            std::string str("> " + cmd.str);
-            ImGui::TextColored(cmd.color, str.c_str());
+        if (ImGui::BeginChild("##memory", ImVec2(-FLT_MIN, 260), false,
+            ImGuiWindowFlags_AlwaysUseWindowPadding))
+        {
+            for (CmdMemory const& cmd : memory) {
+                std::string str("> " + cmd.str);
+                ImGui::TextColored(cmd.color, str.c_str());
+            }
+            static size_t mem_size = 0;
+            if (mem_size !=  memory.size()) {
+                mem_size = memory.size();
+                ImGui::SetScrollHereY();
+            }
         }
+        ImGui::EndChild();
         static char buffer[4096];
         static size_t memory_index = 0;
         static std::string buffer_memory;
         
         ImGui::SetNextItemWidth(-1);
-        ImGui::SetCursorPos(ImVec2(0, 272));
         ImGui::SetKeyboardFocusHere();
         constexpr auto flags = 0
             | ImGuiInputTextFlags_CallbackHistory
