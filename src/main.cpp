@@ -2,57 +2,22 @@
 
 std::unique_ptr<GlobalData> g_data = std::make_unique<GlobalData>();
 
+bool lua_file_script(std::string const& path)
+{
+    auto result = g_data->lua.safe_script_file(path, sol::script_pass_on_error);
+    if (!result.valid()) {
+        sol::error err = result;
+        LOG_CTX_ERR("Lua file script", std::string("\n") + err.what());
+        return true;
+    }
+    return false;
+}
+
 void lua_load_log_functions(sol::state& lua)
 {
     lua["log_msg"] = SSS::log_msg<std::string>;
     lua["log_wrn"] = SSS::log_wrn<std::string>;
     lua["log_err"] = SSS::log_err<std::string>;
-}
-
-void lua_load_audio_functions(sol::state& lua)
-{
-    using namespace SSS::Audio;
-
-    // Buffer
-    lua.new_usertype<Buffer>(
-        "Audio_Buffer",
-        // Properties
-        "loadFile", &Buffer::loadFile,
-        "getProperty", &Buffer::getProperty,
-        // Get
-        "get", ([](uint32_t id) { return getBuffers().at(id); }),
-        "clean", &cleanBuffers,
-        "create", &createBuffer,
-        "remove", &removeBuffer
-        );
-
-    // Source
-    lua.new_usertype<Source>(
-        "Audio_Source",
-        // Settings
-        "useBuffer", &Source::useBuffer,
-        "queueBuffers", &Source::queueBuffers,
-        "detachBuffers", &Source::detachBuffers,
-        // Commands
-        "play", &Source::play,
-        "pause", &Source::pause,
-        "stop", &Source::stop,
-        // Variables
-        "volume", sol::property(&Source::getVolume, &Source::setVolume),
-        "loop", sol::property(&Source::isLooping, &Source::setLooping),
-        // Get
-        "get", ([](uint32_t id) { return getSources().at(id); }),
-        "clean", &cleanSources,
-        "create", &createSource,
-        "remove", &removeSource
-        );
-
-    // Static functions
-    lua["getAllAudioDevices"] = &getDevices;
-    lua["getAudioDevice"] = &getCurrentDevice;
-    lua["setAudioDevice"] = &selectDevice;
-    lua["setMainVolume"] = &setMainVolume;
-    lua["getMainVolume"] = &getMainVolume;
 }
 
 int main(void) try
@@ -62,10 +27,13 @@ int main(void) try
     //SSS::Log::GL::Callbacks::louden(true);
     //SSS::Log::GL::Callbacks::get().mouse_button = true;
 
+    g_data->lua.open_libraries(sol::lib::base, sol::lib::string);
     lua_load_log_functions(g_data->lua);
-    lua_load_audio_functions(g_data->lua);
+    //sol::table sss = g_data->lua["SSS"].get_or_create<sol::table>();
+    //SSS::Audio::lua_load_audio_functions(sss);
+    SSS::Audio::lua_load_audio_functions(g_data->lua.globals());
 
-    g_data->lua.script_file("resources/Lua/audio.lua");
+    lua_file_script("resources/Lua/audio.lua");
 
     SSS::GL::Plane::on_click_funcs = {
         { 0, nullptr },

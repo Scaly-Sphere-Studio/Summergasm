@@ -1,5 +1,6 @@
 #pragma once
 
+#define SSS_LUA
 #include <SSS/ImGuiH.hpp>
 #include <SSS/GL.hpp>
 #include <SSS/Audio.hpp>
