@@ -108,7 +108,7 @@ void print_console() {
             if (!result.valid()) {
                 memory.back().color = ImVec4(1, 0, 0, 1);
                 sol::error err = result;
-                LOG_CTX_ERR("Lua console", err.what());
+                LOG_CTX_ERR("Lua console", std::string("\n") + err.what());
             }
             buffer[0] = 0;
             memory_index = 0;
