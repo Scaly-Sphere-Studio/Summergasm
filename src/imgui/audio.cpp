@@ -1,15 +1,11 @@
 #include "imgui.hpp"
 
 template<>
-static void print_object(SSS::Audio::Source::Ptr const& source)
+static void print_object(SSS::Audio::Source& source)
 {
-    if (!source) {
-        return;
-    }
-
-    int volume = source->getVolume();
+    int volume = source.getVolume();
     if (ImGui::SliderInt(" Volume", &volume, 0, 100)) {
-        source->setVolume(volume);
+        source.setVolume(volume);
     }
     static constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_NoHostExtendX
@@ -19,28 +15,28 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         if (ImGui::Button("Play", ImVec2(60.f, 0))) {
-            source->play();
+            source.play();
         }
         ImGui::TableSetColumnIndex(1);
         if (ImGui::Button("Pause", ImVec2(60.f, 0))) {
-            source->pause();
+            source.pause();
         }
         ImGui::TableSetColumnIndex(2);
         if (ImGui::Button("Stop", ImVec2(60.f, 0))) {
-            source->stop();
+            source.stop();
         }
         ImGui::TableSetColumnIndex(3);
-        ImGui::Text("State: %s.", source->isPlaying() ? "playing" :
-            source->isPaused() ? "paused" : "stopped");
+        ImGui::Text("State: %s.", source.isPlaying() ? "playing" :
+            source.isPaused() ? "paused" : "stopped");
         ImGui::EndTable();
     }
-    bool loop = source->isLooping();
+    bool loop = source.isLooping();
     if (ImGui::Checkbox(" Loop", &loop)) {
-        source->setLooping(loop);
+        source.setLooping(loop);
     }
 
     SSS::Audio::Buffer::Map const& buffers = SSS::Audio::getBuffers();
-    std::vector<uint32_t> buffer_ids = source->getBufferIDs();
+    std::vector<uint32_t> buffer_ids = source.getBufferIDs();
 
     if (buffers.empty()) {
             ImGui::Text("No audio buffer exists.");
@@ -60,7 +56,7 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
                 break;
             }
         }
-        source->queueBuffers(std::vector<uint32_t>(1, new_id));
+        source.queueBuffers(std::vector<uint32_t>(1, new_id));
     }
 
     // Display each chunk object in an organizable single column table
@@ -105,8 +101,8 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
                     int incr = hold_i < i ? 1 : -1;
                     for (size_t k = hold_i; k != i; k += incr) {
                         std::swap(buffer_ids.at(k), buffer_ids.at(k + incr));
-                        source->detachBuffers();
-                        source->queueBuffers(buffer_ids);
+                        source.detachBuffers();
+                        source.queueBuffers(buffer_ids);
                     }
                 }
                 ImGui::EndDragDropTarget();
@@ -122,8 +118,8 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
             if (ImGui::BeginPopup(popup_map_id)) {
                 ImGui::SetNextItemWidth(100.f);
                 if (MapIDCombo(popup_map_id, SSS::Audio::getBuffers(), id)) {
-                    source->detachBuffers();
-                    source->queueBuffers(buffer_ids);
+                    source.detachBuffers();
+                    source.queueBuffers(buffer_ids);
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
@@ -133,8 +129,8 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
             sprintf_s(label, "×##delete_buffer_id%zu", i);
             if (Tooltip("Delete", ImGui::SmallButton, label)) {
                 buffer_ids.erase(buffer_ids.begin() + i);
-                source->detachBuffers();
-                source->queueBuffers(buffer_ids);
+                source.detachBuffers();
+                source.queueBuffers(buffer_ids);
             }
             else
                 ++i;
@@ -145,11 +141,8 @@ static void print_object(SSS::Audio::Source::Ptr const& source)
 }
 
 template<>
-static void print_object(SSS::Audio::Buffer::Ptr const& buffer)
+static void print_object(SSS::Audio::Buffer& buffer)
 {
-    if (!buffer) {
-        return;
-    }
     ImGui::FileBrowser& filebrowser = SSS::ImGuiH::getFilebrowser();
     // Load new file
     if (ImGui::Button("Load sound file")) {
@@ -160,15 +153,15 @@ static void print_object(SSS::Audio::Buffer::Ptr const& buffer)
     filebrowser.Display();
     // If a file has been selected, update buffer
     if (filebrowser.HasSelected()) {
-        buffer->loadFile(filebrowser.GetSelected().string());
+        buffer.loadFile(filebrowser.GetSelected().string());
         filebrowser.ClearSelected();
     }
 
     // Display properties
-    ImGui::Text("%d Ko.", buffer->getProperty(AL_SIZE) / 1000);
-    ImGui::Text("%d Hz.", buffer->getProperty(AL_FREQUENCY));
-    ImGui::Text("%d bits.", buffer->getProperty(AL_BITS));
-    ImGui::Text("%d channel(s).", buffer->getProperty(AL_CHANNELS));
+    ImGui::Text("%d Ko.", buffer.getProperty(AL_SIZE) / 1000);
+    ImGui::Text("%d Hz.", buffer.getProperty(AL_FREQUENCY));
+    ImGui::Text("%d bits.", buffer.getProperty(AL_BITS));
+    ImGui::Text("%d channel(s).", buffer.getProperty(AL_CHANNELS));
 }
 
 template<>

@@ -40,13 +40,7 @@ void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
 void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
 void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
 
-// JSON operations
-
-SSS::GL::Window::Shared createWindow(std::string const& json_path);
-
-void loadScene(SSS::GL::Window::Shared const& window, std::string const& json_path);
-
-void loadTextAreas(std::string const& json_path);
+// ImGui
 
 void print_console();
 void print_imgui();

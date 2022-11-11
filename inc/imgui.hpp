@@ -85,7 +85,13 @@ bool VectorCombo(char const* label, std::vector<_T> const& vec, uint32_t& curren
 
 // Default, deleted
 template<class _Object>
-void print_object(_Object const& ptr) = delete;
+void print_object(_Object& ref) = delete;
+// Shared ptr
+template<class _Object>
+void print_object(std::shared_ptr<_Object> const& ptr) { print_object(*ptr); };
+// Unique ptr
+template<class _Object>
+void print_object(std::unique_ptr<_Object> const& ptr) { print_object(*ptr); };
 
 // Default, deleted
 template<typename _Object>
@@ -194,7 +200,7 @@ void print_objects(Container const& container)
 }
 
 template<typename _Object>
-bool selectVectorElement(std::vector<_Object> const& vec, uint32_t& id)
+bool selectVectorElement(std::vector<std::shared_ptr<_Object>> const& vec, uint32_t& id)
 {
     if (vec.empty()) {
         ImGui::Text("No instance of corresponding class exists");

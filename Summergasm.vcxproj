@@ -21,7 +21,6 @@
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
     <ClCompile Include="src\model_functions.cpp" />
-    <ClCompile Include="src\Json_Operators.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
@@ -29,20 +28,23 @@
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="resources\pictures\coolyori.jpg" />
-    <Image Include="resources\pictures\Mushishi.jpg" />
-    <Image Include="resources\pictures\Skateboard.png" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\json\Scene1.json" />
-    <None Include="resources\json\TextRendering.json" />
-    <None Include="resources\json\Window.json" />
-    <None Include="resources\json\StaticObjects.json" />
     <None Include="resources\lua\audio.lua" />
+    <None Include="resources\lua\Init.lua" />
+    <None Include="resources\lua\Loop.lua" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\assets\plage\foam.png" />
+    <Image Include="resources\assets\plage\sand.png" />
+    <Image Include="resources\assets\plage\water_layer.png" />
+    <Image Include="resources\assets\plage\wet_sand_layer.png" />
+    <Image Include="resources\assets\train\train_result_4.png" />
+    <Image Include="resources\assets\train\train_result_5.png" />
+    <Image Include="resources\assets\train\train_result_6.png" />
+    <Image Include="resources\assets\train\train_result_7.png" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -121,6 +123,7 @@
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -149,6 +152,7 @@
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -178,6 +182,7 @@
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -206,6 +211,7 @@
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
