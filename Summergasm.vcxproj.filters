@@ -10,10 +10,6 @@
       <Extensions>jpg;jpeg;png;bmp;ico</Extensions>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Resource Files\JSON">
-      <UniqueIdentifier>{52172abe-220b-4017-aab3-9dedbbbec6fe}</UniqueIdentifier>
-      <Extensions>json</Extensions>
-    </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
@@ -30,9 +26,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Json_Operators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\callbacks.cpp">
@@ -55,17 +48,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="resources\pictures\coolyori.jpg">
-      <Filter>Resource Files\Pictures</Filter>
-    </Image>
-    <Image Include="resources\pictures\Mushishi.jpg">
-      <Filter>Resource Files\Pictures</Filter>
-    </Image>
-    <Image Include="resources\pictures\Skateboard.png">
-      <Filter>Resource Files\Pictures</Filter>
-    </Image>
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -74,20 +56,40 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\json\Window.json">
-      <Filter>Resource Files\JSON</Filter>
-    </None>
-    <None Include="resources\json\Scene1.json">
-      <Filter>Resource Files\JSON</Filter>
-    </None>
-    <None Include="resources\json\TextRendering.json">
-      <Filter>Resource Files\JSON</Filter>
-    </None>
-    <None Include="resources\json\StaticObjects.json">
-      <Filter>Resource Files\JSON</Filter>
-    </None>
     <None Include="resources\lua\audio.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
+    <None Include="resources\lua\Init.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
+    <None Include="resources\lua\Loop.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\assets\plage\foam.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\plage\sand.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train_result_4.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train_result_5.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train_result_6.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train_result_7.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\plage\water_layer.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\plage\wet_sand_layer.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
   </ItemGroup>
 </Project>
