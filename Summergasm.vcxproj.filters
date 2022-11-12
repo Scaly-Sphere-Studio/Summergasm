@@ -59,12 +59,13 @@
     <None Include="resources\lua\audio.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
-    <None Include="resources\lua\Init.lua">
+    <None Include="resources\lua\beach_init.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
-    <None Include="resources\lua\Loop.lua">
+    <None Include="resources\lua\beach_loop.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
+    <None Include="resources\lua\global_init.lua" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\assets\plage\foam.png">
