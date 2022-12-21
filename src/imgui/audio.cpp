@@ -35,7 +35,7 @@ static void print_object(SSS::Audio::Source& source)
         source.setLooping(loop);
     }
 
-    SSS::Audio::Buffer::Map const& buffers = SSS::Audio::getBuffers();
+    auto const& buffers = SSS::Audio::Buffer::getMap();
     std::vector<uint32_t> buffer_ids = source.getBufferIDs();
 
     if (buffers.empty()) {
@@ -117,7 +117,7 @@ static void print_object(SSS::Audio::Source& source)
             }
             if (ImGui::BeginPopup(popup_map_id)) {
                 ImGui::SetNextItemWidth(100.f);
-                if (MapIDCombo(popup_map_id, SSS::Audio::getBuffers(), id)) {
+                if (MapIDCombo(popup_map_id, SSS::Audio::Buffer::getMap(), id)) {
                     source.detachBuffers();
                     source.queueBuffers(buffer_ids);
                     ImGui::CloseCurrentPopup();
@@ -167,25 +167,25 @@ static void print_object(SSS::Audio::Buffer& buffer)
 template<>
 static void create_object<SSS::Audio::Source>(uint32_t id)
 {
-    SSS::Audio::createSource(id);
+    SSS::Audio::Source::create(id);
 }
 
 template<>
 static void create_object<SSS::Audio::Buffer>(uint32_t id)
 {
-    SSS::Audio::createBuffer(id);
+    SSS::Audio::Buffer::create(id);
 }
 
 template<>
 static void remove_object<SSS::Audio::Source>(uint32_t id)
 {
-    SSS::Audio::removeSource(id);
+    SSS::Audio::Source::remove(id);
 }
 
 template<>
 static void remove_object<SSS::Audio::Buffer>(uint32_t id)
 {
-    SSS::Audio::removeBuffer(id);
+    SSS::Audio::Buffer::remove(id);
 }
 
 void print_audio()
@@ -208,15 +208,15 @@ void print_audio()
         ImGui::EndCombo();
     }
     if (ImGui::Button("Clean sources & buffers")) {
-        SSS::Audio::cleanSources();
-        SSS::Audio::cleanBuffers();
+        SSS::Audio::Source::clearAll();
+        SSS::Audio::Buffer::clearAll();
     }
     if (ImGui::TreeNode("Sources")) {
-        print_objects<SSS::Audio::Source>(SSS::Audio::getSources());
+        print_objects<SSS::Audio::Source>(SSS::Audio::Source::getArray());
         ImGui::TreePop();
     }
     if (ImGui::TreeNode("Buffers")) {
-        print_objects<SSS::Audio::Buffer>(SSS::Audio::getBuffers());
+        print_objects<SSS::Audio::Buffer>(SSS::Audio::Buffer::getMap());
         ImGui::TreePop();
     }
 }

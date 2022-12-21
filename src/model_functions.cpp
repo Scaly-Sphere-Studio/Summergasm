@@ -3,7 +3,7 @@
 void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods)
 {
-    SSS::Audio::Source::Ptr const& source = SSS::Audio::getSources().at(0);
+    SSS::Audio::Source* source = SSS::Audio::Source::get(0);
     if (action == GLFW_PRESS) {
         if (button == GLFW_MOUSE_BUTTON_1) {
             if (source->isPlaying()) {
