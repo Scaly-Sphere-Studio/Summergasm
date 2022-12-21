@@ -8,10 +8,10 @@ do
   BAT_LA_RATE = 0
   OK = 1
 
-  Buffer.get(BAT_LA_RATE):loadFile("resources/sounds/bat-la-rate.mp3")
-  Buffer.get(OK):loadFile("resources/sounds/ok.mp3")
+  Buffer.create(BAT_LA_RATE):loadFile("resources/sounds/bat-la-rate.mp3")
+  Buffer.create(OK):loadFile("resources/sounds/ok.mp3")
   
-  local source = Source.get(0)
+  local source = Source.create()
   source.loop = true;
   source:queueBuffers({BAT_LA_RATE, OK})
   --source.volume = 30

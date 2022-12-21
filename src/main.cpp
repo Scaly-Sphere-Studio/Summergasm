@@ -45,7 +45,7 @@ int main(void) try
     lua_setup(lua);
     TR::lua_setup_TR(lua);
     GL::lua_setup_GL(lua);
-    SSS::Audio::lua_load_audio_functions(lua.globals());
+    Audio::lua_setup_Audio(lua);
     lua["file_script"] = lua_file_script;
     lua["load_scene"] = lua_load_scene;
 
