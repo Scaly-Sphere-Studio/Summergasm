@@ -97,7 +97,7 @@ static void print_object(SSS::GL::Texture& texture)
         //    texture.setTextAreaID(current_id);
         //}
     }
-    if (ui_window == g_data->window) {
+    if (ui_window == g->window) {
         int w, h;
         texture.getCurrentDimensions(w, h);
         if (w != 0 && h != 0) {
@@ -125,7 +125,7 @@ static void print_object(SSS::GL::Plane& plane)
 
     // Display combo to select Texture ID
     uint32_t texture_id = plane.getTextureID();
-    if (MapIDCombo(" Texture ID", g_data->window->getTextureMap(), texture_id)) {
+    if (MapIDCombo(" Texture ID", g->window->getTextureMap(), texture_id)) {
         plane.setTextureID(texture_id);
     }
     // Display combo to select Hitbox Type
@@ -217,7 +217,7 @@ static void print_object(SSS::GL::Renderer& renderer_ptr)
         new_chunk_title.clear();
     }
 
-    SSS::GL::Plane::Vector const all_planes = SSS::GL::Plane::getInstances(g_data->window);
+    SSS::GL::Plane::Vector const all_planes = SSS::GL::Plane::getInstances(g->window);
 
     char label[256];
     // Display each RenderChunk
@@ -291,7 +291,7 @@ static void print_object(SSS::GL::Renderer& renderer_ptr)
                 else {
                     sprintf_s(label, "Create +##create_camera%zu", i);
                     if (CreateButton(label)) {
-                        chunk.camera = SSS::GL::Camera::create(g_data->window);
+                        chunk.camera = SSS::GL::Camera::create(g->window);
                     }
                     ImGui::SameLine();
                     char popup_id[256];
@@ -303,7 +303,7 @@ static void print_object(SSS::GL::Renderer& renderer_ptr)
                         cam_id = 0;
                     }
                     if (ImGui::BeginPopup(popup_id)) {
-                        SSS::GL::Camera::Vector const vec = SSS::GL::Camera::getInstances(g_data->window);
+                        SSS::GL::Camera::Vector const vec = SSS::GL::Camera::getInstances(g->window);
                         if (selectVectorElement(vec, cam_id)) {
                             chunk.camera = vec.at(cam_id);
                             ImGui::CloseCurrentPopup();
@@ -320,7 +320,7 @@ static void print_object(SSS::GL::Renderer& renderer_ptr)
                     ImGui::TableSetColumnIndex(0);
                     sprintf_s(label, "Create Plane +##create_plane%zu", i);
                     if (Tooltip("Create new Plane.", CreateButton, label)) {
-                        planes.emplace_back(SSS::GL::Plane::create(g_data->window));
+                        planes.emplace_back(SSS::GL::Plane::create(g->window));
                     }
                     ImGui::EndTable();
                 }
@@ -406,7 +406,7 @@ static void print_object(SSS::GL::Renderer& renderer_ptr)
                     sprintf_s(label, "+##create_plane%zu", j);
                     if (Tooltip("Create a new Plane", CreateButton, label)) {
                         planes.insert(planes.cbegin() + j + 1,
-                            SSS::GL::Plane::create(g_data->window));
+                            SSS::GL::Plane::create(g->window));
                     }
 
                     // Copy this plane
@@ -453,7 +453,7 @@ static void create_object<SSS::GL::Camera>(uint32_t id)
 template<>
 static void create_object<SSS::GL::Texture>(uint32_t id)
 {
-    g_data->window->createTexture(id);
+    g->window->createTexture(id);
 }
 // Plane
 template<>
@@ -464,7 +464,7 @@ static void create_object<SSS::GL::Plane>(uint32_t id)
 template<>
 static void create_object<SSS::GL::Renderer>(uint32_t id)
 {
-    g_data->window->createRenderer<SSS::GL::PlaneRenderer>(id);
+    g->window->createRenderer<SSS::GL::PlaneRenderer>(id);
 }
 
 // Camera
@@ -476,7 +476,7 @@ static void remove_object<SSS::GL::Camera>(uint32_t id)
 template<>
 static void remove_object<SSS::GL::Texture>(uint32_t id)
 {
-    g_data->window->removeTexture(id);
+    g->window->removeTexture(id);
 }
 // Plane
 template<>
@@ -487,19 +487,19 @@ static void remove_object<SSS::GL::Plane>(uint32_t id)
 template<>
 static void remove_object<SSS::GL::Renderer>(uint32_t id)
 {
-    g_data->window->removeRenderer(id);
+    g->window->removeRenderer(id);
 }
 
 void print_window_objects()
 {
     // Textures
     if (ImGui::TreeNode("Textures")) {
-        print_objects<SSS::GL::Texture>(g_data->window->getTextureMap());
+        print_objects<SSS::GL::Texture>(g->window->getTextureMap());
         ImGui::TreePop();
     }
     // Renderers
     if (ImGui::TreeNode("Renderers")) {
-        print_objects<SSS::GL::Renderer>(g_data->window->getRendererMap());
+        print_objects<SSS::GL::Renderer>(g->window->getRendererMap());
         ImGui::TreePop();
     }
 }

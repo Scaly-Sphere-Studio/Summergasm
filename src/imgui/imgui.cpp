@@ -143,78 +143,78 @@ bool StringButtonEdit(char const* label, std::string& str)
 void print_window_options()
 {
     // Fullscreen mode
-    bool fullscreen = g_data->window->isFullscreen();
+    bool fullscreen = g->window->isFullscreen();
     if (ImGui::Checkbox(" Fullscreen", &fullscreen)) {
-        g_data->window->setFullscreen(fullscreen);
+        g->window->setFullscreen(fullscreen);
     }
     // Maximization mode
-    bool maximized = g_data->window->isMaximized();
+    bool maximized = g->window->isMaximized();
     if (ImGui::Checkbox(" Maximize", &maximized)) {
-        g_data->window->setMaximization(maximized);
+        g->window->setMaximization(maximized);
     }
     // Visibility mode
-    bool show = g_data->window->isVisible();
+    bool show = g->window->isVisible();
     if (ImGui::Checkbox(" Visible", &show)) {
-        g_data->window->setVisibility(show);
+        g->window->setVisibility(show);
     }
     // Iconification mode
-    bool iconify = g_data->window->isIconified();
+    bool iconify = g->window->isIconified();
     if (ImGui::Checkbox(" Iconify", &iconify)) {
-        g_data->window->setIconification(iconify);
+        g->window->setIconification(iconify);
     }
     // Window title
     char title[256];
-    strcpy_s(title, g_data->window->getTitle().c_str());
+    strcpy_s(title, g->window->getTitle().c_str());
     ImGui::InputText(" Window title", title, 256);
     if (ImGui::IsItemDeactivated()) {
-        g_data->window->setTitle(title);
+        g->window->setTitle(title);
     }
     // Window dimensions
     int w, h;
-    g_data->window->getDimensions(w, h);
+    g->window->getDimensions(w, h);
     ImGui::InputInt(" Window width", &w, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setDimensions(w, h);
+        g->window->setDimensions(w, h);
     }
     ImGui::InputInt(" Window height", &h, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setDimensions(w, h);
+        g->window->setDimensions(w, h);
     }
     // Window position
     int x, y;
-    g_data->window->getPosition(x, y);
+    g->window->getPosition(x, y);
     ImGui::InputInt(" Window X pos", &x, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setPosition(x, y);
+        g->window->setPosition(x, y);
     }
     ImGui::InputInt(" Window Y pos", &y, 0);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setPosition(x, y);
+        g->window->setPosition(x, y);
     }
     // VSYNC
-    bool vsync = g_data->window->getVSYNC();
+    bool vsync = g->window->getVSYNC();
     if (ImGui::Checkbox(" VSYNC", &vsync)) {
-        g_data->window->setVSYNC(vsync);
+        g->window->setVSYNC(vsync);
     }
     // FPS Limit
-    int fps_limit = g_data->window->getFPSLimit();
+    int fps_limit = g->window->getFPSLimit();
     ImGui::InputInt(" FPS limit", &fps_limit);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        g_data->window->setFPSLimit(fps_limit);
+        g->window->setFPSLimit(fps_limit);
     }
 }
 
 void print_imgui()
 {
-    if (!g_data->ui_use_separate_window &&
-        glfwGetKey(g_data->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if (!g->ui_use_separate_window &&
+        glfwGetKey(g->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
-        g_data->ui_display = false;
-        g_data->window->unblockInputs();
+        g->ui_display = false;
+        g->window->unblockInputs();
         return;
     }
 
-    ui_window = g_data->ui_use_separate_window ? g_data->ui_window : g_data->window;
+    ui_window = g->ui_use_separate_window ? g->ui_window : g->window;
     SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
 
     // Make context current
@@ -223,7 +223,7 @@ void print_imgui()
         return;
     }
     
-    // ImGui g_data->window presets (cropped to GL window)
+    // ImGui g->window presets (cropped to GL window)
     int ui_w, ui_h;
     ui_window->getDimensions(ui_w, ui_h);
     ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ui_w), static_cast<float>(ui_h)));
@@ -237,7 +237,7 @@ void print_imgui()
     ImGui::SetNextWindowBgAlpha(bg_alpha);
 
     // Render UI
-    if (ImGui::Begin("Main UI g_data->window", nullptr, flags)) {
+    if (ImGui::Begin("Main UI g->window", nullptr, flags)) {
         ImGui::PushItemWidth(300.f);
         // Settings
         if (ImGui::CollapsingHeader("Settings & Object Management")) {
@@ -246,14 +246,14 @@ void print_imgui()
             if (ImGui::CollapsingHeader("UI options")) {
                 ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
                 if (ImGui::Checkbox(" Display UI on a separate window",
-                    &g_data->ui_use_separate_window)) {
-                    if (g_data->ui_use_separate_window) {
-                        glfwShowWindow(g_data->ui_window->getGLFWwindow());
-                        g_data->window->unblockInputs();
+                    &g->ui_use_separate_window)) {
+                    if (g->ui_use_separate_window) {
+                        glfwShowWindow(g->ui_window->getGLFWwindow());
+                        g->window->unblockInputs();
                     }
                     else {
-                        glfwHideWindow(g_data->ui_window->getGLFWwindow());
-                        g_data->window->blockInputs(GLFW_KEY_F1);
+                        glfwHideWindow(g->ui_window->getGLFWwindow());
+                        g->window->blockInputs(GLFW_KEY_F1);
                     }
                 }
             }

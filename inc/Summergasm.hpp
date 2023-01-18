@@ -23,7 +23,12 @@ struct GlobalData {
     sol::state lua;
     std::vector<std::string> texts;
 };
-extern std::unique_ptr<GlobalData> g_data;
+extern std::unique_ptr<GlobalData> g;
+
+// Lua
+bool lua_file_script(std::string const& path);
+bool lua_loop_script();
+bool lua_load_scene(std::string const& scene_name);
 
 // Callbacks
 

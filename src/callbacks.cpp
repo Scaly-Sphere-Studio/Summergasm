@@ -18,17 +18,17 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
             window->setFullscreen(!window->isFullscreen());
             break;
         case GLFW_KEY_F1: {
-            g_data->ui_display = !g_data->ui_display;
-            if (g_data->ui_use_separate_window) {
-                g_data->ui_window->setVisibility(g_data->ui_display);
+            g->ui_display = !g->ui_display;
+            if (g->ui_use_separate_window) {
+                g->ui_window->setVisibility(g->ui_display);
             }
-            else if (g_data->ui_display) {
-                g_data->window->blockInputs(key);
+            else if (g->ui_display) {
+                g->window->blockInputs(key);
             }
         }   break;
         case GLFW_KEY_F2: {
-            g_data->console_display = !g_data->console_display;
-            if (g_data->console_display) {
+            g->console_display = !g->console_display;
+            if (g->console_display) {
                 window->blockInputs(key);
             }
         }   break;
@@ -38,7 +38,7 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
 
 void close_callback(GLFWwindow* ptr)
 {
-    g_data->ui_display = false;
+    g->ui_display = false;
     glfwSetWindowShouldClose(ptr, GLFW_FALSE);
-    g_data->ui_window->setVisibility(false);
+    g->ui_window->setVisibility(false);
 }

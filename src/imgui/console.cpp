@@ -1,22 +1,22 @@
 #include "imgui.hpp"
 
 void print_console() {
-    if (glfwGetKey(g_data->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        g_data->console_display = false;
-        g_data->window->unblockInputs();
+    if (glfwGetKey(g->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        g->console_display = false;
+        g->window->unblockInputs();
         return;
     }
 
     // Make context current
-    SSS::GL::Context const context(g_data->window);
-    SSS::ImGuiH::setContext(g_data->window->getGLFWwindow());
+    SSS::GL::Context const context(g->window);
+    SSS::ImGuiH::setContext(g->window->getGLFWwindow());
     if (!SSS::ImGuiH::newFrame()) {
         return;
     }
 
     // Crop to bottom of Window
     int ui_w, ui_h;
-    g_data->window->getDimensions(ui_w, ui_h);
+    g->window->getDimensions(ui_w, ui_h);
     ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ui_w), static_cast<float>(300)));
     ImGui::SetNextWindowPos(ImVec2(0, ui_h - 300));
     constexpr ImGuiWindowFlags flags = 0
@@ -104,7 +104,7 @@ void print_console() {
         if (ImGui::IsItemDeactivatedAfterEdit()) {
             // Add command to memory
             memory.emplace_back(buffer);
-            auto result = g_data->lua.safe_script(buffer, sol::script_pass_on_error);
+            auto result = g->lua.safe_script(buffer, sol::script_pass_on_error);
             if (!result.valid()) {
                 memory.back().color = ImVec4(1, 0, 0, 1);
                 sol::error err = result;
