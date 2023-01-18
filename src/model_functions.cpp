@@ -27,10 +27,10 @@ void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
     int button, int action, int mods)
 {
     static uint32_t text_id = 1;
-    if (action == GLFW_PRESS && text_id < g_data->texts.size()) {
-        SSS::TR::Area& area = g_data->lua["area"];
-        area.parseString(g_data->lua["string_array"][text_id++]);
-        if (text_id >= g_data->texts.size())
+    if (action == GLFW_PRESS && text_id < g->texts.size()) {
+        SSS::TR::Area& area = g->lua["area"];
+        area.parseString(g->lua["string_array"][text_id++]);
+        if (text_id >= g->texts.size())
             text_id = 0;
     }
 }
