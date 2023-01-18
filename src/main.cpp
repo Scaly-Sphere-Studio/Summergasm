@@ -51,6 +51,7 @@ int main(void) try
 
     if (lua_file_script("global_init.lua"))
         return -1;
+
     lua_file_script("audio.lua");
 
     SSS::GL::Plane::on_click_funcs = {

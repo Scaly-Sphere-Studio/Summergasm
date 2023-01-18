@@ -239,32 +239,37 @@ void print_imgui()
     // Render UI
     if (ImGui::Begin("Main UI g_data->window", nullptr, flags)) {
         ImGui::PushItemWidth(300.f);
-        // UI options
-        if (ImGui::CollapsingHeader("UI options")) {
-            ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
-            if (ImGui::Checkbox(" Display UI on a separate window",
-                &g_data->ui_use_separate_window)) {
-                if (g_data->ui_use_separate_window) {
-                    glfwShowWindow(g_data->ui_window->getGLFWwindow());
-                    g_data->window->unblockInputs();
-                }
-                else {
-                    glfwHideWindow(g_data->ui_window->getGLFWwindow());
-                    g_data->window->blockInputs(GLFW_KEY_F1);
+        // Settings
+        if (ImGui::CollapsingHeader("Settings & Object Management")) {
+            ImGui::Indent(10.f);
+            // UI options
+            if (ImGui::CollapsingHeader("UI options")) {
+                ImGui::SliderFloat(" Background Opacity", &bg_alpha, 0.f, 1.f);
+                if (ImGui::Checkbox(" Display UI on a separate window",
+                    &g_data->ui_use_separate_window)) {
+                    if (g_data->ui_use_separate_window) {
+                        glfwShowWindow(g_data->ui_window->getGLFWwindow());
+                        g_data->window->unblockInputs();
+                    }
+                    else {
+                        glfwHideWindow(g_data->ui_window->getGLFWwindow());
+                        g_data->window->blockInputs(GLFW_KEY_F1);
+                    }
                 }
             }
-        }
-        // Window options
-        if (ImGui::CollapsingHeader("Window options")) {
-            print_window_options();
-        }
-        // Window objects
-        if (ImGui::CollapsingHeader("Window objects")) {
-            print_window_objects();
-        }
-        // Audio
-        if (ImGui::CollapsingHeader("Audio")) {
-            print_audio();
+            // Window options
+            if (ImGui::CollapsingHeader("Window options")) {
+                print_window_options();
+            }
+            // Window objects
+            if (ImGui::CollapsingHeader("Window objects")) {
+                print_window_objects();
+            }
+            // Audio
+            if (ImGui::CollapsingHeader("Audio")) {
+                print_audio();
+            }
+            ImGui::Unindent();
         }
         ImGui::End();
     }
