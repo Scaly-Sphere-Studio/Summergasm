@@ -1,4 +1,4 @@
-print("> global_init.lua start")
+print("> global_setup.lua start")
 
 print("  > Init text areas")
 -- Text areas
@@ -62,4 +62,4 @@ do
     ui_window = GL.Window.create(args)
 end
 
-print("> global_init.lua end")
+print("> global_setup.lua end")

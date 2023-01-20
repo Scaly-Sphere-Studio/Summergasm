@@ -32,10 +32,10 @@
     <ClInclude Include="inc\Summergasm.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\lua\audio.lua" />
+    <None Include="resources\lua\audio_setup.lua" />
     <None Include="resources\lua\beach_init.lua" />
     <None Include="resources\lua\beach_loop.lua" />
-    <None Include="resources\lua\global_init.lua" />
+    <None Include="resources\lua\global_setup.lua" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\assets\plage\foam.png" />

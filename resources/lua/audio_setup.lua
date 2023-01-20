@@ -1,4 +1,4 @@
-log_msg("audio.lua start");
+log_msg("audio_setup.lua start");
 
 do
   local _ENV = Audio
@@ -18,4 +18,4 @@ do
   --source:play()
 end
 
-log_msg("audio.lua end");
+log_msg("audio_setup.lua end");

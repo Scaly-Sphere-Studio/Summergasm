@@ -17,15 +17,23 @@
 struct GlobalData {
     SSS::GL::Window::Shared window;
     SSS::GL::Window::Shared ui_window;
+    
     bool ui_display{ false };
     bool ui_use_separate_window{ false };
     bool console_display{ false };
+    
+    std::string home;
+    std::string resources;
+
     sol::state lua;
+    std::set<std::string> scenes;
+
     std::vector<std::string> texts;
 };
 extern std::unique_ptr<GlobalData> g;
 
 // Lua
+void register_scenes();
 bool lua_file_script(std::string const& path);
 bool lua_loop_script();
 bool lua_load_scene(std::string const& scene_name);

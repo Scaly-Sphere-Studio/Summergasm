@@ -5,9 +5,22 @@ using namespace SSS;
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
+void register_scenes()
+{
+    for (auto const& entry : std::filesystem::directory_iterator(g->resources + "lua/")) {
+        std::string const path = entry.path().string();
+        std::string const name = path.substr(path.rfind('/') + 1);
+        // Ensure filename ends with .lua
+        size_t const dot = name.rfind('.');
+        if (dot == std::string::npos || name.substr(dot) != ".lua")
+            continue;
+        LOG_MSG(name);
+    }
+}
+
 bool lua_file_script(std::string const& path)
 {
-    std::string real_path = "resources/lua/" + path;
+    std::string real_path = g->resources + "lua/" + path;
     auto result = g->lua.safe_script_file(real_path, sol::script_pass_on_error);
     if (!result.valid()) {
         sol::error err = result;
@@ -40,6 +53,14 @@ int main(void) try
     //SSS::Log::GL::Callbacks::louden(true);
     //SSS::Log::GL::Callbacks::get().mouse_button = true;
 
+    std::string const key = "Summergasm";
+    auto const n = SSS::PWD.rfind(key);
+    if (n != std::string::npos) {
+        g->home = SSS::PWD.substr(0, n + key.size() + 1);
+        g->resources = g->home + "resources/";
+    }
+    register_scenes();
+
     g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math);
     sol::state& lua = g->lua;
     lua_setup(lua);
@@ -49,10 +70,10 @@ int main(void) try
     lua["file_script"] = lua_file_script;
     lua["load_scene"] = lua_load_scene;
 
-    if (lua_file_script("global_init.lua"))
+    if (lua_file_script("global_setup.lua"))
         return -1;
 
-    lua_file_script("audio.lua");
+    lua_file_script("audio_setup.lua");
 
     SSS::GL::Plane::on_click_funcs = {
         { 0, nullptr },
