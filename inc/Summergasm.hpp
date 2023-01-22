@@ -22,11 +22,15 @@ struct GlobalData {
     bool ui_use_separate_window{ false };
     bool console_display{ false };
     
-    std::string home;
-    std::string resources;
+    std::string home_folder;
+    std::string resources_folder;
+    std::string lua_folder;
+    std::string assets_folder;
 
     sol::state lua;
-    std::set<std::string> scenes;
+    std::string lua_loop_script;
+    std::set<std::string> lua_scripts;
+    std::set<std::string> lua_scenes;
 
     std::vector<std::string> texts;
 };
