@@ -1,18 +1,24 @@
-print("> global_setup.lua start")
+function getOwnFilename()
+    return debug.getinfo(1, "S").source:match(".*/(.*)")
+end
 
-print("  > Init text areas")
+local f = getOwnFilename()
+
+print(f, "start")
+
+print(f, "  Init text areas")
 -- Text areas
 do
     area = TR.Area.create(1280, 720)
 
-    print("    > Fmt0")
+    print(f, "    Fmt0")
 
     local fmt = area:getFmt(0)
     fmt.font = "impact.ttf"
     fmt.charsize = 150
     area:setFmt(fmt, 0)
 
-    print("    > Fmt1")
+    print(f, "    Fmt1")
 
     local fmt = area:getFmt(1)
     fmt.font = "arial.ttf"
@@ -22,7 +28,7 @@ do
     fmt.has_shadow = true
     area:setFmt(fmt, 1)
 
-    print("    > Array")
+    print(f, "    Array")
 
     string_array = {
         "Lorem ipsum {fmt: 1}dolor sit amet,",
@@ -35,11 +41,11 @@ do
         "sunt in culpa qui officia deserunt mollit anim id est laborum."
     }
     
-    print("    > Parse string")
+    print(f, "    Parse string")
     area.string = string_array[1]
 end
 
-print("  > Init windows")
+print(f, "  Init windows")
 -- Create Window
 do
     local args = GL.WindowArgs.new()
@@ -62,4 +68,4 @@ do
     ui_window = GL.Window.create(args)
 end
 
-print("> global_setup.lua end")
+print(f, "end")
