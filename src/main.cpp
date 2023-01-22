@@ -7,20 +7,41 @@ std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
 void register_scenes()
 {
-    for (auto const& entry : std::filesystem::directory_iterator(g->resources + "lua/")) {
+    std::set<std::string> init, loop;
+    for (auto const& entry : std::filesystem::directory_iterator(g->lua_folder)) {
         std::string const path = entry.path().string();
         std::string const name = path.substr(path.rfind('/') + 1);
         // Ensure filename ends with .lua
-        size_t const dot = name.rfind('.');
-        if (dot == std::string::npos || name.substr(dot) != ".lua")
+        size_t n = name.rfind('.');
+        if (n == std::string::npos || name.substr(n) != ".lua")
             continue;
-        LOG_MSG(name);
+        g->lua_scripts.emplace(name);
+        n = name.rfind('_');
+        if (n != std::string::npos) {
+            std::string const end = name.substr(n);
+            if (end == "_init.lua") {
+                init.emplace(name.substr(0, n));
+            }
+            else if (end == "_loop.lua") {
+                loop.emplace(name.substr(0, n));
+            }
+        }
+    }
+    for (std::string const& str : init) {
+        if (loop.count(str) != 0) {
+            g->lua_scenes.emplace(str);
+        }
     }
 }
 
 bool lua_file_script(std::string const& path)
 {
-    std::string real_path = g->resources + "lua/" + path;
+    if (g->lua_scripts.count(path) == 0) {
+        LOG_FUNC_CTX_WRN("Given script wasn't registered", path);
+        return true;
+    }
+
+    std::string const real_path = g->lua_folder + path;
     auto result = g->lua.safe_script_file(real_path, sol::script_pass_on_error);
     if (!result.valid()) {
         sol::error err = result;
@@ -32,17 +53,20 @@ bool lua_file_script(std::string const& path)
 
 bool lua_loop_script()
 {
-    std::string const path = g->lua["loop_filepath"];
-    if (path.empty())
+    if (g->lua_loop_script.empty())
         return false;
-    return lua_file_script(path);
+    return lua_file_script(g->lua_loop_script);
 }
 
 bool lua_load_scene(std::string const& scene_name)
 {
+    if (g->lua_scenes.count(scene_name) == 0) {
+        LOG_FUNC_CTX_WRN("Given scene wasn't registered", scene_name);
+        return true;
+    }
     if (lua_file_script(scene_name + "_init.lua"))
         return true;
-    g->lua["loop_filepath"] = scene_name + "_loop.lua";
+    g->lua_loop_script = scene_name + "_loop.lua";
     return false;
 }
 
@@ -56,8 +80,10 @@ int main(void) try
     std::string const key = "Summergasm";
     auto const n = SSS::PWD.rfind(key);
     if (n != std::string::npos) {
-        g->home = SSS::PWD.substr(0, n + key.size() + 1);
-        g->resources = g->home + "resources/";
+        g->home_folder = SSS::PWD.substr(0, n + key.size() + 1);
+        g->resources_folder = g->home_folder + "resources/";
+        g->lua_folder = g->resources_folder + "lua/";
+        g->assets_folder = g->resources_folder + "assets/";
     }
     register_scenes();
 

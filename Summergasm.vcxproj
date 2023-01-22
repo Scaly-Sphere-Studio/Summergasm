@@ -131,17 +131,12 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(SolutionDir)resources" "$(TargetDir)resources/" /e /y /i &gt; NUL</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>Copy resources directory</Message>
-    </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>RD /s /q $(TargetDir)\resources</Command>
-    </PreBuildEvent>
-    <PreBuildEvent>
-      <Message>Removing previous resources</Message>
-    </PreBuildEvent>
+    <PostBuildEvent />
+    <PreBuildEvent />
+    <PreBuildEvent />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -164,17 +159,12 @@
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(SolutionDir)resources" "$(TargetDir)resources/" /e /y /i &gt; NUL</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>Copy resources directory</Message>
-    </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>RD /s /q $(TargetDir)\resources</Command>
-    </PreBuildEvent>
-    <PreBuildEvent>
-      <Message>Removing previous resources</Message>
-    </PreBuildEvent>
+    <PostBuildEvent />
+    <PreBuildEvent />
+    <PreBuildEvent />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -192,17 +182,12 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(SolutionDir)resources" "$(TargetDir)resources/" /e /y /i &gt; NUL</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>Copy resources directory</Message>
-    </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>RD /s /q $(TargetDir)\resources</Command>
-    </PreBuildEvent>
-    <PreBuildEvent>
-      <Message>Removing previous resources</Message>
-    </PreBuildEvent>
+    <PostBuildEvent />
+    <PreBuildEvent />
+    <PreBuildEvent />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -225,17 +210,12 @@
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(SolutionDir)resources" "$(TargetDir)resources/" /e /y /i &gt; NUL</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>Copy resources directory</Message>
-    </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>RD /s /q $(TargetDir)\resources</Command>
-    </PreBuildEvent>
-    <PreBuildEvent>
-      <Message>Removing previous resources</Message>
-    </PreBuildEvent>
+    <PostBuildEvent />
+    <PreBuildEvent />
+    <PreBuildEvent />
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
