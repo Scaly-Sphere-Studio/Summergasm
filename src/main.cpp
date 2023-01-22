@@ -87,7 +87,7 @@ int main(void) try
     }
     register_scenes();
 
-    g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math);
+    g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::debug);
     sol::state& lua = g->lua;
     lua_setup(lua);
     TR::lua_setup_TR(lua);
