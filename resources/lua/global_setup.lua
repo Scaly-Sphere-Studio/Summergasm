@@ -1,8 +1,5 @@
-function getOwnFilename()
-    return debug.getinfo(1, "S").source:match(".*/(.*)")
-end
+local f = debug.getinfo(1, "S").source:match(".*/(.*)")
 
-local f = getOwnFilename()
 
 print(f, "start")
 

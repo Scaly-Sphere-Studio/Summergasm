@@ -33,8 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\lua\audio_setup.lua" />
-    <None Include="resources\lua\beach_init.lua" />
-    <None Include="resources\lua\beach_loop.lua" />
+    <None Include="resources\lua\beach.lua" />
     <None Include="resources\lua\global_setup.lua" />
   </ItemGroup>
   <ItemGroup>
