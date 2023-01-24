@@ -59,10 +59,7 @@
     <None Include="resources\lua\audio_setup.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
-    <None Include="resources\lua\beach_init.lua">
-      <Filter>Resource Files\Lua</Filter>
-    </None>
-    <None Include="resources\lua\beach_loop.lua">
+    <None Include="resources\lua\beach.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
     <None Include="resources\lua\global_setup.lua">

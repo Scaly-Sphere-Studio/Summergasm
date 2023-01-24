@@ -12,6 +12,16 @@
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
+// Lua
+
+enum class SceneState {
+    Inactive,
+    Loading,
+    Running,
+    Unloading,
+    NotRegistered
+};
+
 // Static data
 
 struct GlobalData {
@@ -28,19 +38,20 @@ struct GlobalData {
     std::string assets_folder;
 
     sol::state lua;
-    std::string lua_loop_script;
-    std::set<std::string> lua_scripts;
-    std::set<std::string> lua_scenes;
+    std::map<std::string, SceneState> lua_scripts;
 
     std::vector<std::string> texts;
 };
 extern std::unique_ptr<GlobalData> g;
 
 // Lua
-void register_scenes();
-bool lua_file_script(std::string const& path);
-bool lua_loop_script();
-bool lua_load_scene(std::string const& scene_name);
+
+void mylua_register_scripts();
+bool mylua_file_script(std::string const& path);
+bool mylua_run_active_scenes();
+bool mylua_load_scene(std::string const& scene_name);
+bool mylua_unload_scene(std::string const& scene_name);
+SceneState mylua_get_script_state(std::string const& scene_name);
 
 // Callbacks
 
