@@ -1,8 +1,6 @@
-local filename = debug.getinfo(1, "S").source:match(".*/(.*)")
-local state = get_script_state(filename)
 local context = GL.Context.new(window)
 
-if (state == SceneState.Loading)
+if (is_loading)
 then
     print(filename, "init start")
     
@@ -23,7 +21,8 @@ then
     foam:translate(vec3.new(0, 0, 0.9))
     foam:scale(4.0)
 
-    plane_renderer = GL.PlaneRenderer.create(window)
+    plane_renderer = GL.PlaneRenderer.create()
+    window:addRenderer(plane_renderer)
 
     local chunk = GL.Chunk.new(camera)
     chunk.title = filename
@@ -34,7 +33,7 @@ then
     
     print(filename, "init end")
 
-elseif (state == SceneState.Unloading)
+elseif (is_unloading)
 then
     for i=1,#plane_renderer.chunks do
         if (plane_renderer.chunks[i].title == filename) then
@@ -48,7 +47,7 @@ then
     water = nil
     foam = nil
 
-elseif (state == SceneState.Running)
+elseif (is_running)
 then
     local speed = 0.015
 
