@@ -124,9 +124,11 @@ static void print_object(SSS::GL::Plane& plane)
     ImGui::Text("");
 
     // Display combo to select Texture ID
-    uint32_t texture_id = plane.getTextureID();
-    if (MapIDCombo(" Texture ID", g->window->getTextureMap(), texture_id)) {
-        plane.setTextureID(texture_id);
+    auto texture = plane.getTexture();
+    auto map = SSS::GL::Texture::getInstances();
+    uint32_t id = std::distance(map.cbegin(), std::find(map.cbegin(), map.cend(), texture));
+    if (VectorCombo(" Texture ID", SSS::GL::Texture::getInstances(), id)) {
+        plane.setTexture(map.at(id));
     }
     // Display combo to select Hitbox Type
     int current_hitbox = static_cast<int>(plane.getHitbox());
@@ -190,9 +192,8 @@ static void print_object(SSS::GL::Plane& plane)
 }
 // Renderer
 template<>
-static void print_object(SSS::GL::Renderer& renderer_ptr)
+static void print_object(SSS::GL::PlaneRenderer& renderer)
 {
-    SSS::GL::PlaneRenderer& renderer = renderer_ptr.castAs<SSS::GL::PlaneRenderer>();
     // Display title of the Renderer
     ImGui::Text("Renderer title: \"%s\"", renderer.title.c_str());
     StringButtonEdit("Edit title", renderer.title);
@@ -453,7 +454,6 @@ static void create_object<SSS::GL::Camera>(uint32_t id)
 template<>
 static void create_object<SSS::GL::Texture>(uint32_t id)
 {
-    g->window->createTexture(id);
 }
 // Plane
 template<>
@@ -462,9 +462,8 @@ static void create_object<SSS::GL::Plane>(uint32_t id)
 }
 // Renderer
 template<>
-static void create_object<SSS::GL::Renderer>(uint32_t id)
+static void create_object<SSS::GL::PlaneRenderer>(uint32_t id)
 {
-    g->window->createRenderer<SSS::GL::PlaneRenderer>(id);
 }
 
 // Camera
@@ -476,7 +475,6 @@ static void remove_object<SSS::GL::Camera>(uint32_t id)
 template<>
 static void remove_object<SSS::GL::Texture>(uint32_t id)
 {
-    g->window->removeTexture(id);
 }
 // Plane
 template<>
@@ -485,21 +483,27 @@ static void remove_object<SSS::GL::Plane>(uint32_t id)
 }
 // Renderer
 template<>
-static void remove_object<SSS::GL::Renderer>(uint32_t id)
+static void remove_object<SSS::GL::PlaneRenderer>(uint32_t id)
 {
-    g->window->removeRenderer(id);
 }
 
 void print_window_objects()
 {
     // Textures
     if (ImGui::TreeNode("Textures")) {
-        print_objects<SSS::GL::Texture>(g->window->getTextureMap());
+        print_objects<SSS::GL::Texture>(SSS::GL::Texture::getInstances());
         ImGui::TreePop();
     }
     // Renderers
     if (ImGui::TreeNode("Renderers")) {
-        print_objects<SSS::GL::Renderer>(g->window->getRendererMap());
+        auto renderers = g->window->getRenderers();
+        std::vector<SSS::GL::PlaneRenderer::Shared> v;
+        for (auto renderer : renderers) {
+            auto plane_renderer = std::dynamic_pointer_cast<SSS::GL::PlaneRenderer>(renderer);
+            if (plane_renderer)
+                v.emplace_back(plane_renderer);
+        }
+        print_objects<SSS::GL::PlaneRenderer>(v);
         ImGui::TreePop();
     }
 }
