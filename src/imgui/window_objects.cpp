@@ -67,6 +67,11 @@ static void print_object(SSS::GL::Camera& camera)
 template<>
 static void print_object(SSS::GL::Texture& texture)
 {
+    // Get & Display dimensions
+    int w, h;
+    texture.getCurrentDimensions(w, h);
+    ImGui::Text("Width: %d / Height: %d", w, h);
+
     // Display combo to choose Texture Type
     static const char* tex_types[] = { "Raw", "Text" };
     SSS::GL::Texture::Type type = texture.getType();
@@ -74,7 +79,12 @@ static void print_object(SSS::GL::Texture& texture)
     if (ImGui::Combo(" Texture type", &type_id, tex_types, 2)) {
         type = static_cast<SSS::GL::Texture::Type>(type_id);
         texture.setType(type);
+        texture.getCurrentDimensions(w, h);
     }
+
+    static float preview_width = 300.f;
+    ImGui::SliderFloat("Preview's width (px)", &preview_width, 100.f, ui_window->getWidth(), "%.0f");
+
     // Depending on Texture Type, display texture options
     if (type == SSS::GL::Texture::Type::Raw) {
         ImGui::FileBrowser& filebrowser = SSS::ImGuiH::getFilebrowser();
@@ -97,23 +107,38 @@ static void print_object(SSS::GL::Texture& texture)
         //    texture.setTextAreaID(current_id);
         //}
     }
-    if (ui_window == g->window) {
-        int w, h;
-        texture.getCurrentDimensions(w, h);
-        if (w != 0 && h != 0) {
-            float const ratio = static_cast<float>(w) / 300.f;
-            ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
-            // C4312
-#ifdef _WIN64
-            uint64_t const id = texture.getBasicTextureID();
-#else
-            uint32_t const id = texture.getBasicTextureID();
-#endif // _WIN64
-            ImGui::Image(reinterpret_cast<void*>(id), dim);
+
+    if (w != 0 && h != 0) {
+        static auto constexpr init_tex = [](SSS::GL::Window::Shared window) {
+            SSS::GL::Basic::Texture tex(window, GL_TEXTURE_2D);
+            tex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            tex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            tex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            tex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            return tex;
+        };
+        static SSS::GL::Basic::Texture main_tex(init_tex(g->window)),
+                                        ui_tex(init_tex(g->ui_window));
+        auto& tex = g->ui_use_separate_window ? ui_tex : main_tex;
+
+        void const* pixels = nullptr;
+        switch (texture.getType()) {
+            using Type = SSS::GL::Texture::Type;
+        case Type::Raw: {
+            pixels = texture.getRawPixels().data();
+        }   break;
+        case Type::Text: {
+            pixels = texture.getTextArea()->pixelsGet();
+        }   break;
         }
-    }
-    else {
-        ImGui::Text("No preview when using a separate window");
+
+        tex.bind();
+        tex.editSettings(w, h);
+        tex.editPixels(pixels);
+
+        float const ratio = static_cast<float>(w) / preview_width;
+        ImVec2 dim(static_cast<float>(w) / ratio, static_cast<float>(h) / ratio);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<uintptr_t>(tex.id)), dim);
     }
 }
 // Plane
