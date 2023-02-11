@@ -3,10 +3,6 @@ local context = GL.Context.new(window)
 if (is_loading)
 then
     print(filename, "init start")
-    
-    camera = GL.Camera.create()
-    camera.position = vec3.new(0, 0, 3)
-    camera.proj_type = GL.Projection.Ortho
 
     sand = GL.Plane.create(GL.Texture.create("resources/assets/plage/sand.png"))
     sand:scale(4.0)
@@ -20,9 +16,6 @@ then
     foam = GL.Plane.create(GL.Texture.create("resources/assets/plage/foam.png"))
     foam:translate(vec3.new(0, 0, 0.9))
     foam:scale(4.0)
-
-    plane_renderer = GL.PlaneRenderer.create()
-    window:addRenderer(plane_renderer)
 
     local chunk = GL.Chunk.new(camera)
     chunk.title = filename
@@ -41,11 +34,6 @@ then
             break
         end
     end
-    -- TODO: cleanup textures
-    sand = nil
-    wet = nil
-    water = nil
-    foam = nil
 
 elseif (is_running)
 then
