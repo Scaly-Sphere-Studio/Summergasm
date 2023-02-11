@@ -35,6 +35,7 @@
     <None Include="resources\lua\audio_setup.lua" />
     <None Include="resources\lua\beach.lua" />
     <None Include="resources\lua\global_setup.lua" />
+    <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\assets\plage\foam.png" />

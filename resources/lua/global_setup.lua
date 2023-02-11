@@ -65,4 +65,15 @@ do
     ui_window = GL.Window.create(args)
 end
 
+print(f, "  Init window objects")
+-- Create & bind window related objects
+do
+    plane_renderer = GL.PlaneRenderer.create()
+    window:addRenderer(plane_renderer)
+
+    camera = GL.Camera.create()
+    camera.position = vec3.new(0, 0, 3)
+    camera.proj_type = GL.Projection.Ortho
+end
+
 print(f, "end")
