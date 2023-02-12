@@ -28,7 +28,7 @@ do
     print(f, "    Array")
 
     string_array = {
-        "Lorem ipsum {fmt: 1}dolor sit amet,",
+        "Lorem ipsum {{fmt: 1}}dolor sit amet,",
         "consectetur adipiscing elit,",
         "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         "Ut enim ad minim veniam,",
@@ -77,3 +77,5 @@ do
 end
 
 print(f, "end")
+
+load_scene("homescreen")
