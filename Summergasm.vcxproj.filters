@@ -65,6 +65,12 @@
     <None Include="resources\lua\global_setup.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
+    <None Include="resources\lua\train.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
+    <None Include="resources\lua\homescreen.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\assets\plage\foam.png">
