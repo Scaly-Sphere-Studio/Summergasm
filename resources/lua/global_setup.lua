@@ -74,6 +74,10 @@ do
     camera = GL.Camera.create()
     camera.position = vec3.new(0, 0, 3)
     camera.proj_type = GL.Projection.Ortho
+
+    cam_fixed = GL.Camera.create()
+    cam_fixed.position = camera.position
+    cam_fixed.proj_type = GL.Projection.OrthoFixed
 end
 
 print(f, "end")

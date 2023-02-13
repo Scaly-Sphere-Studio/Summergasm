@@ -31,7 +31,7 @@ F2 => Lua Console{{fmt: 2}}
 List of scenes available in F1 settings
 ]]
 
-    text = GL.Plane.create(GL.Texture.create(area))
+    text = GL.Plane.create(area)
     text:scale(2)
 
     local chunk = GL.Chunk.new(camera)

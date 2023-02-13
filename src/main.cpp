@@ -143,7 +143,15 @@ int main(void) try
     lua["file_script"] = mylua_file_script;
     lua["load_scene"] = mylua_load_scene;
     lua["unload_scene"] = mylua_unload_scene;
-    lua["clear_map"] = []() { g->lua_scripts.clear(); };
+    {
+        auto plane = lua["GL"].get<sol::table>()["Plane"].get<sol::usertype<SSS::GL::Plane>>();
+        plane["create"] = sol::overload(
+            [](char const* str)
+                { return SSS::GL::Plane::create(SSS::GL::Texture::create(g->assets_folder + str)); },
+            [](SSS::TR::Area const& area)
+                { return SSS::GL::Plane::create(SSS::GL::Texture::create(area)); }
+        );
+    }
 
     if (mylua_file_script("global_setup.lua"))
         return -1;
