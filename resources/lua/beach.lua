@@ -4,16 +4,16 @@ if (is_loading)
 then
     print(filename, "init start")
 
-    sand = GL.Plane.create(GL.Texture.create("resources/assets/plage/sand.png"))
+    sand = GL.Plane.create("plage/sand.png")
     sand:scale(4.0)
-    wet = GL.Plane.create(GL.Texture.create("resources/assets/plage/wet_sand_layer.png"))
+    wet = GL.Plane.create("plage/wet_sand_layer.png")
     wet:scale(4.0)
     wet:translate(vec3.new(0, 0, 0.3))
     wet.alpha = 0
-    water = GL.Plane.create(GL.Texture.create("resources/assets/plage/water_layer.png"))
+    water = GL.Plane.create("plage/water_layer.png")
     water:scale(4.0)
     water:translate(vec3.new(0, 0, 0.6))
-    foam = GL.Plane.create(GL.Texture.create("resources/assets/plage/foam.png"))
+    foam = GL.Plane.create("plage/foam.png")
     foam:translate(vec3.new(0, 0, 0.9))
     foam:scale(4.0)
 
