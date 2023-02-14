@@ -43,6 +43,13 @@
     <Image Include="resources\assets\plage\sand.png" />
     <Image Include="resources\assets\plage\water_layer.png" />
     <Image Include="resources\assets\plage\wet_sand_layer.png" />
+    <Image Include="resources\assets\train\train trail_beach_10.png" />
+    <Image Include="resources\assets\train\train trail_beach_11.png" />
+    <Image Include="resources\assets\train\train trail_beach_12.png" />
+    <Image Include="resources\assets\train\train trail_beach_15.png" />
+    <Image Include="resources\assets\train\train trail_beach_16.png" />
+    <Image Include="resources\assets\train\train trail_beach_17.png" />
+    <Image Include="resources\assets\train\train trail_beach_18.png" />
     <Image Include="resources\assets\train\train_result_4.png" />
     <Image Include="resources\assets\train\train_result_5.png" />
     <Image Include="resources\assets\train\train_result_6.png" />

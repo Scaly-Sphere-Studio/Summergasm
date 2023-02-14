@@ -97,5 +97,26 @@
     <Image Include="resources\assets\plage\wet_sand_layer.png">
       <Filter>Resource Files\Pictures</Filter>
     </Image>
+    <Image Include="resources\assets\train\train trail_beach_10.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_11.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_12.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_15.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_16.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_17.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
+    <Image Include="resources\assets\train\train trail_beach_18.png">
+      <Filter>Resource Files\Pictures</Filter>
+    </Image>
   </ItemGroup>
 </Project>
