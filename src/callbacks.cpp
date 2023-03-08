@@ -3,7 +3,7 @@
 void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
 {
     SSS::GL::Window::Shared const window = SSS::GL::Window::get(ptr);
-    SSS::GL::Window::KeyInputs const& keys = window->getKeyInputs();
+    auto const& keys = window->getKeyInputs();
 
     if (action == GLFW_PRESS) {
         switch (key) {

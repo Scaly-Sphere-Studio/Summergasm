@@ -80,6 +80,13 @@ do
     cam_fixed.proj_type = GL.Projection.OrthoFixed
 end
 
+
+print(f, "  Init audio")
+file_script("audio_setup")
+
+print(f, "  Init model functions")
+file_script("model_functions")
+
 print(f, "end")
 
 load_scene("homescreen")

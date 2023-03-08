@@ -31,9 +31,6 @@
     <ClCompile Include="src\callbacks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\model_functions.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\imgui\imgui.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
@@ -69,6 +66,9 @@
       <Filter>Resource Files\Lua</Filter>
     </None>
     <None Include="resources\lua\homescreen.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
+    <None Include="resources\lua\model_functions.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
   </ItemGroup>
