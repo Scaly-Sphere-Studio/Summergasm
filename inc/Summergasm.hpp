@@ -67,16 +67,6 @@ bool mylua_unload_scene(std::string const& scene_name);
 void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods);
 void close_callback(GLFWwindow* ptr);
 
-// Model functions
-
-void button_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
-    int button, int action, int mods);
-void button_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane,
-    int button, int action, int mods);
-
-void passive_func_1(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
-void passive_func_2(SSS::GL::Window::Shared window, SSS::GL::Plane::Shared plane);
-
 // ImGui
 
 void print_console();

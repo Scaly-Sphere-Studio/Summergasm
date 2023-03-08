@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
-    <ClCompile Include="src\model_functions.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
@@ -36,6 +35,7 @@
     <None Include="resources\lua\audio_setup.lua" />
     <None Include="resources\lua\beach.lua" />
     <None Include="resources\lua\global_setup.lua" />
+    <None Include="resources\lua\model_functions.lua" />
     <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>

@@ -156,19 +156,6 @@ int main(void) try
     if (mylua_file_script("global_setup.lua"))
         return -1;
 
-    mylua_file_script("audio_setup.lua");
-
-    GL::Plane::on_click_funcs = {
-        { 0, nullptr },
-        { 1, button_func_1 },
-        { 2, button_func_2 }
-    };
-    GL::Plane::passive_funcs = {
-        { 0, nullptr },
-        { 1, passive_func_1 },
-        { 2, passive_func_2 }
-    };
-
     // Main Window callbacks
     g->window = lua["window"];
     g->window->setCallback(glfwSetKeyCallback, key_callback);

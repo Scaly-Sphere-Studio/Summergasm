@@ -161,16 +161,6 @@ static void print_object(SSS::GL::Plane& plane)
     if (ImGui::Combo(" Hitbox Type", &current_hitbox, hitboxes, 3)) {
         plane.setHitbox(static_cast<SSS::GL::Plane::Hitbox>(current_hitbox));
     }
-    // Display combo to select On Click Function ID
-    uint32_t on_click_func_id = plane.getOnClickFuncID();
-    if (MapIDCombo(" OnClickFuncID", SSS::GL::Plane::on_click_funcs, on_click_func_id)) {
-        plane.setOnClickFuncID(on_click_func_id);
-    }
-    // Display combo to select Passive Function ID
-    uint32_t passive_func_id = plane.getPassiveFuncID();
-    if (MapIDCombo(" PassiveFuncID", SSS::GL::Plane::passive_funcs, passive_func_id)) {
-        plane.setPassiveFuncID(passive_func_id);
-    }
     glm::vec3 scaling, angles, translation;
     plane.getAllTransformations(scaling, angles, translation);
 
