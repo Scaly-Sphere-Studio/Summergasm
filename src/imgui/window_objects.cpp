@@ -210,8 +210,8 @@ template<>
 static void print_object(SSS::GL::PlaneRenderer& renderer)
 {
     // Display title of the Renderer
-    ImGui::Text("Renderer title: \"%s\"", renderer.title.c_str());
-    StringButtonEdit("Edit title", renderer.title);
+    ImGui::Text("Renderer title: \"%s\"", renderer.name.c_str());
+    StringButtonEdit("Edit name", renderer.name);
 
     static constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_RowBg
@@ -229,7 +229,7 @@ static void print_object(SSS::GL::PlaneRenderer& renderer)
     ImGui::TableSetColumnIndex(0);
     static std::string new_chunk_title;
     if (StringButtonEdit("Add chunk", new_chunk_title)) {
-        renderer.chunks.emplace_back().title = new_chunk_title;
+        renderer.chunks.emplace_back().name = new_chunk_title;
         new_chunk_title.clear();
     }
 
@@ -245,7 +245,7 @@ static void print_object(SSS::GL::PlaneRenderer& renderer)
 
         // Open a tree node for each RenderChunk
         static char tree_title[256];
-        sprintf_s(tree_title, "Chunk: \"%s\"", chunk.title.c_str());
+        sprintf_s(tree_title, "Chunk: \"%s\"", chunk.name.c_str());
         bool const tree_open = ImGui::TreeNode(tree_title);
         if (ImGui::IsItemHovered()) {
             SetCursor(ui_window, GLFW_HAND_CURSOR);
@@ -256,7 +256,7 @@ static void print_object(SSS::GL::PlaneRenderer& renderer)
             ImGui::SetDragDropPayload("Chunk_swapping", &i, sizeof(size_t));
             SetCursor(ui_window, GLFW_HAND_CURSOR);
             // Drag & Drop preview
-            ImGui::Text("Selected Chunk: \"%s\"", chunk.title.c_str());
+            ImGui::Text("Selected Chunk: \"%s\"", chunk.name.c_str());
             ImGui::EndDragDropSource();
         }
         // ... and drop tree nodes, to move/swap chunks
@@ -278,7 +278,7 @@ static void print_object(SSS::GL::PlaneRenderer& renderer)
             SSS::GL::Plane::Vector& planes = chunk.planes;
 
             // Edit chunk title
-            StringButtonEdit("Edit chunk title", chunk.title);
+            StringButtonEdit("Edit chunk title", chunk.name);
 
             // Checkboxes for related booleans
             ImGui::Checkbox(" Reset Z-buffer before rendering?", &chunk.reset_depth_before);

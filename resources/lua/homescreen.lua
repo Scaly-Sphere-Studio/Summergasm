@@ -33,9 +33,9 @@ List of scenes available in F1 settings
 
     text = GL.Plane.create(area)
     text:scale(2)
+    text.hitbox = GL.PlaneHitbox.Full
 
     local chunk = GL.Chunk.new(camera)
-    chunk.title = filename
     chunk.planes = { text }
     plane_renderer.chunks:add(chunk)
 
@@ -43,14 +43,8 @@ List of scenes available in F1 settings
 
 elseif (is_unloading)
 then
-    for i=1,#plane_renderer.chunks do
-        if (plane_renderer.chunks[i].title == filename) then
-            plane_renderer.chunks:erase(i)
-            break
-        end
-    end
 
 elseif (is_running)
 then
-    
+    drag_plane(text)
 end
