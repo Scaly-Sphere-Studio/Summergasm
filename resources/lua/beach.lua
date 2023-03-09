@@ -18,7 +18,6 @@ then
     foam:scale(4.0)
 
     local chunk = GL.Chunk.new(camera)
-    chunk.title = filename
     chunk.planes = { sand, wet, water, foam }
     plane_renderer.chunks:add(chunk)
 
@@ -28,12 +27,6 @@ then
 
 elseif (is_unloading)
 then
-    for i=1,#plane_renderer.chunks do
-        if (plane_renderer.chunks[i].title == filename) then
-            plane_renderer.chunks:erase(i)
-            break
-        end
-    end
 
 elseif (is_running)
 then

@@ -1,6 +1,10 @@
 #pragma once
 
-#include "Summergasm.hpp"
+#include "includes.hpp"
+
+void print_console();
+void print_imgui();
+
 
 extern SSS::GL::Window::Shared ui_window;
 

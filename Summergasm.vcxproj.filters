@@ -43,12 +43,21 @@
     <ClCompile Include="src\imgui\console.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\mylua.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="inc\imgui.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\mylua.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\includes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

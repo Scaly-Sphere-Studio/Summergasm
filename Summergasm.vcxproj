@@ -24,11 +24,14 @@
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\imgui\console.cpp" />
+    <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\imgui.hpp" />
+    <ClInclude Include="inc\includes.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
+    <ClInclude Include="inc\mylua.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\lua\homescreen.lua" />
