@@ -1,9 +1,9 @@
 #include "imgui.hpp"
 
-SSS::GL::Window::Shared ui_window = nullptr;
+SSS::GL::Window* ui_window = nullptr;
 static constexpr bool print_demo = false;
 
-void SetCursor(SSS::GL::Window::Shared window, int shape)
+void SetCursor(SSS::GL::Window* window, int shape)
 {
     using CursorPtr = SSS::C_Ptr<GLFWcursor, void(*)(GLFWcursor*), glfwDestroyCursor>;
     static std::map<int, CursorPtr> cursors;
@@ -110,32 +110,33 @@ bool InputFloatWasEdited(const char* label, float* v, float step,
     return (ret);
 }
 
-bool StringButtonEdit(char const* label, std::string& str)
+bool StringCreateButton(char const* label, std::string& str)
 {
-    static std::string* ptr = nullptr;
+    char popup_id[128];
     static char buff[256];
     static bool set_focus = false;
-    if (ptr != &str) {
-        if (ImGui::Button(label)) {
-            ptr = &str;
-            strcpy_s(buff, str.c_str());
-            set_focus = true;
-        }
+    sprintf_s(popup_id, "string_create_button_popup%s", label);
+    if (CreateButton(label)) {
+        strcpy_s(buff, str.c_str());
+        set_focus = true;
+        ImGui::OpenPopup(popup_id);
     }
-    else {
+    if (ImGui::BeginPopup(popup_id)) {
         if (set_focus) {
             ImGui::SetKeyboardFocusHere();
             set_focus = false;
         }
-        ImGui::SetNextItemWidth(300.f);
+        ImGui::SetNextItemWidth(150.f);
         ImGui::InputText("###", buff, 256);
         if (ImGui::IsItemDeactivated()) {
-            ptr = nullptr;
             if (buff[0] != '\0') {
+                ImGui::CloseCurrentPopup();
                 str = buff;
+                buff[0] = '\0';
                 return true;
             }
         }
+        ImGui::EndPopup();
     }
     return false;
 }
@@ -215,10 +216,10 @@ void print_imgui()
     }
 
     ui_window = g->ui_use_separate_window ? g->ui_window : g->window;
+    SSS::GL::Context const context = ui_window->setContext();
     SSS::ImGuiH::setContext(ui_window->getGLFWwindow());
 
     // Make context current
-    SSS::GL::Context const context(ui_window);
     if (!SSS::ImGuiH::newFrame()) {
         return;
     }
@@ -284,5 +285,5 @@ void print_imgui()
 
     // Render dear imgui into screen
     SSS::ImGuiH::render();
-    ui_window.reset();
+    ui_window = nullptr;
 }

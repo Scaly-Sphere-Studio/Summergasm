@@ -1,7 +1,10 @@
 #pragma once
 
-#include "imgui.hpp"
 #include "mylua.hpp"
+
+// ImGui
+void print_console();
+void print_imgui();
 
 // Callbacks
 

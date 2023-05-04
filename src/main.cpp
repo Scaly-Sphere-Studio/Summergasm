@@ -2,6 +2,18 @@
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
+void exitSummergasm(int status)
+{
+    g->lua_scenes.clear();
+    g->lua.collect_garbage();
+    SSS::Audio::terminate();
+    g->ui_window->close();
+    g->window->close();
+    g.reset();
+    LOG_CTX_MSG("Exiting with status", status);
+    exit(status);
+}
+
 int main(void) try
 {
     //Log::louden(true);
@@ -16,16 +28,16 @@ int main(void) try
         g->resources_folder = g->home_folder + "resources/";
         g->lua_folder = g->resources_folder + "lua/";
         g->assets_folder = g->resources_folder + "assets/";
+        SSS::GL::Texture::setResourceFolder(g->assets_folder);
     }
 
+    SSS::Audio::init();
     if (setup_lua())
         return -1;
 
     // Main Window callbacks
-    g->window = g->lua["window"];
     g->window->setCallback(glfwSetKeyCallback, key_callback);
     // UI Window callbacks
-    g->ui_window = g->lua["ui_window"];
     g->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
@@ -42,7 +54,6 @@ int main(void) try
         g->ui_window->printFrame();
     }
 
-    g->lua_scenes.clear();
-    g.reset();
+    exitSummergasm(0);
 }
 CATCH_AND_LOG_FUNC_EXC

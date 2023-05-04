@@ -2,13 +2,9 @@
 
 #include "includes.hpp"
 
-void print_console();
-void print_imgui();
+extern SSS::GL::Window* ui_window;
 
-
-extern SSS::GL::Window::Shared ui_window;
-
-void SetCursor(SSS::GL::Window::Shared window, int shape);
+void SetCursor(SSS::GL::Window* window, int shape);
 
 bool SmallColoredButton(char const* label, ImVec4 const& col,
     ImVec4 const& hover, ImVec4 const& active);
@@ -42,7 +38,7 @@ bool Tooltip(char const* description, _Func f, Args ...args)
 bool InputFloatWasEdited(const char* label, float* v, float step = 0.0f,
     float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
 
-bool StringButtonEdit(char const* label, std::string& str);
+bool StringCreateButton(char const* label, std::string& str);
 
 template<typename _T>
 bool MapIDCombo(char const* label, std::map<uint32_t, _T> const& map, uint32_t& current_id)
@@ -70,12 +66,12 @@ template<typename _T>
 bool VectorCombo(char const* label, std::vector<_T> const& vec, uint32_t& current_id)
 {
     bool ret = false;
-    if (ImGui::BeginCombo(label, std::to_string(current_id).c_str())) {
+    if (ImGui::BeginCombo(label, vec.at(current_id)->getName().c_str())) {
         // Loop over vec to display each ID
         for (uint32_t id = 0; id < vec.size(); ++id) {
             bool is_selected = (current_id == id);
             // Display selectable ID
-            if (ImGui::Selectable(std::to_string(id).c_str(), is_selected)) {
+            if (ImGui::Selectable(vec.at(id)->getName().c_str(), is_selected)) {
                 current_id = id;
                 ret = true;
             }

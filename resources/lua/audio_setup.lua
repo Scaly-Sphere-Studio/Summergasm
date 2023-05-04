@@ -1,21 +1,14 @@
 log_msg("audio_setup.lua start");
 
-do
-  local _ENV = Audio
+Audio.setVolume(50)
 
-  setVolume(50)
-  
-  BAT_LA_RATE = 0
-  OK = 1
+bat_la_rate = Audio.Buffer.new("resources/sounds/bat-la-rate.mp3")
+ok = Audio.Buffer.new("resources/sounds/ok.mp3")
 
-  Buffer.create(BAT_LA_RATE):loadFile("resources/sounds/bat-la-rate.mp3")
-  Buffer.create(OK):loadFile("resources/sounds/ok.mp3")
-  
-  local source = Source.create()
-  source.loop = true;
-  source:queueBuffers({BAT_LA_RATE, OK})
-  --source.volume = 30
-  --source:play()
-end
+source = Audio.Source.new()
+source.loop = true;
+source:queueBuffers({bat_la_rate.id, ok.id})
+--source.volume = 30
+--source:play()
 
 log_msg("audio_setup.lua end");

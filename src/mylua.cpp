@@ -7,10 +7,38 @@ static void name_env_objects(sol::table const& env)
     for (auto&& [key, object] : env) {
         if (object.get_type() != sol::type::userdata || key.get_type() != sol::type::string)
             continue;
-        if (object.is<GL::Basic::Base>())
-            object.as<GL::Basic::Base>().name = key.as<std::string>();
-        else if (object.is<GL::PlaneRenderer::Chunk>())
-            object.as<GL::PlaneRenderer::Chunk>().name = key.as<std::string>();
+        std::string const key_s = key.as<std::string>();
+        if (key_s.find("sol.") == 0)
+            continue;
+        if (object.is<Base>()) {
+            object.as<Base>().setName(key_s);
+            LOG_MSG(object.as<Base>().getName())
+        }
+    }
+    for (auto const& tex : SSS::GL::Texture::getInstances()) {
+        if (!tex->getName().empty())
+            continue;
+        switch (tex->getType()) {
+        case SSS::GL::Texture::Type::Raw: {
+            std::string const path = tex->getFilepath();
+            size_t const slash = path.rfind('/');
+            size_t const dot = path.rfind('.');
+            if (slash != std::string::npos && dot != std::string::npos)
+                tex->setName(path.substr(slash + 1, dot - slash - 1));
+            else
+                tex->setName(path);
+        }   break;
+        case SSS::GL::Texture::Type::Text: {
+            TR::Area const* area = tex->getTextArea();
+            if (area && !area->getName().empty()) {
+                tex->setName(area->getName() + "");
+            }
+        }   break;
+        }
+        if (tex->getName().empty()) {
+            static int count = 1;
+            tex->setName("unnamed_texture_" + std::to_string(count++));
+        }
     }
 }
 
@@ -127,33 +155,29 @@ bool mylua_unload_scene(std::string const& scene_name)
     return false;
 }
 
+void lua_setup_other_libs(sol::state& lua);
+
 bool setup_lua()
 {
     mylua_register_scripts();
-
     g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::debug);
     sol::state& lua = g->lua;
-    lua_setup(lua);
-    TR::lua_setup_TR(lua);
-    GL::lua_setup_GL(lua);
-    Audio::lua_setup_Audio(lua);
+    lua.new_usertype<Base>("Base", sol::no_constructor);
+    lua_setup_other_libs(lua);
     lua["file_script"] = mylua_file_script;
     lua["load_scene"] = mylua_load_scene;
     lua["unload_scene"] = mylua_unload_scene;
     {
-        auto plane = lua["GL"].get<sol::table>()["Plane"].get<sol::usertype<GL::Plane>>();
-        plane["create"] = sol::overload(
-            [](char const* str) {
-                return GL::Plane::create(GL::Texture::create(g->assets_folder + str));
-            },
-            [](TR::Area const& area) {
-                return GL::Plane::create(GL::Texture::create(area));
-            }
-        );
+        auto window = lua["GL"].get<sol::table>()["Window"].get<sol::usertype<GL::Window>>();
+        window["getHoveredPlane"] = &GL::Window::getHovered<GL::Plane>;
     }
 
     if (mylua_file_script("global_setup.lua"))
         return true;
+
+    g->window = g->lua["window"];
+    g->ui_window = g->lua["ui_window"];
+
     name_env_objects(lua.globals());
 
     return false;

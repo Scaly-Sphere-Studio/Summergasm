@@ -1,6 +1,5 @@
 #pragma once
 
-#define SSS_LUA
 #include <SSS/ImGuiH.hpp>
 #include <SSS/GL.hpp>
 #include <SSS/Audio.hpp>
@@ -15,8 +14,8 @@
 class Scene;
 
 struct GlobalData {
-    SSS::GL::Window::Shared window;
-    SSS::GL::Window::Shared ui_window;
+    SSS::GL::Window* window;
+    SSS::GL::Window* ui_window;
 
     bool ui_display{ false };
     bool ui_use_separate_window{ false };
@@ -33,3 +32,5 @@ struct GlobalData {
     std::vector<std::string> texts;
 };
 extern std::unique_ptr<GlobalData> g;
+
+void exitSummergasm(int status);
