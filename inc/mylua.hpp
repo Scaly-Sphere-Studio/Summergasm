@@ -14,7 +14,7 @@ public:
 	Scene& operator=(Scene&&) = delete;	// Move assignment
 
 	bool run();
-
+	auto& getEnv() const noexcept { return env; };
 private:
 	sol::environment env{ g->lua, sol::create, g->lua.globals() };
 	std::string path;

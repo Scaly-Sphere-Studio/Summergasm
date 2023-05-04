@@ -46,6 +46,9 @@
     <ClCompile Include="src\mylua.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\setup_lua.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">

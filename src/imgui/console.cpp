@@ -8,7 +8,7 @@ void print_console() {
     }
 
     // Make context current
-    SSS::GL::Context const context(g->window);
+    SSS::GL::Context const context = g->window->setContext();
     SSS::ImGuiH::setContext(g->window->getGLFWwindow());
     if (!SSS::ImGuiH::newFrame()) {
         return;
