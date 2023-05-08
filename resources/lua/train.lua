@@ -100,4 +100,11 @@ then
     if (window:keyIsHeld(GL.KEY_RIGHT)) then
         cam_fixed:move(vec3.new(cam_speed, 0, 0))
     end
+    local cam_zoom = 0.01
+    if (window:keyIsHeld(GL.KEY_KP_ADD)) then
+        cam_fixed:zoomIn(cam_zoom)
+    end
+    if (window:keyIsHeld(GL.KEY_KP_SUBTRACT)) then
+        cam_fixed:zoomOut(cam_zoom)
+    end
 end
