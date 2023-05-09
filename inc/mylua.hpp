@@ -18,6 +18,8 @@ public:
 private:
 	sol::environment env{ g->lua, sol::create, g->lua.globals() };
 	std::string path;
+	std::string filename;
+	std::string script;
 };
 
 void mylua_register_scripts();

@@ -42,13 +42,18 @@ static void name_env_objects(sol::table const& env)
     }
 }
 
-Scene::Scene(std::string const& filename) try
-    : path(g->lua_folder + filename)
+Scene::Scene(std::string const& filename_) try
+    : filename(filename_), path(g->lua_folder + filename_)
 {
     if (!env.valid()) {
         throw_exc("Could not initialize environment properly.");
-        return;
     }
+    auto result = g->lua.load_file(path);
+    if (!result.valid()) {
+        auto err = result.get<sol::error>();
+        throw_exc(CONTEXT_MSG("Couldn't load file", err.what()));
+    }
+    script = readFile(path);
     env["filename"] = filename;
     env["is_loading"] = true;
     env["is_running"] = false;
@@ -69,10 +74,10 @@ Scene::~Scene()
 
 bool Scene::run()
 {
-    auto result = g->lua.safe_script_file(path, env, sol::script_pass_on_error);
+    auto result = g->lua.do_string(script, env);
     if (!result.valid()) {
         sol::error const err = result;
-        std::cout << "\n" << err.what() << "\n\n";
+        LOG_CTX_ERR(filename, err.what());
         return true;
     }
     return false;
