@@ -68,7 +68,6 @@ then
 
     if (not bg_is_setup)
     then
-        print("not yet")
         setup_bg()
     else
         for i = 1, #bg do
