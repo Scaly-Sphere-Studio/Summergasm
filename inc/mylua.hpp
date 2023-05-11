@@ -8,15 +8,15 @@ public:
 	Scene(std::string const& filename);
 	~Scene();
 
-	Scene(const Scene&) = delete;	// Copy constructor
-	Scene(Scene&&) = delete;	// Move constructor
+	Scene(const Scene&) = delete;				// Copy constructor
+	Scene(Scene&&) = delete;					// Move constructor
 	Scene& operator=(const Scene&) = delete;	// Copy assignment
-	Scene& operator=(Scene&&) = delete;	// Move assignment
+	Scene& operator=(Scene&&) = delete;			// Move assignment
 
 	bool run();
-	auto& getEnv() const noexcept { return env; };
+	auto& getEnv() const noexcept { return *env; };
 private:
-	sol::environment env{ g->lua, sol::create, g->lua.globals() };
+	std::unique_ptr<sol::environment> env;
 	std::string path;
 	std::string filename;
 	std::string script;

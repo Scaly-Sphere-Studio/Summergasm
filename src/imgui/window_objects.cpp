@@ -519,9 +519,82 @@ static void print_env(char const* name, sol::environment const& env)
     ImGui::TreePop();
 };
 
+using time_point = std::chrono::steady_clock::time_point;
+
+template<class T>
+static void update_map(std::map<time_point, std::shared_ptr<T>>& set)
+{
+    for (std::weak_ptr<T> weak : T::getInstances())
+        set.emplace(weak.lock()->getCreationTime(), weak.lock());
+}
+
+template<class T>
+static void print_map(std::map<time_point, std::shared_ptr<T>> const& map, char const* label)
+{
+    if (!ImGui::TreeNode(label))
+        return;
+    if (ImGui::BeginTabBar("###"))
+    {
+        // Display all IDs as tabs
+        for (auto const& [t, shared] : map)
+        {
+            // Display tab
+            if (ImGui::BeginTabItem(GetLabel(*shared).c_str())) {
+                // Tab is active, display object UI
+                print_object(*shared);
+                ImGui::EndTabItem();
+            }
+        }
+
+        ImGui::EndTabBar();
+    }
+    ImGui::TreePop();
+}
+
+template<class T>
+static void clean_map(std::map<time_point, std::shared_ptr<T>>& map)
+{
+    for (auto it = map.begin(); it != map.end();) {
+        if (it->second.use_count() == 1)
+            it = map.erase(it);
+        else
+            ++it;
+    }
+}
+
 void print_window_objects()
 {
-    print_env("Globals", g->lua.globals());
+    using namespace SSS;
+    static std::map<time_point, GL::Shaders::Shared> shaders;
+    static std::map<time_point, GL::PlaneRenderer::Shared> renderers;
+    static std::map<time_point, GL::Texture::Shared> textures;
+    static std::map<time_point, GL::Camera::Shared> cameras;
+    static std::map<time_point, GL::Plane::Shared> planes;
+
+    update_map(shaders);
+    update_map(renderers);
+    update_map(textures);
+    update_map(cameras);
+    update_map(planes);
+
+    if (ImGui::TreeNode("All objects")) {
+        if (ImGui::Button("Remove all unused objects")) {
+            clean_map(renderers);
+            clean_map(shaders);
+            clean_map(planes);
+            clean_map(textures);
+            clean_map(cameras);
+        }
+        //print_map(shaders, "Shaders");
+        print_map(renderers, "Renderers");
+        print_map(textures, "Textures");
+        print_map(cameras, "Cameras");
+        print_map(planes, "Planes");
+
+        ImGui::TreePop();
+    }
+
+    print_env("Lua Globals", g->lua.globals());
     for (auto const& [key, scene] : g->lua_scenes) {
         if (!scene)
             continue;

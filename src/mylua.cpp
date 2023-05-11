@@ -45,7 +45,8 @@ static void name_env_objects(sol::table const& env)
 Scene::Scene(std::string const& filename_) try
     : filename(filename_), path(g->lua_folder + filename_)
 {
-    if (!env.valid()) {
+    env = std::make_unique<sol::environment>(g->lua, sol::create, g->lua.globals());
+    if (!env->valid()) {
         throw_exc("Could not initialize environment properly.");
     }
     auto result = g->lua.load_file(path);
@@ -54,27 +55,29 @@ Scene::Scene(std::string const& filename_) try
         throw_exc(CONTEXT_MSG("Couldn't load file", err.what()));
     }
     script = readFile(path);
-    env["filename"] = filename;
-    env["is_loading"] = true;
-    env["is_running"] = false;
-    env["is_unloading"] = false;
+    (*env)["filename"] = filename;
+    (*env)["is_loading"] = true;
+    (*env)["is_running"] = false;
+    (*env)["is_unloading"] = false;
     run();
-    name_env_objects(env);
-    env["is_loading"] = false;
-    env["is_running"] = true;
+    name_env_objects(*env);
+    (*env)["is_loading"] = false;
+    (*env)["is_running"] = true;
 }
 CATCH_AND_RETHROW_FUNC_EXC;
 
 Scene::~Scene()
 {
-    env["is_running"] = false;
-    env["is_unloading"] = true;
+    (*env)["is_running"] = false;
+    (*env)["is_unloading"] = true;
     run();
+    env.reset();
+    g->lua.collect_garbage();
 }
 
 bool Scene::run()
 {
-    auto result = g->lua.do_string(script, env);
+    auto result = g->lua.do_string(script, *env);
     if (!result.valid()) {
         sol::error const err = result;
         LOG_CTX_ERR(filename, err.what());
