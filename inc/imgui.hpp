@@ -13,6 +13,14 @@ bool DeleteButton(char const* label);
 bool CreateButton(char const* label);
 bool CopyButton(char const* label);
 
+template <class T>
+std::string GetLabel(T const& instance)
+{
+    if (!instance.getName().empty())
+        return instance.getName();
+    return SSS::toString(&instance);
+}
+
 template <typename ...Args>
 void TextCentered(char const* text, Args ...args)
 {
