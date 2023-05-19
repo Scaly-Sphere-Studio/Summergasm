@@ -10,22 +10,30 @@ void Parallax::_setupPlanes()
             return;
     }
 
+    _width = 0.f;
+    float offset = 0.f;
+
     for (auto& plane : planes) {
         int w, h;
         plane->getTexture()->getCurrentDimensions(w, h);
-        plane->setScaling(glm::vec3(h));
-        plane->setTranslation(glm::vec3(_width, 0, 0));
-        _width += w - 1;
+        float const p_width = plane->getScaling().x *
+            (static_cast<float>(w) / static_cast<float>(h));
+        if (offset == 0.f) {
+            offset = p_width / 2.f;
+            _width -= offset;
+        }
+        plane->translate(glm::vec3(_width + p_width / 2, 0, 0));
+        _width += p_width;
     }
+    _width += offset;
 
     _is_setup = true;
     _last_update = std::chrono::steady_clock::now();
-    LOG_CTX_MSG("width", _width)
 }
 
 void Parallax::_movePlanes()
 {
-    if (!_is_setup)
+    if (!_is_setup || !_play)
         return;
     auto const now = std::chrono::steady_clock::now();
     std::chrono::duration<float> const diff = now - _last_update;
@@ -45,4 +53,23 @@ void Parallax::render()
     _setupPlanes();
     _movePlanes();
     PlaneRendererBase::render();
+}
+
+void Parallax::pause()
+{
+    _play = false;
+}
+
+void Parallax::toggle()
+{
+    if (_play)
+        pause();
+    else
+        play();
+}
+
+void Parallax::play()
+{
+    _play = true;
+    _last_update = std::chrono::steady_clock::now();
 }
