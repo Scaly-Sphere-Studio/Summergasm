@@ -11,6 +11,8 @@
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
+void exitSummergasm(int status);
+
 class Scene;
 
 struct GlobalData {
@@ -32,5 +34,3 @@ struct GlobalData {
     std::vector<std::string> texts;
 };
 extern std::unique_ptr<GlobalData> g;
-
-void exitSummergasm(int status);

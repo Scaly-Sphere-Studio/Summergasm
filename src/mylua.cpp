@@ -178,6 +178,14 @@ bool setup_lua()
     {
         auto window = lua["GL"].get<sol::table>()["Window"].get<sol::usertype<GL::Window>>();
         window["getHoveredPlane"] = &GL::Window::getHovered<GL::Plane>;
+
+        auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
+            sol::resolve<Parallax::Shared()>(Parallax::create),
+            [](GL::Camera* cam) { return Parallax::create(GL::Camera::get(cam)); },
+            [](GL::Camera* cam, bool clear) { return Parallax::create(GL::Camera::get(cam), clear); }
+        ), sol::base_classes, sol::bases<GL::PlaneRendererBase, GL::RendererBase, Base>());
+        parallax["width"] = sol::property(&Parallax::getWidth);
+        parallax["speed"] = &Parallax::speed;
     }
 
     if (mylua_file_script("global_setup.lua"))

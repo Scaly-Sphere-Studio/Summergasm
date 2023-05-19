@@ -26,6 +26,7 @@
     <ClCompile Include="src\imgui\console.cpp" />
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Parallax.cpp" />
     <ClCompile Include="src\setup_lua.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -33,6 +34,7 @@
     <ClInclude Include="inc\includes.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
     <ClInclude Include="inc\mylua.hpp" />
+    <ClInclude Include="inc\Parallax.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\lua\homescreen.lua" />
