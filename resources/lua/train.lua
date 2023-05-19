@@ -9,8 +9,16 @@ then
         GL.Plane.new("train/train trail_beach_10.png"),
         GL.Plane.new("train/train trail_beach_11.png")
     }
+
+
     for i = 1, #bg do
         local plane = bg[i]
+        local function update_plane()
+            local w, h = plane.texture:getDimensions()
+            plane:scale(h)
+            plane:translate(vec3.new(0, -h / 2, 0))
+        end
+        plane.texture:setUpdateCallback(update_plane)
         plane.hitbox = GL.PlaneHitbox.Full
     end
     
@@ -26,7 +34,7 @@ then
     end
     bg_renderer = Parallax.new(cam_fixed)
     bg_renderer.planes = bg
-    bg_renderer.speed = -500
+    bg_renderer.speed = 300
     window:addRenderer(bg_renderer)
 
     train_renderer = GL.PlaneRenderer.new(cam_fixed, true)
@@ -47,25 +55,13 @@ then
         drag_plane_fixed(plane)
     end
 
+    if (window:keyIsPressed(GL.KEY_SPACE))
+    then
+        bg_renderer:toggle();
+    end
 
-    local cam_speed = 30
-    if (window:keyIsHeld(GL.KEY_UP)) then
-        cam_fixed:move(vec3.new(0, cam_speed, 0))
-    end
-    if (window:keyIsHeld(GL.KEY_DOWN)) then
-        cam_fixed:move(vec3.new(0, -cam_speed, 0))
-    end
-    if (window:keyIsHeld(GL.KEY_LEFT)) then
-        cam_fixed:move(vec3.new(-cam_speed, 0, 0))
-    end
-    if (window:keyIsHeld(GL.KEY_RIGHT)) then
-        cam_fixed:move(vec3.new(cam_speed, 0, 0))
-    end
-    local cam_zoom = 0.01
-    if (window:keyIsHeld(GL.KEY_KP_ADD)) then
-        cam_fixed:zoomIn(cam_zoom)
-    end
-    if (window:keyIsHeld(GL.KEY_KP_SUBTRACT)) then
-        cam_fixed:zoomOut(cam_zoom)
-    end
+    move_camera(camera, 0.1)
+    move_camera(cam_fixed, 30)
+    zoom_camera(camera, 0.01)
+    zoom_camera(cam_fixed, 0.01)
 end

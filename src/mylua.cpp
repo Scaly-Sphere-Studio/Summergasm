@@ -186,6 +186,9 @@ bool setup_lua()
         ), sol::base_classes, sol::bases<GL::PlaneRendererBase, GL::RendererBase, Base>());
         parallax["width"] = sol::property(&Parallax::getWidth);
         parallax["speed"] = &Parallax::speed;
+        parallax["pause"] = &Parallax::pause;
+        parallax["play"] = &Parallax::play;
+        parallax["toggle"] = &Parallax::toggle;
     }
 
     if (mylua_file_script("global_setup.lua"))

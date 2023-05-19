@@ -43,3 +43,27 @@ function drag_plane_fixed (plane)
         end
     end
 end
+
+function move_camera (camera, speed)
+    if (window:keyIsHeld(GL.KEY_UP)) then
+        camera:move(vec3.new(0, speed, 0))
+    end
+    if (window:keyIsHeld(GL.KEY_DOWN)) then
+        camera:move(vec3.new(0, -speed, 0))
+    end
+    if (window:keyIsHeld(GL.KEY_LEFT)) then
+        camera:move(vec3.new(-speed, 0, 0))
+    end
+    if (window:keyIsHeld(GL.KEY_RIGHT)) then
+        camera:move(vec3.new(speed, 0, 0))
+    end
+end
+
+function zoom_camera (camera, zoom)
+    if (window:keyIsHeld(GL.KEY_KP_ADD)) then
+        camera:zoomIn(zoom)
+    end
+    if (window:keyIsHeld(GL.KEY_KP_SUBTRACT)) then
+        camera:zoomOut(zoom)
+    end
+end
