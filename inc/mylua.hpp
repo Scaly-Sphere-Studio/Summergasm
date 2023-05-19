@@ -1,6 +1,7 @@
 #pragma once
 
 #include "includes.hpp"
+#include "Parallax.hpp"
 
 class Scene {
 public:

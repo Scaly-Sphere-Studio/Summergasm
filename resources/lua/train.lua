@@ -13,31 +13,6 @@ then
         local plane = bg[i]
         plane.hitbox = GL.PlaneHitbox.Full
     end
-
-    bg_is_setup = false
-    bg_width = 0
-
-    function setup_bg()
-        for i = 1, #bg do
-            local plane = bg[i]
-            if (plane.texture:hasRunningThread())
-            then
-                return;
-            end
-        end
-
-        for i = 1, #bg do
-            local plane = bg[i]
-            local w, h = plane.texture:getDimensions()
-            print(w, h)
-            plane.scaling = vec3.new(h)
-            plane.translation = vec3.new(bg_width, -300, 0)
-            bg_width = bg_width + w-1
-        end
-
-        bg_is_setup = true
-        print(bg_width)
-    end
     
     motor = GL.Plane.new("train/train_result_5.png")
     wheels = GL.Plane.new("train/train_result_4.png")
@@ -49,8 +24,9 @@ then
         plane.hitbox = GL.PlaneHitbox.Alpha
         plane:scale(400)
     end
-    bg_renderer = GL.PlaneRenderer.new(cam_fixed)
+    bg_renderer = Parallax.new(cam_fixed)
     bg_renderer.planes = bg
+    bg_renderer.speed = -500
     window:addRenderer(bg_renderer)
 
     train_renderer = GL.PlaneRenderer.new(cam_fixed, true)
@@ -65,20 +41,6 @@ then
 
 elseif (is_running)
 then
-
-    if (not bg_is_setup)
-    then
-        setup_bg()
-    else
-        for i = 1, #bg do
-            local plane = bg[i]
-            plane:translate(vec3.new(-5, 0, 0))
-            if (plane.translation.x < (bg_width / -2))
-            then
-                plane:translate(vec3.new(bg_width, 0, 0))
-            end
-        end
-    end
 
     for i = 1, #train do
         local plane = train[i]
