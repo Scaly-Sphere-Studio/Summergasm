@@ -2,8 +2,11 @@
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
+void free_imgui_objects();
+
 void exitSummergasm(int status)
 {
+    free_imgui_objects();
     g->lua_scenes.clear();
     g->lua.collect_garbage();
     SSS::Audio::terminate();
