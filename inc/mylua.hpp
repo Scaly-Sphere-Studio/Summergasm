@@ -23,6 +23,8 @@ private:
 	std::string script;
 };
 
+std::map<std::string, sol::type> const& mylua_get_all_keys();
+
 void mylua_register_scripts();
 bool mylua_file_script(std::string const& path);
 bool mylua_run_active_scenes();
