@@ -165,6 +165,32 @@ bool mylua_unload_scene(std::string const& scene_name)
 
 void lua_setup_other_libs(sol::state& lua);
 
+static std::map<std::string, sol::type> all_keys;
+
+std::map<std::string, sol::type> const& mylua_get_all_keys()
+{
+    return all_keys;
+}
+
+static std::map<std::string, sol::type> get_keys_from_table(sol::table const& table)
+{
+    std::map<std::string, sol::type> ret;
+    for (auto const& [raw_key, obj] : table) {
+        if (raw_key.get_type() != sol::type::string)
+            continue;
+        std::string const key = raw_key.as<std::string>();
+        if (key.find("_") == 0 || key.find("sol.") == 0 || key == "base")
+            continue;
+        ret[key] = obj.get_type();
+        if (ret[key] == sol::type::table) {
+            auto append = get_keys_from_table(obj);
+            for (auto const& [str, type] : append)
+                ret[key + "." + str] = type;
+        }
+    }
+    return ret;
+}
+
 bool setup_lua()
 {
     mylua_register_scripts();
@@ -198,6 +224,8 @@ bool setup_lua()
     g->ui_window = g->lua["ui_window"];
 
     name_env_objects(lua.globals());
+
+    all_keys = get_keys_from_table(lua.globals());
 
     return false;
 }

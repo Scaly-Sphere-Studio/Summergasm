@@ -1,6 +1,8 @@
 #include "imgui.hpp"
+#include "mylua.hpp"
 
-void print_console() {
+void print_console()
+{
     if (glfwGetKey(g->window->getGLFWwindow(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         g->console_display = false;
         g->window->unblockInputs();
@@ -52,6 +54,7 @@ void print_console() {
         static char buffer[4096];
         static size_t memory_index = 0;
         static std::string buffer_memory;
+        static std::string last_key;
         
         ImGui::SetNextItemWidth(-1);
         ImGui::SetKeyboardFocusHere();
@@ -64,6 +67,10 @@ void print_console() {
         ImGui::InputText("##console_text", buffer, 4096, flags,
             [](ImGuiInputTextCallbackData* data)->int
             {
+                if (!last_key.empty() && data->EventFlag != ImGuiInputTextFlags_CallbackCompletion) {
+                    buffer_memory = data->Buf;
+                    last_key.clear();
+                }
                 switch (data->EventFlag) {
                 // History
                 case ImGuiInputTextFlags_CallbackHistory: {
@@ -89,7 +96,27 @@ void print_console() {
                 }   break;
                 // Completion
                 case ImGuiInputTextFlags_CallbackCompletion: {
-                    // TODO
+                    std::string const& buf = buffer_memory;
+                    auto const& all_keys = mylua_get_all_keys();
+                    if (!last_key.empty()) {
+                        data->DeleteChars(buf.size(), last_key.size() - buf.size());
+                        auto it = all_keys.find(last_key);
+                        if (it != all_keys.cend() && ++it != all_keys.cend()) {
+                            std::string const& key = it->first;
+                            if (key.find(buf) == 0 && key != buf) {
+                                data->InsertChars(buf.size(), key.c_str() + buf.size());
+                                last_key = key;
+                                break;
+                            }
+                        }
+                    }
+                    for (auto const& [key, type] : all_keys) {
+                        if (key.find(buf) == 0 && (!last_key.empty() || key != buf)) {
+                            data->InsertChars(buf.size(), key.c_str() + buf.size());
+                            last_key = key;
+                            break;
+                        }
+                    }
                 }   break;
                 // Normal edit
                 case ImGuiInputTextFlags_CallbackEdit: {
