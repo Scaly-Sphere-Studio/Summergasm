@@ -96,23 +96,26 @@ void print_console()
                 }   break;
                 // Completion
                 case ImGuiInputTextFlags_CallbackCompletion: {
-                    std::string const& buf = buffer_memory;
+                    size_t const n = buffer_memory.rfind(' ');
+                    std::string const current = n == std::string::npos ?
+                        buffer_memory : buffer_memory.substr(n + 1);
                     auto const& all_keys = mylua_get_all_keys();
                     if (!last_key.empty()) {
-                        data->DeleteChars(buf.size(), last_key.size() - buf.size());
+                        data->DeleteChars(buffer_memory.size(),
+                            last_key.size() - current.size());
                         auto it = all_keys.find(last_key);
                         if (it != all_keys.cend() && ++it != all_keys.cend()) {
                             std::string const& key = it->first;
-                            if (key.find(buf) == 0 && key != buf) {
-                                data->InsertChars(buf.size(), key.c_str() + buf.size());
+                            if (key.find(current) == 0 && key != current) {
+                                data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
                                 last_key = key;
                                 break;
                             }
                         }
                     }
                     for (auto const& [key, type] : all_keys) {
-                        if (key.find(buf) == 0 && (!last_key.empty() || key != buf)) {
-                            data->InsertChars(buf.size(), key.c_str() + buf.size());
+                        if (key.find(current) == 0 && (!last_key.empty() || key != current)) {
+                            data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
                             last_key = key;
                             break;
                         }
