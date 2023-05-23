@@ -179,13 +179,38 @@ static std::map<std::string, sol::type> get_keys_from_table(sol::table const& ta
         if (raw_key.get_type() != sol::type::string)
             continue;
         std::string const key = raw_key.as<std::string>();
-        if (key.find("_") == 0 || key.find("sol.") == 0 || key == "base")
+        sol::type const obj_type = obj.get_type();
+        if (key.find("_") == 0 || key.find("sol.") == 0 || key == "base" ||
+            obj_type == sol::type::lightuserdata)
             continue;
-        ret[key] = obj.get_type();
-        if (ret[key] == sol::type::table) {
+        ret[key] = obj_type;
+        if (obj_type == sol::type::table) {
             auto append = get_keys_from_table(obj);
             for (auto const& [str, type] : append)
                 ret[key + "." + str] = type;
+        }
+    }
+    return ret;
+}
+
+static std::map<std::string, sol::type> get_keys_and_metadata_from_table(sol::table const& table)
+{
+    auto ret = get_keys_from_table(g->lua.globals());
+    for (auto& [key, type] : ret) {
+        if (type == sol::type::userdata) {
+            auto append = get_keys_from_table(g->lua[key][sol::metatable_key]);
+            for (auto& [subkey, subtype] : append) {
+                if (subkey == "new")
+                    continue;
+                sol::protected_function_result res = g->lua.safe_script(
+                    "return " + key + "." + subkey, sol::script_pass_on_error);
+                if (res.valid() && res.get_type() != sol::type::function) {
+                    ret[key + "." + subkey] = subtype;
+                }
+                else {
+                    ret[key + ":" + subkey] = subtype;
+                }
+            }
         }
     }
     return ret;
@@ -196,26 +221,22 @@ bool setup_lua()
     mylua_register_scripts();
     g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::debug);
     sol::state& lua = g->lua;
-    lua.new_usertype<Base>("Base", sol::no_constructor);
     lua_setup_other_libs(lua);
+
     lua["file_script"] = mylua_file_script;
     lua["load_scene"] = mylua_load_scene;
     lua["unload_scene"] = mylua_unload_scene;
-    {
-        auto window = lua["GL"].get<sol::table>()["Window"].get<sol::usertype<GL::Window>>();
-        window["getHoveredPlane"] = &GL::Window::getHovered<GL::Plane>;
 
-        auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
-            sol::resolve<Parallax::Shared()>(Parallax::create),
-            [](GL::Camera* cam) { return Parallax::create(GL::Camera::get(cam)); },
-            [](GL::Camera* cam, bool clear) { return Parallax::create(GL::Camera::get(cam), clear); }
-        ), sol::base_classes, sol::bases<GL::PlaneRendererBase, GL::RendererBase, Base>());
-        parallax["width"] = sol::property(&Parallax::getWidth);
-        parallax["speed"] = &Parallax::speed;
-        parallax["pause"] = &Parallax::pause;
-        parallax["play"] = &Parallax::play;
-        parallax["toggle"] = &Parallax::toggle;
-    }
+    auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
+        sol::resolve<Parallax::Shared()>(Parallax::create),
+        [](GL::Camera* cam) { return Parallax::create(GL::Camera::get(cam)); },
+        [](GL::Camera* cam, bool clear) { return Parallax::create(GL::Camera::get(cam), clear); }
+    ), sol::base_classes, sol::bases<GL::PlaneRendererBase, GL::RendererBase, Base>());
+    parallax["width"] = sol::property(&Parallax::getWidth);
+    parallax["speed"] = &Parallax::speed;
+    parallax["pause"] = &Parallax::pause;
+    parallax["play"] = &Parallax::play;
+    parallax["toggle"] = &Parallax::toggle;
 
     if (mylua_file_script("global_setup.lua"))
         return true;
@@ -225,7 +246,7 @@ bool setup_lua()
 
     name_env_objects(lua.globals());
 
-    all_keys = get_keys_from_table(lua.globals());
+    all_keys = get_keys_and_metadata_from_table(lua.globals());
 
     return false;
 }
