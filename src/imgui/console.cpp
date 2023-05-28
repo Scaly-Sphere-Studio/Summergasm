@@ -99,7 +99,7 @@ void print_console()
                     size_t const n = buffer_memory.rfind(' ');
                     std::string const current = n == std::string::npos ?
                         buffer_memory : buffer_memory.substr(n + 1);
-                    auto const& all_keys = mylua_get_all_keys();
+                    auto const all_keys = mylua_get_keys(*mylua_console_env);
                     if (!last_key.empty()) {
                         data->DeleteChars(buffer_memory.size(),
                             last_key.size() - current.size());
@@ -134,7 +134,7 @@ void print_console()
         if (ImGui::IsItemDeactivatedAfterEdit()) {
             // Add command to memory
             memory.emplace_back(buffer);
-            auto result = g->lua.safe_script(buffer, sol::script_pass_on_error);
+            auto result = g->lua.safe_script(buffer, *mylua_console_env, sol::script_pass_on_error);
             if (!result.valid()) {
                 memory.back().color = ImVec4(1, 0, 0, 1);
                 sol::error err = result;

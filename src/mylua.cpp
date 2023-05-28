@@ -2,6 +2,8 @@
 
 using namespace SSS;
 
+sol::environment* mylua_console_env{ nullptr };
+
 static void name_env_objects(sol::table const& env)
 {
     for (auto&& [key, object] : env) {
@@ -55,6 +57,9 @@ Scene::Scene(std::string const& filename_) try
         throw_exc(CONTEXT_MSG("Couldn't load file", err.what()));
     }
     script = readFile(path);
+    size_t const n = filename.find('.');
+    std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
+    g->lua["scenes"][name] = *env;
     (*env)["filename"] = filename;
     (*env)["is_loading"] = true;
     (*env)["is_running"] = false;
@@ -66,11 +71,29 @@ Scene::Scene(std::string const& filename_) try
 }
 CATCH_AND_RETHROW_FUNC_EXC;
 
+static void empty_table(sol::table table)
+{
+    for (auto& [key, obj] : table) {
+        if (obj.is<SSS::GL::RendererBase*>())
+            g->window->removeRenderer(obj.as<SSS::GL::RendererBase*>()->getShared());
+        if (obj.get_type() == sol::type::table) {
+            empty_table(obj);
+            if (!obj.as<sol::table>().empty())
+                LOG_MSG("THIS SHOULD BE EMPTY")
+        }
+        table[key] = sol::nil;
+    }
+}
+
 Scene::~Scene()
 {
     (*env)["is_running"] = false;
     (*env)["is_unloading"] = true;
     run();
+    size_t const n = filename.find('.');
+    std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
+    g->lua["scenes"][name] = sol::nil;
+    empty_table(*env);
     env.reset();
     g->lua.collect_garbage();
 }
@@ -165,13 +188,6 @@ bool mylua_unload_scene(std::string const& scene_name)
 
 void lua_setup_other_libs(sol::state& lua);
 
-static std::map<std::string, sol::type> all_keys;
-
-std::map<std::string, sol::type> const& mylua_get_all_keys()
-{
-    return all_keys;
-}
-
 static std::map<std::string, sol::type> get_keys_from_table(sol::table const& table)
 {
     std::map<std::string, sol::type> ret;
@@ -180,7 +196,9 @@ static std::map<std::string, sol::type> get_keys_from_table(sol::table const& ta
             continue;
         std::string const key = raw_key.as<std::string>();
         sol::type const obj_type = obj.get_type();
-        if (key.find("_") == 0 || key.find("sol.") == 0 || key == "base" ||
+        // Skip if empty key, or private value, or risk of stack overflow (base)
+        if (key.empty() || key.find("_") == 0 || key.find("sol.") == 0 ||
+            key == "base" || key == "new" || obj_type == sol::type::nil ||
             obj_type == sol::type::lightuserdata)
             continue;
         ret[key] = obj_type;
@@ -193,17 +211,16 @@ static std::map<std::string, sol::type> get_keys_from_table(sol::table const& ta
     return ret;
 }
 
-static std::map<std::string, sol::type> get_keys_and_metadata_from_table(sol::table const& table)
+std::map<std::string, sol::type> mylua_get_keys(sol::environment const& env) try
 {
-    auto ret = get_keys_from_table(g->lua.globals());
+    auto ret = get_keys_from_table(env);
     for (auto& [key, type] : ret) {
         if (type == sol::type::userdata) {
-            auto append = get_keys_from_table(g->lua[key][sol::metatable_key]);
-            for (auto& [subkey, subtype] : append) {
-                if (subkey == "new")
-                    continue;
+            sol::userdata data = g->lua.safe_script("return " + key, env);
+            auto const append = get_keys_from_table(data[sol::metatable_key]);
+            for (auto const& [subkey, subtype] : append) {
                 sol::protected_function_result res = g->lua.safe_script(
-                    "return " + key + "." + subkey, sol::script_pass_on_error);
+                    "return " + key + "." + subkey, env, sol::script_pass_on_error);
                 if (res.valid() && res.get_type() != sol::type::function) {
                     ret[key + "." + subkey] = subtype;
                 }
@@ -214,6 +231,9 @@ static std::map<std::string, sol::type> get_keys_and_metadata_from_table(sol::ta
         }
     }
     return ret;
+}
+catch (...) {
+    return std::map<std::string, sol::type>();
 }
 
 bool setup_lua()
@@ -226,6 +246,21 @@ bool setup_lua()
     lua["file_script"] = mylua_file_script;
     lua["load_scene"] = mylua_load_scene;
     lua["unload_scene"] = mylua_unload_scene;
+    lua["scenes"].get_or_create<sol::table>();
+
+    lua["console_set_env"] = [](char const* scene_name) {
+        std::string const key = complete_script_name(scene_name);
+        if (g->lua_scenes.count(key) == 0)
+            SSS::throw_exc("No scene with this given name.");
+        auto& scene = g->lua_scenes.at(key);
+        if (!scene)
+            SSS::throw_exc("Scene isn't running");
+        mylua_console_env = &scene->getEnv();
+    };
+    lua["console_reset_env"] = []() {
+        mylua_console_env = reinterpret_cast<sol::environment*>(&g->lua.globals());
+    };
+    lua["console_reset_env"]();
 
     auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
         sol::resolve<Parallax::Shared()>(Parallax::create),
@@ -245,8 +280,6 @@ bool setup_lua()
     g->ui_window = g->lua["ui_window"];
 
     name_env_objects(lua.globals());
-
-    all_keys = get_keys_and_metadata_from_table(lua.globals());
 
     return false;
 }
