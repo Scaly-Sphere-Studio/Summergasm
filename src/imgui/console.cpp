@@ -54,6 +54,7 @@ void print_console()
         static char buffer[4096];
         static size_t memory_index = 0;
         static std::string buffer_memory;
+        static std::unique_ptr<LuaConsoleData> console_data;
         static std::string last_key;
         
         ImGui::SetNextItemWidth(-1);
@@ -69,6 +70,7 @@ void print_console()
             {
                 if (!last_key.empty() && data->EventFlag != ImGuiInputTextFlags_CallbackCompletion) {
                     buffer_memory = data->Buf;
+                    console_data.reset();
                     last_key.clear();
                 }
                 switch (data->EventFlag) {
@@ -96,15 +98,16 @@ void print_console()
                 }   break;
                 // Completion
                 case ImGuiInputTextFlags_CallbackCompletion: {
+                    if (!console_data)
+                        console_data = std::make_unique<LuaConsoleData>(g->lua, *mylua_console_env);
                     size_t const n = buffer_memory.rfind(' ');
                     std::string const current = n == std::string::npos ?
                         buffer_memory : buffer_memory.substr(n + 1);
-                    auto const all_keys = mylua_get_keys(*mylua_console_env);
                     if (!last_key.empty()) {
                         data->DeleteChars(buffer_memory.size(),
                             last_key.size() - current.size());
-                        auto it = all_keys.find(last_key);
-                        if (it != all_keys.cend() && ++it != all_keys.cend()) {
+                        auto it = console_data->find(last_key);
+                        if (it != console_data->cend() && ++it != console_data->cend()) {
                             std::string const& key = it->first;
                             if (key.find(current) == 0 && key != current) {
                                 data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
@@ -113,7 +116,7 @@ void print_console()
                             }
                         }
                     }
-                    for (auto const& [key, type] : all_keys) {
+                    for (auto const& [key, type] : *console_data) {
                         if (key.find(current) == 0 && (!last_key.empty() || key != current)) {
                             data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
                             last_key = key;
