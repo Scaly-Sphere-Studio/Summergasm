@@ -52,6 +52,9 @@
     <ClCompile Include="src\Parallax.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\LuaConsoleData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">

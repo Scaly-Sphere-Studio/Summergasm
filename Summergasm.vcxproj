@@ -24,6 +24,7 @@
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\imgui\console.cpp" />
+    <ClCompile Include="src\LuaConsoleData.cpp" />
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Parallax.cpp" />
