@@ -6,7 +6,10 @@ std::vector<LuaConsoleData::_AppendBaseClassFunc> LuaConsoleData::_append_fns{
     _appendBaseClass<SSS::GL::PlaneRendererBase>
 };
 
-LuaConsoleData::LuaConsoleData(sol::state& lua, sol::table table, std::string name)
+bool LuaConsoleData::recursive{ false };
+
+LuaConsoleData::LuaConsoleData(sol::state& lua, sol::table table, sol::environment env,
+    std::string name)
     : LuaConsoleData(sol::type::table, name)
 {
     for (auto const& [k, v] : table) {
@@ -25,48 +28,60 @@ LuaConsoleData::LuaConsoleData(sol::state& lua, sol::table table, std::string na
         std::string const new_name = (name.empty() ? "" : name + '.') + key;
         emplace(key, LuaConsoleData(type, new_name));
 
+        if (!recursive)
+            continue;
+
         if (type == sol::type::table)
-            at(key)._append(LuaConsoleData(lua, v, new_name));
+            at(key)._append(LuaConsoleData(lua, v, env, new_name));
 
         if (type == sol::type::userdata) {
             sol::userdata u = v;
             LuaConsoleData& data = at(key);
 
             for (_AppendBaseClassFunc const& f : _append_fns) {
-                f(lua, data, u);
+                f(lua, data, env, u);
             }
 
-            data._appendUserdata(lua, u);
+            data._appendUserdata(lua, env, u);
         }
+    }
+
+    if (!recursive && table.is<sol::userdata>()) {
+        for (_AppendBaseClassFunc const& f : _append_fns) {
+            f(lua, *this, env, table);
+        }
+        _appendUserdata(lua, env, table);
     }
 }
 
-void LuaConsoleData::_appendUserdata(sol::state& lua, sol::userdata u)
+void LuaConsoleData::_appendUserdata(sol::state& lua, sol::environment env, sol::userdata u)
 {
-    _append(LuaConsoleData(lua, u[sol::metatable_key], name));
+    _append(LuaConsoleData(lua, u[sol::metatable_key], env, name));
     for (auto& [k, v] : *this) {
         sol::protected_function_result result = lua.safe_script(
-            "return " + v.name, sol::script_pass_on_error);
+            "return " + v.name, env, sol::script_pass_on_error);
         if (result.valid() && result.get_type() != sol::type::function) {
             v.type = result.get_type();
             if (v.type == sol::type::userdata)
-                v._appendUserdata(lua, result);
+                v._appendUserdata(lua, env, result);
         }
-        else
-            v.name = name + ":" + k;
+        else {
+            v.separator = ':';
+            v.name = name + ':' + k;
+        }
     }
 }
 
 template <class T>
-static void LuaConsoleData::_appendBaseClass(sol::state& lua,
-    LuaConsoleData& data, sol::userdata const& u)
+static void LuaConsoleData::_appendBaseClass(sol::state& lua, LuaConsoleData& data,
+    sol::environment env, sol::userdata const& u)
 {
     if (u.is<T>()) {
         std::string tmp = "tmp";
         for (size_t i = 1; lua[tmp] != sol::nil; ++i)
             tmp = "tmp" + std::to_string(i);
         lua[tmp] = u.as<T*>();
-        data._appendUserdata(lua, lua[tmp]);
+        data._appendUserdata(lua, env, lua[tmp]);
         lua[tmp] = sol::nil;
     }
 };
