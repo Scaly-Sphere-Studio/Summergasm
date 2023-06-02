@@ -27,25 +27,29 @@ class LuaConsoleData : public std::map<std::string, LuaConsoleData> {
 private:
     LuaConsoleData(sol::type type_, std::string name_) : type(type_), name(name_) {};
 public:
-    LuaConsoleData(sol::state& lua, sol::table table, std::string name = "");
-    LuaConsoleData() = delete;
+    LuaConsoleData(sol::state& lua, sol::table table, sol::environment env,
+        std::string name = "");
 
 private:
     inline void _append(LuaConsoleData const& data) { insert(data.cbegin(), data.cend()); }
-    void _appendUserdata(sol::state& lua, sol::userdata u);
+    void _appendUserdata(sol::state& lua, sol::environment env, sol::userdata u);
     
     template <class T>
-    static void _appendBaseClass(sol::state& lua, LuaConsoleData& data, sol::userdata const& u);
+    static void _appendBaseClass(sol::state& lua, LuaConsoleData& data,
+        sol::environment env, sol::userdata const& u);
     using _AppendBaseClassFunc = std::function <
-        void(sol::state&, LuaConsoleData&, sol::userdata const&) >;
+        void(sol::state&, LuaConsoleData&, sol::environment, sol::userdata const&) >;
     static std::vector<_AppendBaseClassFunc> _append_fns;
 
 public:
     template <class T>
     static inline void addBaseClass() { _append_fns.emplace_back(_appendBaseClass<T>); }
 
+    static bool recursive;
+
     sol::type type;
     std::string name;
+    char separator{ '.' };
 
     std::string to_string() const;
     inline operator std::string() const { return to_string(); }

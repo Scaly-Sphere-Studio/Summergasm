@@ -1,5 +1,6 @@
 #include "imgui.hpp"
 #include "mylua.hpp"
+#include <regex>
 
 struct CmdMemory {
     CmdMemory(std::string const& s) : str(s) {};
@@ -13,15 +14,17 @@ static char buffer[4096];
 static size_t memory_index = 0;
 static std::string buffer_memory;
 
-static std::unique_ptr<LuaConsoleData> console_data;
+static std::unique_ptr<LuaConsoleData const> console_data;
 static std::string last_key;
 
 static int inputTextCallback(ImGuiInputTextCallbackData* data)
 {
-    if (!last_key.empty() && data->EventFlag != ImGuiInputTextFlags_CallbackCompletion) {
-        buffer_memory = data->Buf;
+    if (data->EventFlag != ImGuiInputTextFlags_CallbackCompletion && console_data) {
+        if (!last_key.empty()) {
+            buffer_memory = data->Buf;
+            last_key.clear();
+        }
         console_data.reset();
-        last_key.clear();
     }
 
     switch (data->EventFlag) {
@@ -51,31 +54,69 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data)
 
     // Completion
     case ImGuiInputTextFlags_CallbackCompletion: {
-        if (!console_data)
-            console_data = std::make_unique<LuaConsoleData>(g->lua, *mylua_console_env);
 
-        size_t const n = buffer_memory.rfind(' ');
-        std::string const current = n == std::string::npos ?
-            buffer_memory : buffer_memory.substr(n + 1);
+        std::string const current = []() {
+            size_t const n = buffer_memory.rfind(' ');
+            return n == std::string::npos ?
+                buffer_memory : buffer_memory.substr(n + 1);
+        }();
+
+        auto const [table_name, key, separator] = [current]() {
+            std::regex const r("[.:]");
+            std::string key = current;
+            std::string table;
+            char separator = '.';
+            std::smatch sm;
+            while (std::regex_search(key, sm, r)) {
+                if (!table.empty()) {
+                    table += separator;
+                }
+                separator = sm[0].str().at(0);
+                table += sm.prefix().str();
+                key = sm.suffix().str();
+            }
+            return std::make_tuple(table, key, separator);
+        }();
+
+        if (!console_data) {
+            sol::environment const env = *mylua_console_env;
+            sol::table t = env;
+            if (!table_name.empty()) {
+                auto res = g->lua.safe_script("return " + table_name, env, sol::script_pass_on_error);
+                if (!res.valid() || (res.get_type() != sol::type::table &&
+                    res.get_type() != sol::type::userdata))
+                {
+                    break;
+                }
+                t = res;
+            }
+            console_data = std::make_unique<LuaConsoleData const>(g->lua, t, env, table_name);
+        }
 
         if (!last_key.empty()) {
-            data->DeleteChars(buffer_memory.size(),
-                last_key.size() - current.size());
+            data->DeleteChars(buffer_memory.size(), last_key.size() - key.size());
             auto it = console_data->find(last_key);
-            if (it != console_data->cend() && ++it != console_data->cend()) {
-                std::string const& key = it->first;
-                if (key.find(current) == 0 && key != current) {
-                    data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
-                    last_key = key;
-                    break;
+            if (it != console_data->cend()) {
+                ++it;
+                while (it != console_data->cend() && it->second.separator != separator)
+                    ++it;
+                if (it != console_data->cend()) {
+                    std::string const& new_key = it->first;
+                    if (new_key.find(key) == 0) {
+                        data->InsertChars(buffer_memory.size(), new_key.c_str() + key.size());
+                        last_key = new_key;
+                        break;
+                    }
                 }
             }
         }
 
-        for (auto const& [key, type] : *console_data) {
-            if (key.find(current) == 0 && (!last_key.empty() || key != current)) {
-                data->InsertChars(buffer_memory.size(), key.c_str() + current.size());
-                last_key = key;
+        for (auto const& [k, v] : *console_data) {
+            if (v.separator == separator && k.find(key) == 0 &&
+                (!last_key.empty() || k != current))
+            {
+                data->InsertChars(buffer_memory.size(), k.c_str() + key.size());
+                last_key = k;
                 break;
             }
         }
