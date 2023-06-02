@@ -28,25 +28,12 @@ LuaConsoleData::LuaConsoleData(sol::state& lua, sol::table table, sol::environme
         std::string const new_name = (name.empty() ? "" : name + '.') + key;
         emplace(key, LuaConsoleData(type, new_name));
 
-        if (!recursive)
-            continue;
-
-        if (type == sol::type::table)
+        if (recursive && (type == sol::type::table || type == sol::type::userdata))
             at(key)._append(LuaConsoleData(lua, v, env, new_name));
-
-        if (type == sol::type::userdata) {
-            sol::userdata u = v;
-            LuaConsoleData& data = at(key);
-
-            for (_AppendBaseClassFunc const& f : _append_fns) {
-                f(lua, data, env, u);
-            }
-
-            data._appendUserdata(lua, env, u);
-        }
     }
 
-    if (!recursive && table.is<sol::userdata>()) {
+    if (table.is<sol::userdata>()) {
+        type = sol::type::userdata;
         for (_AppendBaseClassFunc const& f : _append_fns) {
             f(lua, *this, env, table);
         }
