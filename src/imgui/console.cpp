@@ -15,16 +15,22 @@ static size_t memory_index = 0;
 static std::string buffer_memory;
 
 static std::unique_ptr<LuaConsoleData const> console_data;
+static size_t cursor = 0;
+static bool reset_cursor = true;
 static std::string last_key;
 
 static int inputTextCallback(ImGuiInputTextCallbackData* data)
 {
-    if (data->EventFlag != ImGuiInputTextFlags_CallbackCompletion && console_data) {
-        if (!last_key.empty()) {
-            buffer_memory = data->Buf;
-            last_key.clear();
+    if (data->EventFlag != ImGuiInputTextFlags_CallbackCompletion || reset_cursor) {
+        if (console_data) {
+            if (!last_key.empty()) {
+                buffer_memory = data->Buf;
+                last_key.clear();
+            }
+            console_data.reset();
         }
-        console_data.reset();
+        cursor = data->CursorPos;
+        reset_cursor = false;
     }
 
     switch (data->EventFlag) {
@@ -55,11 +61,16 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data)
     // Completion
     case ImGuiInputTextFlags_CallbackCompletion: {
 
-        std::string const current = []() {
-            size_t const n = buffer_memory.rfind(' ');
-            return n == std::string::npos ?
-                buffer_memory : buffer_memory.substr(n + 1);
-        }();
+        std::string const buf = buffer_memory.substr(0, cursor);
+        
+        std::string const current = [](std::string buf) {
+            std::regex const r("[ (]");
+            std::smatch sm;
+            while (std::regex_search(buf, sm, r)) {
+                buf = sm.suffix();
+            }
+            return buf;
+        }(buf);
 
         auto const [table_name, key, separator] = [current]() {
             std::regex const r("[.:]");
@@ -94,7 +105,7 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data)
         }
 
         if (!last_key.empty()) {
-            data->DeleteChars(buffer_memory.size(), last_key.size() - key.size());
+            data->DeleteChars(buf.size() , last_key.size() - key.size());
             auto it = console_data->find(last_key);
             if (it != console_data->cend()) {
                 ++it;
@@ -103,7 +114,7 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data)
                 if (it != console_data->cend()) {
                     std::string const& new_key = it->first;
                     if (new_key.find(key) == 0) {
-                        data->InsertChars(buffer_memory.size(), new_key.c_str() + key.size());
+                        data->InsertChars(buf.size(), new_key.c_str() + key.size());
                         last_key = new_key;
                         break;
                     }
@@ -115,7 +126,7 @@ static int inputTextCallback(ImGuiInputTextCallbackData* data)
             if (v.separator == separator && k.find(key) == 0 &&
                 (!last_key.empty() || k != current))
             {
-                data->InsertChars(buffer_memory.size(), k.c_str() + key.size());
+                data->InsertChars(buf.size(), k.c_str() + key.size());
                 last_key = k;
                 break;
             }
@@ -184,6 +195,12 @@ void print_console()
             | ImGuiInputTextFlags_CallbackCompletion
             | ImGuiInputTextFlags_CallbackEdit
         ;
+
+        if (glfwGetKey(g->window->getGLFWwindow(), GLFW_KEY_LEFT) ||
+            glfwGetKey(g->window->getGLFWwindow(), GLFW_KEY_RIGHT)) {
+            reset_cursor = true;
+        }
+
         // Text input, with internal callback
         ImGui::InputText("##console_text", buffer, 4096, flags, inputTextCallback);
         // Enter after edit
@@ -199,6 +216,8 @@ void print_console()
             buffer[0] = 0;
             memory_index = 0;
             buffer_memory.clear();
+            console_data.reset();
+            last_key.clear();
         }
         ImGui::End();
     }
