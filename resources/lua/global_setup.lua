@@ -32,27 +32,17 @@ print(f, "  Init text areas")
 do
     area = TR.Area.new(1280, 720)
 
-    print(f, "    Fmt0")
+    print(f, "    Fmt")
 
-    local fmt = area:getFmt(0)
+    local fmt = area:getFmt()
     fmt.font = "impact.ttf"
     fmt.charsize = 150
-    area:setFmt(fmt, 0)
-
-    print(f, "    Fmt1")
-
-    local fmt = area:getFmt(1)
-    fmt.font = "arial.ttf"
-    fmt.charsize = 150
-    fmt.outline_size = 50
-    fmt.has_outline = true
-    fmt.has_shadow = true
-    area:setFmt(fmt, 1)
+    area:setFmt(fmt)
 
     print(f, "    Array")
 
     string_array = {
-        "Lorem ipsum {{fmt: 1}}dolor sit amet,",
+        "Lorem ipsum {{\"font\":\"arial.ttf\"}}dolor sit amet,",
         "consectetur adipiscing elit,",
         "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         "Ut enim ad minim veniam,",
