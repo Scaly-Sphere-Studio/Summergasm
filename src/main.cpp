@@ -9,7 +9,6 @@ void exitSummergasm(int status)
     free_imgui_objects();
     g->lua_scenes.clear();
     g->lua.collect_garbage();
-    SSS::Audio::terminate();
     g->ui_window->close();
     g->window->close();
     g.reset();
@@ -34,7 +33,7 @@ int main(void) try
         SSS::GL::Texture::setResourceFolder(g->assets_folder);
     }
 
-    SSS::Audio::init();
+    static_cast<void>(SSS::Audio::getDevices());
     if (setup_lua())
         return -1;
 
