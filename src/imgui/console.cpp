@@ -211,7 +211,7 @@ void print_console()
     if (ImGui::Begin("Console", nullptr, flags)) {
 
         if (ImGui::BeginChild("##memory", ImVec2(-FLT_MIN, 260), false,
-            ImGuiWindowFlags_AlwaysUseWindowPadding))
+            ImGuiChildFlags_AlwaysUseWindowPadding))
         {
             auto const& cmds = console.memory.cmds;
 

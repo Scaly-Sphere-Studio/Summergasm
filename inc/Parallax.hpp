@@ -2,14 +2,19 @@
 
 #include "includes.hpp"
 
-class Parallax : public SSS::GL::PlaneRendererTemplate<Parallax>
+class Parallax : public SSS::GL::PlaneRenderer
 {
-    friend class SSS::GL::Basic::SharedBase<Parallax>;
-
 private:
     Parallax() = default;
 
 public:
+    using Shared = std::shared_ptr<Parallax>;
+    static Shared create(SSS::GL::Camera::Shared camera = nullptr,
+        bool clear_depth_buffer = false);
+
+    std::vector<SSS::GL::Plane::Shared> getPlanes() const;
+    void setPlanes(std::vector<SSS::GL::Plane::Shared> planes);
+
     void render() override;
     float getWidth() const noexcept { return _width; };
 

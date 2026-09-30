@@ -1,19 +1,46 @@
 #include "Parallax.hpp"
 
+Parallax::Shared Parallax::create(SSS::GL::Camera::Shared camera,
+    bool clear_depth_buffer)
+{
+    Shared renderer(new Parallax());
+    renderer->camera = std::move(camera);
+    renderer->clear_depth_buffer = clear_depth_buffer;
+    return renderer;
+}
+
+std::vector<SSS::GL::Plane::Shared> Parallax::getPlanes() const
+{
+    std::vector<SSS::GL::Plane::Shared> result;
+    result.reserve(_planes.size());
+    for (auto const& plane : _planes)
+        result.emplace_back(std::dynamic_pointer_cast<SSS::GL::Plane>(plane));
+    return result;
+}
+
+void Parallax::setPlanes(std::vector<SSS::GL::Plane::Shared> planes)
+{
+    SSS::GL::PlaneRenderer::setPlanes(std::move(planes));
+}
+
 void Parallax::_setupPlanes()
 {
     if (_is_setup)
         return;
-    for (auto& plane : planes) {
+    for (auto const& plane : _planes) {
         auto const tex = plane->getTexture();
-        if (!tex || tex->hasRunningThread())
+        if (!tex)
+            return;
+        int w, h;
+        tex->getCurrentDimensions(w, h);
+        if (w == 0 || h == 0)
             return;
     }
 
     _width = 0.f;
     float offset = 0.f;
 
-    for (auto& plane : planes) {
+    for (auto& plane : _planes) {
         int w, h;
         plane->getTexture()->getCurrentDimensions(w, h);
         float const p_width = plane->getScaling().x *
@@ -38,7 +65,7 @@ void Parallax::_movePlanes()
     auto const now = std::chrono::steady_clock::now();
     std::chrono::duration<float> const diff = now - _last_update;
     float const coeff = -speed * diff.count();
-    for (auto& plane : planes) {
+    for (auto& plane : _planes) {
         plane->translate(glm::vec3(coeff, 0.f, 0.f));
         if ((coeff < 0.f && plane->getTranslation().x < -_width / 2.f) ||
             (coeff > 0.f && plane->getTranslation().x > _width / 2.f)) {
@@ -52,7 +79,7 @@ void Parallax::render()
 {
     _setupPlanes();
     _movePlanes();
-    PlaneRendererBase::render();
+    SSS::GL::PlaneRenderer::render();
 }
 
 void Parallax::pause()

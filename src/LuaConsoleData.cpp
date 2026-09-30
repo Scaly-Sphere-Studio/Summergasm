@@ -3,7 +3,7 @@
 std::vector<LuaConsoleData::_AppendBaseClassFunc> LuaConsoleData::_append_fns{
     _appendBaseClass<SSS::GL::ModelBase>,
     _appendBaseClass<SSS::GL::RendererBase>,
-    _appendBaseClass<SSS::GL::PlaneRendererBase>
+    _appendBaseClass<SSS::GL::PlaneRenderer>
 };
 
 bool LuaConsoleData::recursive{ false };

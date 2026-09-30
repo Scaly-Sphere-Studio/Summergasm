@@ -31,7 +31,7 @@ static void name_env_objects(sol::table const& env)
                 tex->setName(path);
         }   break;
         case SSS::GL::Texture::Type::Text: {
-            TR::Area const* area = tex->getTextArea();
+            TR::Area::Shared area = tex->getTextArea();
             if (area && !area->getName().empty()) {
                 tex->setName(area->getName() + "");
             }
@@ -75,7 +75,7 @@ static void empty_table(sol::table table)
 {
     for (auto& [key, obj] : table) {
         if (obj.is<SSS::GL::RendererBase*>())
-            g->window->removeRenderer(obj.as<SSS::GL::RendererBase*>()->getShared());
+            g->window->removeRenderer(obj.as<SSS::GL::RendererBase*>()->getSharedBase());
         if (obj.get_type() == sol::type::table) {
             empty_table(obj);
             if (!obj.as<sol::table>().empty())
@@ -263,10 +263,10 @@ bool setup_lua()
     lua["console_reset_env"]();
 
     auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
-        sol::resolve<Parallax::Shared()>(Parallax::create),
+        []() { return Parallax::create(); },
         [](GL::Camera* cam) { return Parallax::create(GL::Camera::get(cam)); },
         [](GL::Camera* cam, bool clear) { return Parallax::create(GL::Camera::get(cam), clear); }
-    ), sol::base_classes, sol::bases<GL::PlaneRendererBase, GL::RendererBase, Base>());
+    ), sol::base_classes, sol::bases<GL::PlaneRenderer, GL::RendererBase, Base>());
     parallax["width"] = sol::property(&Parallax::getWidth);
     parallax["speed"] = &Parallax::speed;
     parallax["pause"] = &Parallax::pause;

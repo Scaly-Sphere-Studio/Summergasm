@@ -255,8 +255,7 @@ static void print_object(SSS::GL::Plane& plane)
         plane.setTranslation(translation);
 }
 // Renderer
-template<>
-static void print_object(SSS::GL::PlaneRendererBase& renderer)
+static void print_planes(SSS::GL::PlaneRenderer& renderer)
 {
     static constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_RowBg
@@ -268,7 +267,12 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
 
     char label[256];
     std::string id = SSS::toString(&renderer);
-    SSS::GL::Plane::Vector& planes = renderer.planes;
+    std::vector<SSS::GL::Plane::Shared> planes;
+    for (auto const& plane_base : renderer.getPlanes()) {
+        if (auto plane = std::dynamic_pointer_cast<SSS::GL::Plane>(plane_base))
+            planes.emplace_back(std::move(plane));
+    }
+    bool planes_changed = false;
 
     // Checkboxes for related booleans
     ImGui::Checkbox(" Reset Z-buffer before rendering?", &renderer.clear_depth_buffer);
@@ -286,6 +290,7 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
             sprintf_s(label, "Create Plane +##create_plane%s", id.c_str());
             if (Tooltip("Create new Plane.", CreateButton, label)) {
                 planes.emplace_back(SSS::GL::Plane::create());
+                    planes_changed = true;
             }
             ImGui::EndTable();
         }
@@ -342,6 +347,7 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
                     for (size_t j = hold_i; j != i; j += incr) {
                         std::swap(planes.at(j), planes.at(j + incr));
                     }
+                        planes_changed = true;
                 }
                 ImGui::EndDragDropTarget();
             }
@@ -368,6 +374,7 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
                 new_plane->setName(new_plane_name);
                 new_plane_name.clear();
                 planes.insert(planes.cbegin() + i + 1, new_plane);
+                    planes_changed = true;
                 return;
             }
 
@@ -376,6 +383,7 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
             sprintf_s(label, "&##copy_plane%zu", i);
             if (Tooltip("Copy this Plane", CopyButton, label)) {
                 planes.insert(planes.cbegin() + i + 1, plane->duplicate());
+                    planes_changed = true;
             }
 
             // Delete plane
@@ -383,18 +391,21 @@ static void print_object(SSS::GL::PlaneRendererBase& renderer)
             sprintf_s(label, "×##delete_plane%zu", i);
             if (Tooltip("Delete this Plane", DeleteButton, label)) {
                 planes.erase(planes.begin() + i);
+                    planes_changed = true;
             }
             else
                 ++i;
         }
         ImGui::EndTable();
     }
+        if (planes_changed)
+            renderer.setPlanes(std::move(planes));
 }
 template<>
 static void print_object(SSS::GL::PlaneRenderer& renderer)
 {
     print_object<SSS::Base>(renderer);
-    print_object<SSS::GL::PlaneRendererBase>(renderer);
+    print_planes(renderer);
 }
 template<>
 static void print_object(Parallax& renderer)
@@ -405,7 +416,7 @@ static void print_object(Parallax& renderer)
     if (ImGui::Checkbox("Play", &is_playing))
         renderer.toggle();
     InputFloatWasEdited("Speed", &renderer.speed, 0.01f);
-    print_object<SSS::GL::PlaneRendererBase>(renderer);
+    print_planes(renderer);
 }
 
 template<>
@@ -521,11 +532,11 @@ static void print_env(char const* name, sol::environment const& env)
         else if (value.is<GL::Plane>()) {
             print_tab_object<GL::Plane>(value, ImColor(0.8f, 0.3f, 0.3f));
         }
-        else if (value.is<GL::PlaneRenderer>()) {
-            print_tab_object<GL::PlaneRenderer>(value, ImColor(0.7f, 0.f, 0.8f));
-        }
         else if (value.is<Parallax>()) {
             print_tab_object<Parallax>(value, ImColor(0.7f, 0.f, 0.8f));
+        }
+        else if (value.is<GL::PlaneRenderer>()) {
+            print_tab_object<GL::PlaneRenderer>(value, ImColor(0.7f, 0.f, 0.8f));
         }
         else if (value.is<TR::Area>()) {
             print_tab_object<TR::Area>(value, ImColor(0.3f, 0.8f, 0.3f));
@@ -582,8 +593,6 @@ static void clean_map(std::map<time_point, std::shared_ptr<T>>& map)
 }
 
 static std::map<time_point, SSS::GL::Shaders::Shared> shaders;
-static std::map<time_point, SSS::GL::PlaneRenderer::Shared> plane_renderers;
-static std::map<time_point, Parallax::Shared> parallax_renderers;
 static std::map<time_point, SSS::GL::Texture::Shared> textures;
 static std::map<time_point, SSS::GL::Camera::Shared> cameras;
 static std::map<time_point, SSS::GL::Plane::Shared> planes;
@@ -591,8 +600,6 @@ static std::map<time_point, SSS::GL::Plane::Shared> planes;
 void free_imgui_objects()
 {
     shaders.clear();
-    plane_renderers.clear();
-    parallax_renderers.clear();
     textures.clear();
     cameras.clear();
     planes.clear();
@@ -601,24 +608,18 @@ void free_imgui_objects()
 void print_window_objects()
 {
     update_map(shaders);
-    update_map(plane_renderers);
-    update_map(parallax_renderers);
     update_map(textures);
     update_map(cameras);
     update_map(planes);
 
     if (ImGui::TreeNode("All objects")) {
         if (ImGui::Button("Remove all unused objects")) {
-            clean_map(plane_renderers);
-            clean_map(parallax_renderers);
             clean_map(shaders);
             clean_map(planes);
             clean_map(textures);
             clean_map(cameras);
         }
         //print_map(shaders, "Shaders");
-        print_map(plane_renderers, "Renderers");
-        print_map(parallax_renderers, "Renderers");
         print_map(textures, "Textures");
         print_map(cameras, "Cameras");
         print_map(planes, "Planes");
