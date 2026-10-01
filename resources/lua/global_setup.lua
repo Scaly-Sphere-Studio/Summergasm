@@ -71,6 +71,56 @@ do
 end
 
 
+print(f, "  Init watermark")
+-- Development disclaimer, always displayed on top of every scene.
+-- update_watermark() is called every frame by C++, which also keeps
+-- watermark_renderer as the last (topmost) renderer of the window.
+do
+    watermark_area = TR.Area.new(800, 40)
+    local fmt = TR.Fmt.new()
+    fmt.charsize = 18
+    fmt.alignment = TR.Alignment.Right
+    fmt.has_outline = true
+    fmt.alpha = 170
+    watermark_area:setFmt(fmt)
+    watermark_area.string = "Game in development - Subject to change"
+
+    watermark = GL.Plane.new(watermark_area)
+
+    -- Own camera, so scenes moving / zooming cam_fixed don't move the watermark
+    watermark_cam = GL.Camera.new()
+    watermark_cam.position = vec3.new(0, 0, 3)
+    watermark_cam.proj_type = GL.Projection.OrthoFixed
+
+    watermark_renderer = GL.PlaneRenderer.new(watermark_cam, true)
+    watermark_renderer.planes = { watermark }
+    window:addRenderer(watermark_renderer)
+
+    -- Distance (in pixels) from the top right corner of the window,
+    -- leaving room for a settings ribbon at the top
+    watermark_margin_top = 64
+    watermark_margin_right = 24
+
+    local last_w, last_h = 0, 0
+    function update_watermark ()
+        local w, h = window:getDimensions()
+        if (w == last_w and h == last_h)
+        then
+            return
+        end
+        last_w, last_h = w, h
+        local aw, ah = watermark_area:getDimensions()
+        -- Planes are already scaled to their texture ratio: scale by the
+        -- height to get a pixel-perfect size with an OrthoFixed camera
+        watermark.scaling = vec3.new(ah, ah, 1)
+        watermark.translation = vec3.new(
+            w / 2 - aw / 2 - watermark_margin_right,
+            h / 2 - ah / 2 - watermark_margin_top,
+            0)
+    end
+end
+
+
 print(f, "  Init audio")
 file_script("audio_setup")
 

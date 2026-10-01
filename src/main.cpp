@@ -16,6 +16,22 @@ void exitSummergasm(int status)
     exit(status);
 }
 
+// Places the development watermark, and keeps its renderer drawn last so
+// that it stays on top of any renderer added by scenes
+static void update_watermark()
+{
+    sol::object const obj = g->lua["watermark_renderer"];
+    if (!obj.is<SSS::GL::RendererBase*>())
+        return;
+    g->lua["update_watermark"]();
+    auto const renderer = obj.as<SSS::GL::RendererBase*>()->getSharedBase();
+    auto const& renderers = g->window->getRenderers();
+    if (renderers.empty() || renderers.back() != renderer) {
+        g->window->removeRenderer(renderer);
+        g->window->addRenderer(renderer);
+    }
+}
+
 int main(void) try
 {
     //Log::louden(true);
@@ -47,6 +63,7 @@ int main(void) try
     while (!g->window->shouldClose()) {
         SSS::GL::pollEverything();
         mylua_run_active_scenes();
+        update_watermark();
         g->window->drawObjects();
         if (g->console_display)
             print_console();
