@@ -30,6 +30,7 @@ end
 print(f, "  Init text areas")
 -- Text areas
 do
+    TR.init()
     area = TR.Area.new(1280, 720)
 
     print(f, "    Fmt")

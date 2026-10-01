@@ -27,7 +27,7 @@ List of scenes available in F1 settings
     text.hitbox = GL.PlaneHitbox.Full
 
     plane_renderer = GL.PlaneRenderer.new(camera)
-    plane_renderer.planes:add(text)
+    plane_renderer.planes = { text }
     window:addRenderer(plane_renderer)
 
     print(filename, "init end")
