@@ -8,6 +8,12 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
     if (action == GLFW_PRESS) {
         switch (key) {
         case GLFW_KEY_ESCAPE:
+            // Main window: handled by the main loop (back to the menu, or quit)
+            if (window == g->window) {
+                g->escape_pressed = true;
+                break;
+            }
+            [[fallthrough]];
         case GLFW_KEY_KP_0:
             glfwSetWindowShouldClose(ptr, GLFW_TRUE);
             break;
@@ -34,6 +40,24 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
         }   break;
         }
     }
+}
+
+// Accumulates the mouse wheel for the scenes, and forwards it to the
+// previous callback (ImGui's, if installed before)
+static GLFWscrollfun previous_scroll_callback{ nullptr };
+
+static void scroll_callback(GLFWwindow* ptr, double x, double y)
+{
+    if (SSS::GL::Window::get(ptr) == g->window)
+        g->scroll_y += y;
+    if (previous_scroll_callback)
+        previous_scroll_callback(ptr, x, y);
+}
+
+void set_scroll_callback(GLFWwindow* ptr)
+{
+    // Window::setCallback() doesn't handle scrolling: set it directly
+    previous_scroll_callback = glfwSetScrollCallback(ptr, scroll_callback);
 }
 
 void close_callback(GLFWwindow* ptr)

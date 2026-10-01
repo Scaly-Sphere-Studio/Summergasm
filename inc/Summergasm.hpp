@@ -10,3 +10,4 @@ void print_imgui();
 
 void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods);
 void close_callback(GLFWwindow* ptr);
+void set_scroll_callback(GLFWwindow* ptr);

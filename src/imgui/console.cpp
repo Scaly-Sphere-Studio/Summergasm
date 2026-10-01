@@ -82,9 +82,10 @@ void ConsoleMemory::pushCmd(std::string const& buffer)
     //  "h", "?", "help" [filter]   -> help([filter])
     //  "ls" [scene]                -> list_scenes() / load_scene(scene)
     //  "us" [scene]                -> unload_scene([scene])
+    //  "m", "menu"                 -> menu()
     std::string cmd = buffer;
     std::smatch sm;
-    static std::regex const alias_regex(R"re(\s*(h|\?|help|ls|us)(?:\s+"?([^\s"]+)"?)?\s*)re");
+    static std::regex const alias_regex(R"re(\s*(h|\?|help|ls|us|m|menu)(?:\s+"?([^\s"]+)"?)?\s*)re");
     if (std::regex_match(buffer, sm, alias_regex)) {
         std::string const alias = sm[1].str();
         std::string const arg = sm[2].matched ? '"' + sm[2].str() + '"' : "";
@@ -92,6 +93,8 @@ void ConsoleMemory::pushCmd(std::string const& buffer)
             cmd = arg.empty() ? "list_scenes()" : "load_scene(" + arg + ")";
         else if (alias == "us")
             cmd = "unload_scene(" + arg + ")";
+        else if (alias == "m" || alias == "menu")
+            cmd = "menu()";
         else
             cmd = "help(" + arg + ")";
     }

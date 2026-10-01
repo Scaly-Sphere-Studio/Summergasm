@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
+    <ClCompile Include="src\Dialog.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
@@ -28,24 +29,33 @@
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Parallax.cpp" />
+    <ClCompile Include="src\renpy\RenpyParser.cpp" />
     <ClCompile Include="src\setup_lua.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="inc\Dialog.hpp" />
     <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\includes.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
     <ClInclude Include="inc\mylua.hpp" />
     <ClInclude Include="inc\Parallax.hpp" />
+    <ClInclude Include="src\renpy\RenpyParser.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\lua\homescreen.lua" />
     <None Include="resources\lua\audio_setup.lua" />
     <None Include="resources\lua\beach.lua" />
+    <None Include="resources\lua\dialog.lua" />
     <None Include="resources\lua\global_setup.lua" />
+    <None Include="resources\lua\menu.lua" />
     <None Include="resources\lua\model_functions.lua" />
+    <None Include="resources\assets\char\scene_vacances.rpy" />
     <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="resources\assets\char\background.jpg" />
+    <Image Include="resources\assets\char\char1.png" />
+    <Image Include="resources\assets\char\char4.png" />
+    <Image Include="resources\assets\char\char5.png" />
     <Image Include="resources\assets\plage\foam.png" />
     <Image Include="resources\assets\plage\sand.png" />
     <Image Include="resources\assets\plage\water_layer.png" />

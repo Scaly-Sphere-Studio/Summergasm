@@ -32,5 +32,11 @@ struct GlobalData {
     std::map<std::string, std::unique_ptr<Scene>> lua_scenes;
 
     std::vector<std::string> texts;
+
+    // Mouse wheel of the main window, accumulated by its scroll callback
+    // and reset every frame, after the scenes ran
+    double scroll_y{ 0.0 };
+    // Escape key of the main window, handled by the main loop
+    bool escape_pressed{ false };
 };
 extern std::unique_ptr<GlobalData> g;

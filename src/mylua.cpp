@@ -1,4 +1,5 @@
 #include "mylua.hpp"
+#include "Dialog.hpp"
 
 using namespace SSS;
 
@@ -153,12 +154,45 @@ bool mylua_file_script(std::string const& path)
     return false;
 }
 
+// Main menu, loaded by default (see global_setup.lua)
+static std::string const menu_scene = "menu.lua";
+
+// Scenes can't be loaded or unloaded while they're running (a scene could
+// destroy its own environment mid-script, e.g. a menu button loading a scene
+// which unloads the menu): those requests are deferred until every scene ran.
+static bool scenes_running = false;
+static std::vector<std::function<void()>> pending_requests;
+
+static bool defer_request(std::function<void()> request)
+{
+    if (!scenes_running)
+        return false;
+    pending_requests.emplace_back(std::move(request));
+    return true;
+}
+
 bool mylua_run_active_scenes()
 {
     bool ret = false;
+    scenes_running = true;
     for (auto const& pair : g->lua_scenes) {
         if (pair.second)
             pair.second->run();
+    }
+    scenes_running = false;
+    // Requests may queue other ones (e.g. loading a scene unloads the menu)
+    while (!pending_requests.empty()) {
+        auto const requests = std::move(pending_requests);
+        pending_requests.clear();
+        for (auto const& request : requests) {
+            try {
+                request();
+            }
+            catch (std::exception const& e) {
+                LOG_FUNC_ERR(e.what());
+                ret = true;
+            }
+        }
     }
     return ret;
 }
@@ -170,15 +204,17 @@ bool mylua_load_scene(std::string const& scene_name)
         LOG_FUNC_CTX_WRN("Given script wasn't registered", script_name);
         return true;
     }
+    if (defer_request([script_name]() { mylua_load_scene(script_name); }))
+        return false;
     auto& scene = g->lua_scenes[script_name];
     if (scene) {
         LOG_FUNC_CTX_WRN("Given scene is already running", script_name);
         return true;
     }
     scene = std::make_unique<Scene>(script_name);
-    // The homescreen is only a dev menu: unload it once another scene is loaded
-    if (script_name != "homescreen.lua") {
-        auto const it = g->lua_scenes.find("homescreen.lua");
+    // Unload the menu once another scene is loaded, see mylua_return_to_menu()
+    if (script_name != menu_scene) {
+        auto const it = g->lua_scenes.find(menu_scene);
         if (it != g->lua_scenes.end() && it->second)
             it->second.reset();
     }
@@ -200,6 +236,8 @@ bool mylua_unload_scene(std::string const& scene_name)
         LOG_FUNC_CTX_WRN("Given script wasn't registered", script_name);
         return true;
     }
+    if (defer_request([script_name]() { mylua_unload_scene(script_name); }))
+        return false;
     auto& scene = g->lua_scenes[script_name];
     if (!scene) {
         LOG_FUNC_CTX_WRN("Given scene was not running", script_name);
@@ -207,6 +245,49 @@ bool mylua_unload_scene(std::string const& scene_name)
     }
     scene.reset();
     return false;
+}
+
+// Unloads every scene but the menu, and loads the menu if needed
+bool mylua_return_to_menu()
+{
+    if (g->lua_scenes.count(menu_scene) == 0) {
+        LOG_FUNC_CTX_WRN("Menu script wasn't registered", menu_scene);
+        return true;
+    }
+    if (defer_request([]() { mylua_return_to_menu(); }))
+        return false;
+    for (auto& [name, scene] : g->lua_scenes) {
+        if (name != menu_scene && scene)
+            scene.reset();
+    }
+    if (!g->lua_scenes[menu_scene])
+        return mylua_load_scene(menu_scene);
+    return false;
+}
+
+// Escape key of the main window. The current scene may handle it with an
+// on_escape() function returning true (e.g. the dialog closing its log).
+// Otherwise, returns to the menu. Returns false if nothing was done (the
+// menu is the current scene): the caller then closes the game.
+bool mylua_on_escape()
+{
+    if (!scenes_order.empty()) {
+        std::string const current = scenes_order.back();
+        sol::object const handler = g->lua_scenes.at(current)->getEnv()["on_escape"];
+        if (handler.is<sol::protected_function>()) {
+            sol::protected_function_result const result = handler.as<sol::protected_function>()();
+            if (!result.valid()) {
+                sol::error const err = result;
+                LOG_CTX_ERR(current, err.what());
+            }
+            else if (result.get_type() == sol::type::boolean && result.get<bool>()) {
+                return true;
+            }
+        }
+        if (current == menu_scene)
+            return false;
+    }
+    return !mylua_return_to_menu();
 }
 
 static void mylua_list_scenes()
@@ -280,9 +361,10 @@ struct LuaCommandHelp {
 static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "help",               { "[filter]",   "List commands & functions (aliases: h, ? [filter])" } },
     { "file_script",        { "path",       "Run resources/lua/<path>.lua once" } },
-    { "load_scene",         { "scene_name",   "Load & run a scene, unloads homescreen (alias: ls <scene>)" } },
+    { "load_scene",         { "scene_name",   "Load & run a scene, unloads the menu (alias: ls <scene>)" } },
     { "unload_scene",       { "[scene_name]", "Unload a scene, default: current one (alias: us [scene])" } },
     { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
+    { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
     { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
     { "console_reset_env",  { "",           "Run console commands in the global env" } },
 };
@@ -372,6 +454,9 @@ bool setup_lua()
         return !mylua_unload_scene(scene_name.value_or(""));
     };
     lua["list_scenes"] = mylua_list_scenes;
+    lua["menu"] = []() {
+        return !mylua_return_to_menu();
+    };
     lua["help"] = mylua_help;
     lua["scenes"].get_or_create<sol::table>();
 
@@ -399,6 +484,13 @@ bool setup_lua()
     parallax["pause"] = &Parallax::pause;
     parallax["play"] = &Parallax::play;
     parallax["toggle"] = &Parallax::toggle;
+
+    // Ren'Py dialog player, see Dialog.hpp & dialog.lua
+    auto dialog = lua.new_usertype<Dialog>("Dialog", sol::factories(
+        [](std::string const& path) { return std::make_unique<Dialog>(path); }
+    ));
+    dialog["update"] = &Dialog::update;
+    dialog["log_open"] = sol::readonly_property(&Dialog::isLogOpen);
 
     if (mylua_file_script("global_setup.lua"))
         return true;

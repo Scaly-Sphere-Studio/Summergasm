@@ -23,6 +23,9 @@
     <Filter Include="Resource Files\Lua">
       <UniqueIdentifier>{e1afe9a0-7d1d-4b31-ad6e-7a276e62a0fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\renpy">
+      <UniqueIdentifier>{3b8f2c71-5d4e-4a9b-9c1f-7e2a6d0b4f58}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -55,6 +58,12 @@
     <ClCompile Include="src\LuaConsoleData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\renpy\RenpyParser.cpp">
+      <Filter>Source Files\renpy</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Summergasm.hpp">
@@ -72,6 +81,12 @@
     <ClInclude Include="inc\Parallax.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="inc\Dialog.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\renpy\RenpyParser.h">
+      <Filter>Source Files\renpy</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\lua\audio_setup.lua">
@@ -86,8 +101,14 @@
     <None Include="resources\lua\train.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
-    <None Include="resources\lua\homescreen.lua">
+    <None Include="resources\lua\menu.lua">
       <Filter>Resource Files\Lua</Filter>
+    </None>
+    <None Include="resources\lua\dialog.lua">
+      <Filter>Resource Files\Lua</Filter>
+    </None>
+    <None Include="resources\assets\char\scene_vacances.rpy">
+      <Filter>Resource Files</Filter>
     </None>
     <None Include="resources\lua\model_functions.lua">
       <Filter>Resource Files\Lua</Filter>

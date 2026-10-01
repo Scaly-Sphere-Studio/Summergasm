@@ -60,6 +60,8 @@ bool mylua_file_script(std::string const& path);
 bool mylua_run_active_scenes();
 bool mylua_load_scene(std::string const& scene_name);
 bool mylua_unload_scene(std::string const& scene_name);
+bool mylua_return_to_menu();
+bool mylua_on_escape();
 
 extern sol::environment* mylua_console_env;
 

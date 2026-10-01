@@ -129,4 +129,4 @@ file_script("model_functions")
 
 print(f, "end")
 
-load_scene("homescreen")
+load_scene("menu")

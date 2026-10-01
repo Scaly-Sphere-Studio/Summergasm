@@ -12,6 +12,10 @@ void exitSummergasm(int status)
     g->ui_window->close();
     g->window->close();
     g.reset();
+    // Closes the OpenAL device now: left to sss-audio's static destructor, it
+    // happens while DLLs unload, after OpenAL's threads were killed, and can
+    // hang forever (the process stays alive and the .exe locked)
+    SSS::Audio::terminate();
     LOG_CTX_MSG("Exiting with status", status);
     exit(status);
 }
@@ -55,6 +59,7 @@ int main(void) try
 
     // Main Window callbacks
     g->window->setCallback(glfwSetKeyCallback, key_callback);
+    set_scroll_callback(g->window->getGLFWwindow());
     // UI Window callbacks
     g->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
@@ -62,7 +67,11 @@ int main(void) try
     // Main loop
     while (!g->window->shouldClose()) {
         SSS::GL::pollEverything();
+        // Back to the menu (scenes are switched outside of GLFW callbacks), or quit from it
+        if (std::exchange(g->escape_pressed, false) && !mylua_on_escape())
+            glfwSetWindowShouldClose(g->window->getGLFWwindow(), GLFW_TRUE);
         mylua_run_active_scenes();
+        g->scroll_y = 0.0;
         update_watermark();
         g->window->drawObjects();
         if (g->console_display)
