@@ -3,17 +3,17 @@ then
     print(filename, "init start")
 
     sand = GL.Plane.new("plage/sand.png")
-    sand:scale(4.0)
+    scale_when_loaded(sand, vec3.new(4, 4, 4))
     wet = GL.Plane.new("plage/wet_sand_layer.png")
-    wet:scale(4.0)
+    scale_when_loaded(wet, vec3.new(4, 4, 4))
     wet:translate(vec3.new(0, 0, 0.3))
     wet.alpha = 0
     water = GL.Plane.new("plage/water_layer.png")
-    water:scale(4.0)
+    scale_when_loaded(water, vec3.new(4, 4, 4))
     water:translate(vec3.new(0, 0, 0.6))
     foam = GL.Plane.new("plage/foam.png")
     foam:translate(vec3.new(0, 0, 0.9))
-    foam:scale(4.0)
+    scale_when_loaded(foam, vec3.new(4, 4, 4))
 
     renderer = GL.PlaneRenderer.new(camera)
     renderer.planes = { sand, wet, water, foam }
@@ -29,6 +29,8 @@ then
 
 elseif (is_running)
 then
+    apply_loaded_scalings()
+
     local speed = 0.015
 
     if (window:keyIsPressed(GL.KEY_UP))
@@ -48,8 +50,11 @@ then
         camera:move( vec3.new(speed, 0, 0) )
     end
 
-    water.translation = vec3.new(0, math.cos(math.pi * coeff) / 2, 0)
-    foam.translation = water.translation
+    -- Keep each layer at its own depth (sand 0, wet 0.3, water 0.6, foam 0.9):
+    -- planes at the same z fail the depth test and aren't drawn
+    local wave_y = math.cos(math.pi * coeff) / 2
+    water.translation = vec3.new(0, wave_y, 0.6)
+    foam.translation = vec3.new(0, wave_y, 0.9)
     foam.alpha = math.abs(coeff)
     wet.alpha = wet.alpha - 0.004
 
@@ -58,7 +63,7 @@ then
     if (coeff >= 1)
     then
         coeff = -1
-        wet.translation = water.translation
+        wet.translation = vec3.new(0, water.translation.y, 0.3)
         wet.alpha = 1
     end
 end

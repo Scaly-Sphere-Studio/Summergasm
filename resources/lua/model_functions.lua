@@ -16,6 +16,35 @@ function audio_plane (plane)
     end
 end
 
+-- Planes created from an image file are resized to the image's pixel size by
+-- GL once the file has loaded (async), overriding any earlier scaling.
+-- Register the wanted scaling here, and call apply_loaded_scalings() every
+-- frame to re-apply it once the image is loaded.
+-- Not a weak table: planes passed by forEach() are temporary userdata that
+-- would be collected before being loaded. Entries are removed once applied.
+local pending_scalings = {}
+
+function scale_when_loaded (plane, scaling)
+    pending_scalings[plane] = scaling
+end
+
+function apply_loaded_scalings ()
+    for plane, scaling in pairs(pending_scalings) do
+        local w, h = plane.texture:getDimensions()
+        if (w ~= 0 and h ~= 0)
+        then
+            -- scaling is either a vec3, or a function(plane, w, h)
+            if (type(scaling) == "function")
+            then
+                scaling(plane, w, h)
+            else
+                plane.scaling = scaling
+            end
+            pending_scalings[plane] = nil
+        end
+    end
+end
+
 function drag_plane (plane)
     if (plane:isHeld())
     then

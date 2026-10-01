@@ -3,17 +3,19 @@
 #include <regex>
 
 struct CmdMemory {
-    CmdMemory(std::string const& s) : str(s) {};
+    CmdMemory(std::string const& s, ImVec4 c = ImVec4(1, 1, 1, 1)) : str(s), color(c) {};
     std::string str;
-    ImVec4 color{ 1, 1, 1, 1 };
+    ImVec4 color;
 };
 
 struct ConsoleMemory {
-    std::vector<CmdMemory> cmds;
+    std::vector<CmdMemory> cmds;    // Command history
+    std::vector<CmdMemory> lines;   // Displayed commands & outputs
     size_t index{ 0 };
 
     void callback(ImGuiInputTextCallbackData* data, std::string const& buffer);
     void pushCmd(std::string const& buffer);
+    void pushOutput(std::string const& str, ImVec4 color = ImVec4(0.7f, 0.7f, 0.7f, 1));
 };
 
 struct ConsoleAutocomplete {
@@ -58,16 +60,111 @@ void ConsoleMemory::callback(ImGuiInputTextCallbackData* data, std::string const
     }
 }
 
+void ConsoleMemory::pushOutput(std::string const& str, ImVec4 color)
+{
+    // Split multi-line outputs so each line is displayed separately
+    size_t start = 0;
+    while (start <= str.size()) {
+        size_t const end = std::min(str.find('\n', start), str.size());
+        lines.emplace_back(str.substr(start, end - start), color);
+        start = end + 1;
+    }
+}
+
 void ConsoleMemory::pushCmd(std::string const& buffer)
 {
     cmds.emplace_back(buffer);
-    auto result = g->lua.safe_script(buffer, *mylua_console_env, sol::script_pass_on_error);
-    if (!result.valid()) {
-        cmds.back().color = ImVec4(1, 0, 0, 1);
-        sol::error err = result;
-        LOG_CTX_ERR("Lua console", std::string("\n") + err.what());
-    }
+    lines.emplace_back("> " + buffer);
+    size_t const cmd_line = lines.size() - 1;
     index = 0;
+
+    // Aliases, with an optional argument (quotes optional):
+    //  "h", "?", "help" [filter]   -> help([filter])
+    //  "ls" [scene]                -> list_scenes() / load_scene(scene)
+    //  "us" [scene]                -> unload_scene([scene])
+    std::string cmd = buffer;
+    std::smatch sm;
+    static std::regex const alias_regex(R"re(\s*(h|\?|help|ls|us)(?:\s+"?([^\s"]+)"?)?\s*)re");
+    if (std::regex_match(buffer, sm, alias_regex)) {
+        std::string const alias = sm[1].str();
+        std::string const arg = sm[2].matched ? '"' + sm[2].str() + '"' : "";
+        if (alias == "ls")
+            cmd = arg.empty() ? "list_scenes()" : "load_scene(" + arg + ")";
+        else if (alias == "us")
+            cmd = "unload_scene(" + arg + ")";
+        else
+            cmd = "help(" + arg + ")";
+    }
+
+    sol::environment const& env = *mylua_console_env;
+    sol::table globals = g->lua.globals();
+    sol::function const tostring = globals["tostring"];
+    auto const to_string = [&](sol::object const& obj) -> std::string {
+        return tostring(obj).get<std::string>();
+    };
+
+    // Redirect print to the console while the command runs
+    sol::object const old_print = globals["print"];
+    globals["print"] = [&](sol::variadic_args va) {
+        std::string str;
+        for (auto const& arg : va) {
+            if (!str.empty())
+                str += '\t';
+            str += to_string(arg.get<sol::object>());
+        }
+        pushOutput(str);
+    };
+
+    auto const push_error = [&](std::string const& what) {
+        lines.at(cmd_line).color = ImVec4(1, 0, 0, 1);
+        cmds.back().color = ImVec4(1, 0, 0, 1);
+        pushOutput(what, ImVec4(1, 0.4f, 0.4f, 1));
+        LOG_CTX_ERR("Lua console", std::string("\n") + what);
+    };
+
+    // Try as an expression first (like the standard Lua REPL), then as a statement.
+    // The load_result must be destroyed BEFORE calling the function: its
+    // destructor pops the top of the Lua stack, which would otherwise be the
+    // call's results.
+    sol::protected_function f;
+    std::string load_error;
+    {
+        sol::load_result expr = g->lua.load("return " + cmd, "console");
+        if (expr.valid())
+            f = expr;
+    }
+    if (!f.valid()) {
+        sol::load_result stmt = g->lua.load(cmd, "console");
+        if (stmt.valid())
+            f = stmt;
+        else
+            load_error = stmt.get<sol::error>().what();
+    }
+    if (!f.valid()) {
+        globals["print"] = old_print;
+        push_error(load_error);
+        return;
+    }
+    env.set_on(f);
+    sol::protected_function_result result = f();
+
+    globals["print"] = old_print;
+
+    if (!result.valid()) {
+        sol::error err = result;
+        push_error(err.what());
+        return;
+    }
+
+    // Print returned values, if any
+    std::string str;
+    for (int i = 0; i < result.return_count(); ++i) {
+        if (!str.empty())
+            str += '\t';
+        str += to_string(result.get<sol::object>(i));
+    }
+    if (!str.empty())
+        pushOutput(str);
 }
 
 
@@ -213,16 +310,15 @@ void print_console()
         if (ImGui::BeginChild("##memory", ImVec2(-FLT_MIN, 260), false,
             ImGuiChildFlags_AlwaysUseWindowPadding))
         {
-            auto const& cmds = console.memory.cmds;
+            auto const& lines = console.memory.lines;
 
-            for (CmdMemory const& cmd : cmds) {
-                std::string str("> " + cmd.str);
-                ImGui::TextColored(cmd.color, str.c_str());
+            for (CmdMemory const& line : lines) {
+                ImGui::TextColored(line.color, "%s", line.str.c_str());
             }
-            
+
             static size_t mem_size = 0;
-            if (mem_size != cmds.size()) {
-                mem_size = cmds.size();
+            if (mem_size != lines.size()) {
+                mem_size = lines.size();
                 ImGui::SetScrollHereY();
             }
         }

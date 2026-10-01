@@ -44,6 +44,9 @@ static void name_env_objects(sol::table const& env)
     }
 }
 
+// Running scenes, in loading order: the last one is the current scene
+static std::vector<std::string> scenes_order;
+
 Scene::Scene(std::string const& filename_) try
     : filename(filename_), path(g->lua_folder + filename_)
 {
@@ -68,13 +71,15 @@ Scene::Scene(std::string const& filename_) try
     name_env_objects(*env);
     (*env)["is_loading"] = false;
     (*env)["is_running"] = true;
+    scenes_order.push_back(filename);
 }
 CATCH_AND_RETHROW_FUNC_EXC;
 
 static void empty_table(sol::table table)
 {
     for (auto& [key, obj] : table) {
-        if (obj.is<SSS::GL::RendererBase*>())
+        // Window may not be set yet if a scene is unloaded during global_setup.lua
+        if (g->window && obj.is<SSS::GL::RendererBase*>())
             g->window->removeRenderer(obj.as<SSS::GL::RendererBase*>()->getSharedBase());
         if (obj.get_type() == sol::type::table) {
             empty_table(obj);
@@ -87,12 +92,16 @@ static void empty_table(sol::table table)
 
 Scene::~Scene()
 {
+    std::erase(scenes_order, filename);
     (*env)["is_running"] = false;
     (*env)["is_unloading"] = true;
     run();
     size_t const n = filename.find('.');
     std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
     g->lua["scenes"][name] = sol::nil;
+    // Don't leave the console pointing to a deleted env
+    if (mylua_console_env == env.get())
+        g->lua["console_reset_env"]();
     empty_table(*env);
     env.reset();
     g->lua.collect_garbage();
@@ -167,11 +176,25 @@ bool mylua_load_scene(std::string const& scene_name)
         return true;
     }
     scene = std::make_unique<Scene>(script_name);
+    // The homescreen is only a dev menu: unload it once another scene is loaded
+    if (script_name != "homescreen.lua") {
+        auto const it = g->lua_scenes.find("homescreen.lua");
+        if (it != g->lua_scenes.end() && it->second)
+            it->second.reset();
+    }
     return false;
 }
 
 bool mylua_unload_scene(std::string const& scene_name)
 {
+    // Empty name: unload the current (last loaded) scene
+    if (scene_name.empty()) {
+        if (scenes_order.empty()) {
+            LOG_FUNC_WRN("No scene is running");
+            return true;
+        }
+        return mylua_unload_scene(scenes_order.back());
+    }
     std::string const script_name = complete_script_name(scene_name);
     if (g->lua_scenes.count(script_name) == 0) {
         LOG_FUNC_CTX_WRN("Given script wasn't registered", script_name);
@@ -184,6 +207,19 @@ bool mylua_unload_scene(std::string const& scene_name)
     }
     scene.reset();
     return false;
+}
+
+static void mylua_list_scenes()
+{
+    std::string scenes;
+    for (auto const& [name, scene] : g->lua_scenes) {
+        scenes += (scenes.empty() ? "" : ", ") + name.substr(0, name.rfind(".lua"));
+        if (!scenes_order.empty() && name == scenes_order.back())
+            scenes += " (current)";
+        else if (scene)
+            scenes += " (running)";
+    }
+    g->lua["print"]("Scenes: " + scenes);
 }
 
 void lua_setup_other_libs(sol::state& lua);
@@ -236,6 +272,90 @@ catch (...) {
     return std::map<std::string, sol::type>();
 }
 
+// C++ bound functions carry no argument info in Lua, so they're documented here
+struct LuaCommandHelp {
+    std::string args;
+    std::string description;
+};
+static std::map<std::string, LuaCommandHelp> const lua_commands_help{
+    { "help",               { "[filter]",   "List commands & functions (aliases: h, ? [filter])" } },
+    { "file_script",        { "path",       "Run resources/lua/<path>.lua once" } },
+    { "load_scene",         { "scene_name",   "Load & run a scene, unloads homescreen (alias: ls <scene>)" } },
+    { "unload_scene",       { "[scene_name]", "Unload a scene, default: current one (alias: us [scene])" } },
+    { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
+    { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
+    { "console_reset_env",  { "",           "Run console commands in the global env" } },
+};
+
+// Returns "name(arg1, arg2, ...)" for Lua functions, or an empty string otherwise
+static std::string lua_function_signature(std::string const& name, sol::function const& f)
+{
+    sol::table const debug = g->lua["debug"];
+    sol::table const info = debug["getinfo"](f, "Su");
+    if (info["what"].get_or<std::string>("") != "Lua")
+        return std::string();
+    sol::function const getlocal = debug["getlocal"];
+    int const nparams = info["nparams"].get_or(0);
+    std::string args;
+    for (int i = 1; i <= nparams; ++i) {
+        if (!args.empty())
+            args += ", ";
+        args += getlocal(f, i).get<std::string>();
+    }
+    if (info["isvararg"].get_or(false))
+        args += args.empty() ? "..." : ", ...";
+    return name + '(' + args + ')';
+}
+
+static void mylua_help(sol::optional<std::string> filter)
+{
+    sol::function const print = g->lua["print"];
+    auto const matches = [&](std::string const& name) {
+        return !filter || name.find(*filter) != std::string::npos;
+    };
+    auto const print_aligned = [&](std::string const& signature, std::string const& description) {
+        constexpr size_t width = 32;
+        std::string line = "  " + signature;
+        if (!description.empty())
+            line += std::string(line.size() < width ? width - line.size() : 1, ' ') + description;
+        print(line);
+    };
+
+    print("Commands:");
+    for (auto const& [name, help] : lua_commands_help) {
+        if (matches(name))
+            print_aligned(name + '(' + help.args + ')', help.description);
+    }
+
+    // Lua functions of the console env (scene env first, then globals)
+    std::map<std::string, std::string> functions;
+    auto const add_functions = [&](sol::table const& table) {
+        for (auto const& [key, value] : table) {
+            if (key.get_type() != sol::type::string || value.get_type() != sol::type::function)
+                continue;
+            std::string const name = key.as<std::string>();
+            if (name.empty() || name.find("_") == 0 || lua_commands_help.count(name) != 0
+                || functions.count(name) != 0 || !matches(name))
+                continue;
+            std::string const signature = lua_function_signature(name, value.as<sol::function>());
+            if (!signature.empty())
+                functions.emplace(name, signature);
+        }
+    };
+    add_functions(*mylua_console_env);
+    add_functions(g->lua.globals());
+    if (!functions.empty()) {
+        print("Lua functions:");
+        for (auto const& [name, signature] : functions)
+            print_aligned(signature, "");
+    }
+
+    if (filter)
+        return;
+    mylua_list_scenes();
+    print("Libraries: GL, TR, Audio, Parallax, vec3... (Tab to autocomplete, e.g. GL.Plane.)");
+}
+
 bool setup_lua()
 {
     mylua_register_scripts();
@@ -244,8 +364,15 @@ bool setup_lua()
     lua_setup_other_libs(lua);
 
     lua["file_script"] = mylua_file_script;
-    lua["load_scene"] = mylua_load_scene;
-    lua["unload_scene"] = mylua_unload_scene;
+    // C++ functions return true on error, Lua ones return true on success
+    lua["load_scene"] = [](std::string const& scene_name) {
+        return !mylua_load_scene(scene_name);
+    };
+    lua["unload_scene"] = [](sol::optional<std::string> scene_name) {
+        return !mylua_unload_scene(scene_name.value_or(""));
+    };
+    lua["list_scenes"] = mylua_list_scenes;
+    lua["help"] = mylua_help;
     lua["scenes"].get_or_create<sol::table>();
 
     lua["console_set_env"] = [](char const* scene_name) {
