@@ -1,4 +1,5 @@
 #include "Summergasm.hpp"
+#include "Dialog.hpp"
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
@@ -7,6 +8,7 @@ void free_imgui_objects();
 void exitSummergasm(int status)
 {
     free_imgui_objects();
+    mylua_free_dialog();
     g->lua_scenes.clear();
     g->lua.collect_garbage();
     g->ui_window->close();
@@ -50,6 +52,7 @@ int main(void) try
         g->resources_folder = g->home_folder + "resources/";
         g->lua_folder = g->resources_folder + "lua/";
         g->assets_folder = g->resources_folder + "assets/";
+        g->dialogs_folder = g->resources_folder + "dialogs/";
         SSS::GL::Texture::setResourceFolder(g->assets_folder);
     }
 
@@ -71,6 +74,8 @@ int main(void) try
         if (std::exchange(g->escape_pressed, false) && !mylua_on_escape())
             glfwSetWindowShouldClose(g->window->getGLFWwindow(), GLFW_TRUE);
         mylua_run_active_scenes();
+        // Started by the scenes, before scroll_y is reset (scrolls their log)
+        Dialog::updateAll();
         g->scroll_y = 0.0;
         update_watermark();
         g->window->drawObjects();

@@ -12,10 +12,10 @@ define l = Character("Léa", color="#ff7eb6")
 define t = Character("Tom", color="#4aa3ff")
 define c = Character("Camille", color="#f2b632")
 
-image l = "char4.png"
-image c = "char5.png"
-image t = "char1.png"
-image bg chambre = "background.jpg"
+image l = "char/char4.png"
+image c = "char/char5.png"
+image t = "char/char1.png"
+image bg chambre = "char/background.jpg"
 
 default choix_lea = ""
 

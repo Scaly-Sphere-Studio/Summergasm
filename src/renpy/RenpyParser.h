@@ -75,8 +75,9 @@ struct Statement {
 class Script {
 public:
     // Throws std::runtime_error on I/O or syntax errors.
-    // Image files are resolved relative to the script's directory.
-    static Script load(std::string const& path);
+    // Image files are resolved relative to image_dir, by default the
+    // script's directory.
+    static Script load(std::string const& path, std::string const& image_dir = {});
 
     std::vector<Statement> const& statements() const { return _stmts; }
     size_t entry() const { return _entry; }

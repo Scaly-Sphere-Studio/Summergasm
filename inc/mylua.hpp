@@ -62,6 +62,8 @@ bool mylua_load_scene(std::string const& scene_name);
 bool mylua_unload_scene(std::string const& scene_name);
 bool mylua_return_to_menu();
 bool mylua_on_escape();
+// Destroys the node of dialog(name), before the window is closed
+void mylua_free_dialog();
 
 extern sol::environment* mylua_console_env;
 

@@ -1,27 +1,75 @@
--- Ren'Py dialog, played by the C++ Dialog (see Dialog.hpp for the controls).
+-- Ren'Py dialog scene: plays a conversation with dialog(name) (see
+-- Dialog.hpp for the controls) over the background its script sets.
 -- Returns to the menu once the story is over, or on Escape.
 if (is_loading)
 then
     print(filename, "init start")
 
-    dialog = Dialog.new("char/scene_vacances.rpy")
+    -- Background of the script's `scene` statements: the Dialog node only
+    -- shows the characters, the text and the choices. Its renderer is added
+    -- first, so that it's drawn behind the dialog.
+    bg_plane = GL.Plane.new(GL.Texture.new())
+    bg_plane.translation = vec3.new(0, 0, -1)
+    bg_renderer = GL.PlaneRenderer.new(cam_fixed)
+    bg_renderer.planes = { bg_plane }
+    window:addRenderer(bg_renderer)
+    bg_textures = {}    -- by image path or color, loaded once
+    bg_key = nil        -- of the texture shown
+    bg_applied = nil    -- window & texture sizes its scaling was computed for
 
-    -- Escape closes the dialog's log if it's open, instead of leaving
-    function on_escape ()
-        return dialog ~= nil and dialog.log_open
+    -- Texture of an image path, or of a 0xRRGGBB color (black when none)
+    function bg_texture (image, color)
+        local key = image or color or 0
+        if (bg_textures[key] == nil)
+        then
+            if (image ~= nil)
+            then
+                bg_textures[key] = GL.Texture.new(image)
+            else
+                local tex = GL.Texture.new()
+                tex:setColor(RGBA.new((key >> 16) & 0xff, (key >> 8) & 0xff, key & 0xff, 255))
+                bg_textures[key] = tex
+            end
+        end
+        return key, bg_textures[key]
     end
+
+    -- Follows the dialog's current step, covering the window. Images load
+    -- asynchronously: the scaling is applied once their size is known.
+    function update_background ()
+        local key, tex = bg_texture(conversation.background_image, conversation.background_color)
+        if (key ~= bg_key)
+        then
+            bg_plane.texture = tex
+            bg_key = key
+            bg_applied = nil
+        end
+        local w, h = window:getDimensions()
+        local tw, th = tex:getDimensions()
+        local applied = w .. "x" .. h .. " " .. tw .. "x" .. th
+        if (tw ~= 0 and th ~= 0 and applied ~= bg_applied)
+        then
+            -- Planes keep their texture's ratio, scaling its smaller side
+            local s = math.min(tw, th) * math.max(w / tw, h / th)
+            bg_plane.scaling = vec3.new(s, s, 1)
+            bg_applied = applied
+        end
+    end
+
+    -- Played by the shared dialog node, which updates itself
+    conversation = dialog("scene_vacances")
+    conversation.end_text = '{{"effect":"FadingWaves","effect_offset":3}}~ Fin ~{{}}'
+        .. "     (Retour arrière pour revenir, Entrée ou Échap pour retourner au menu)"
+    conversation.on_finished = menu
 
     print(filename, "init end")
 
 elseif (is_unloading)
 then
-    -- Destroyed (and its renderer removed) when collected
-    dialog = nil
+    if (conversation ~= nil) then conversation:stop() end
+    window:removeRenderer(bg_renderer)
 
 elseif (is_running)
 then
-    if (dialog ~= nil and dialog:update())
-    then
-        menu()
-    end
+    if (conversation ~= nil) then update_background() end
 end

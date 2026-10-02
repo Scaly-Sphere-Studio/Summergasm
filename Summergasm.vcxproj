@@ -21,6 +21,12 @@
   <ItemGroup>
     <ClCompile Include="src\callbacks.cpp" />
     <ClCompile Include="src\Dialog.cpp" />
+    <ClCompile Include="src\dialog\DialogCommon.cpp" />
+    <ClCompile Include="src\dialog\DialogCharacters.cpp" />
+    <ClCompile Include="src\dialog\DialogBox.cpp" />
+    <ClCompile Include="src\dialog\DialogChoices.cpp" />
+    <ClCompile Include="src\dialog\DialogControls.cpp" />
+    <ClCompile Include="src\dialog\DialogLog.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
@@ -34,6 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Dialog.hpp" />
+    <ClInclude Include="src\dialog\DialogCommon.hpp" />
+    <ClInclude Include="src\dialog\DialogNodes.hpp" />
     <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\includes.hpp" />
     <ClInclude Include="inc\Summergasm.hpp" />
@@ -48,7 +56,7 @@
     <None Include="resources\lua\global_setup.lua" />
     <None Include="resources\lua\menu.lua" />
     <None Include="resources\lua\model_functions.lua" />
-    <None Include="resources\assets\char\scene_vacances.rpy" />
+    <None Include="resources\dialogs\scene_vacances.rpy" />
     <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>

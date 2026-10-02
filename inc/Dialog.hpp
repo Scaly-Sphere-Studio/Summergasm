@@ -2,10 +2,20 @@
 
 #include "includes.hpp"
 
-// Ren'Py dialog player, ported from the renpy_scene example of the
-// Documentation: parses a .rpy script (see src/renpy/RenpyParser.h) and plays
-// it in a visual-novel UI drawn by its own UIRenderer, added to the main window.
-// The UI is rebuilt when the window is resized, the story going on where it was.
+#include <functional>
+#include <optional>
+
+// Ren'Py dialog node, ported from the renpy_scene example of the
+// Documentation: plays .rpy scripts (see src/renpy/RenpyParser.h) in a
+// visual-novel UI drawn by its own UIRenderer, added to the main window over
+// whatever the host scene draws. The node only shows the characters, the
+// dialogue box, the menu choices and its settings & log (see
+// src/dialog/DialogNodes.hpp): the background of the script's `scene`
+// statements is left to the host (see background*()).
+//
+// Idle until start(), it can play any number of conversations one after the
+// other, and updates itself while one is playing. The UI is rebuilt when the window is resized, the story going on
+// where it was.
 //
 //   Space / Enter / left click   finish the line, then next line (or pick the highlighted choice)
 //   Backspace / Left arrow       previous line
@@ -15,11 +25,14 @@
 //   X / click log icon           open / close the log (Escape closes it too)
 //   Mouse wheel / Up / Down      scroll the log (Page Up / Page Down: a page at a time)
 //
-// Bound to Lua as Dialog (see dialog.lua): Dialog.new(path), dialog:update(), dialog.log_open
+// Bound to Lua as Dialog, see mylua.cpp & dialog.lua
 class Dialog {
 public:
-    // path: .rpy script, relative to the assets folder. Throws if it can't be loaded.
-    explicit Dialog(std::string const& path);
+    // Parts that can be hidden (their input is then ignored, but for the
+    // settings' keyboard shortcuts)
+    enum class Part { Characters, Box, Choices, Controls };
+
+    Dialog();
     ~Dialog();
 
     Dialog(const Dialog&) = delete;
@@ -27,10 +40,49 @@ public:
     Dialog& operator=(const Dialog&) = delete;
     Dialog& operator=(Dialog&&) = delete;
 
-    // Plays a frame. Returns true once the story is over and the player
-    // confirmed the end screen (time to leave the scene).
-    bool update();
+    // Plays a conversation, replacing the current one if any (and showing
+    // the dialog if it was hidden). name: Ren'Py script of resources/dialogs/,
+    // with or without its extension ("dial1" -> dial1.*), else a direct path
+    // (absolute, or relative to the working directory). Only .rpy & .txt
+    // files are accepted, others being warned about. Its images are relative
+    // to resources/assets/. Throws if it can't be loaded, the current
+    // conversation going on.
+    void start(std::string const& name);
+    // Ends the conversation and destroys its UI. Settings are kept.
+    void stop();
+    // Plays a frame of every started dialog (not hidden), called by the main
+    // loop once the scenes ran. When a story is over, its dialog stops and
+    // calls its finished callback.
+    static void updateAll();
+
+    // Stop / resume drawing: everything is kept as is (line, choices, log),
+    // and the story waits while hidden.
+    void hide();
+    void show();
+
+    // A conversation is loaded, hidden or not
+    bool isActive() const noexcept;
+    bool isHidden() const noexcept;
+    // Active and not hidden: it takes the inputs
+    bool isVisible() const noexcept { return isActive() && !isHidden(); }
     bool isLogOpen() const noexcept;
+
+    void setPartShown(Part part, bool shown);
+    bool isPartShown(Part part) const noexcept;
+
+    // Shown on the story's End step (SSS::TR markup), until confirmed.
+    // Empty (default): the dialog finishes as soon as the last line is.
+    void setEndText(std::string text);
+    std::string const& getEndText() const noexcept;
+
+    // Called once a conversation is over, after stop()
+    void setOnFinished(std::function<void()> callback);
+
+    // Background set by the current step's `scene`, for the host to draw:
+    // an image file (absolute path), or a 0xRRGGBB color. Both empty when
+    // the script set none, or when idle.
+    std::string backgroundImage() const;
+    std::optional<uint32_t> backgroundColor() const;
 
 private:
     struct Impl;

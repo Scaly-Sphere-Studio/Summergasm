@@ -26,6 +26,9 @@
     <Filter Include="Source Files\renpy">
       <UniqueIdentifier>{3b8f2c71-5d4e-4a9b-9c1f-7e2a6d0b4f58}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\dialog">
+      <UniqueIdentifier>{7c2e9d14-3a6b-4f80-b5d2-1e9a4c7f0b36}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -61,6 +64,24 @@
     <ClCompile Include="src\Dialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\dialog\DialogCommon.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\DialogCharacters.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\DialogBox.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\DialogChoices.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\DialogControls.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\DialogLog.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
     <ClCompile Include="src\renpy\RenpyParser.cpp">
       <Filter>Source Files\renpy</Filter>
     </ClCompile>
@@ -83,6 +104,12 @@
     </ClInclude>
     <ClInclude Include="inc\Dialog.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dialog\DialogCommon.hpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dialog\DialogNodes.hpp">
+      <Filter>Source Files\dialog</Filter>
     </ClInclude>
     <ClInclude Include="src\renpy\RenpyParser.h">
       <Filter>Source Files\renpy</Filter>
@@ -107,7 +134,7 @@
     <None Include="resources\lua\dialog.lua">
       <Filter>Resource Files\Lua</Filter>
     </None>
-    <None Include="resources\assets\char\scene_vacances.rpy">
+    <None Include="resources\dialogs\scene_vacances.rpy">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="resources\lua\model_functions.lua">

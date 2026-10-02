@@ -161,6 +161,31 @@ static std::string const menu_scene = "menu.lua";
 // destroy its own environment mid-script, e.g. a menu button loading a scene
 // which unloads the menu): those requests are deferred until every scene ran.
 static bool scenes_running = false;
+
+// Dialog node of dialog(name), played over the current scene. Created on
+// first use, it lives until the game exits (Lua may keep references to it).
+static std::unique_ptr<Dialog> shared_dialog;
+
+void mylua_free_dialog()
+{
+    shared_dialog.reset();
+}
+
+// Stops the previous conversation, resets the node's options and plays the
+// given one, see Dialog::start()
+static Dialog* mylua_dialog(std::string const& name)
+{
+    if (!shared_dialog)
+        shared_dialog = std::make_unique<Dialog>();
+    Dialog& dialog = *shared_dialog;
+    dialog.stop();
+    dialog.setOnFinished(nullptr);
+    dialog.setEndText({});
+    for (auto const part : { Dialog::Part::Characters, Dialog::Part::Box, Dialog::Part::Choices, Dialog::Part::Controls })
+        dialog.setPartShown(part, true);
+    dialog.start(name);
+    return &dialog;
+}
 static std::vector<std::function<void()>> pending_requests;
 
 static bool defer_request(std::function<void()> request)
@@ -260,6 +285,8 @@ bool mylua_return_to_menu()
         if (name != menu_scene && scene)
             scene.reset();
     }
+    if (shared_dialog)
+        shared_dialog->stop();
     if (!g->lua_scenes[menu_scene])
         return mylua_load_scene(menu_scene);
     return false;
@@ -271,6 +298,9 @@ bool mylua_return_to_menu()
 // menu is the current scene): the caller then closes the game.
 bool mylua_on_escape()
 {
+    // The dialog closes its log itself
+    if (shared_dialog && shared_dialog->isVisible() && shared_dialog->isLogOpen())
+        return true;
     if (!scenes_order.empty()) {
         std::string const current = scenes_order.back();
         sol::object const handler = g->lua_scenes.at(current)->getEnv()["on_escape"];
@@ -365,6 +395,7 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "unload_scene",       { "[scene_name]", "Unload a scene, default: current one (alias: us [scene])" } },
     { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
     { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
+    { "dialog",             { "name",         "Play resources/dialogs/<name>[.rpy|.txt] (or a direct path) over the current scene, replacing the previous one. Returns the Dialog" } },
     { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
     { "console_reset_env",  { "",           "Run console commands in the global env" } },
 };
@@ -457,6 +488,7 @@ bool setup_lua()
     lua["menu"] = []() {
         return !mylua_return_to_menu();
     };
+    lua["dialog"] = mylua_dialog;
     lua["help"] = mylua_help;
     lua["scenes"].get_or_create<sol::table>();
 
@@ -485,12 +517,61 @@ bool setup_lua()
     parallax["play"] = &Parallax::play;
     parallax["toggle"] = &Parallax::toggle;
 
-    // Ren'Py dialog player, see Dialog.hpp & dialog.lua
+    // Ren'Py dialog node, see Dialog.hpp & dialog.lua
+    // Dialog.new() is idle, Dialog.new(name) starts the conversation at once
+    // (see also dialog(name), playing on a shared node).
+    // Started dialogs are updated by the main loop (Dialog::updateAll).
     auto dialog = lua.new_usertype<Dialog>("Dialog", sol::factories(
-        [](std::string const& path) { return std::make_unique<Dialog>(path); }
+        []() { return std::make_unique<Dialog>(); },
+        [](std::string const& name) {
+            auto d = std::make_unique<Dialog>();
+            d->start(name);
+            return d;
+        }
     ));
-    dialog["update"] = &Dialog::update;
+    dialog["start"] = &Dialog::start;
+    dialog["stop"] = &Dialog::stop;
+    dialog["hide"] = &Dialog::hide;
+    dialog["show"] = &Dialog::show;
+    dialog["active"] = sol::readonly_property(&Dialog::isActive);
+    dialog["hidden"] = sol::readonly_property(&Dialog::isHidden);
+    dialog["visible"] = sol::readonly_property(&Dialog::isVisible);
     dialog["log_open"] = sol::readonly_property(&Dialog::isLogOpen);
+    dialog["end_text"] = sol::property(&Dialog::getEndText, &Dialog::setEndText);
+    auto const part_property = [](Dialog::Part part) {
+        return sol::property(
+            [part](Dialog const& d) { return d.isPartShown(part); },
+            [part](Dialog& d, bool shown) { d.setPartShown(part, shown); });
+    };
+    dialog["show_characters"] = part_property(Dialog::Part::Characters);
+    dialog["show_box"] = part_property(Dialog::Part::Box);
+    dialog["show_choices"] = part_property(Dialog::Part::Choices);
+    dialog["show_controls"] = part_property(Dialog::Part::Controls);
+    // Image path, or nil
+    dialog["background_image"] = sol::readonly_property([](Dialog const& d) -> sol::optional<std::string> {
+        std::string image = d.backgroundImage();
+        if (image.empty()) return sol::nullopt;
+        return image;
+    });
+    // 0xRRGGBB, or nil
+    dialog["background_color"] = sol::readonly_property([](Dialog const& d) -> sol::optional<uint32_t> {
+        if (auto const color = d.backgroundColor()) return *color;
+        return sol::nullopt;
+    });
+    // function () or nil, called once a conversation is over
+    dialog["on_finished"] = sol::writeonly_property([](Dialog& d, sol::object callback) {
+        if (!callback.is<sol::protected_function>()) {
+            d.setOnFinished(nullptr);
+            return;
+        }
+        d.setOnFinished([f = callback.as<sol::protected_function>()]() {
+            sol::protected_function_result const result = f();
+            if (!result.valid()) {
+                sol::error const err = result;
+                LOG_CTX_ERR("Dialog.on_finished", err.what());
+            }
+        });
+    });
 
     if (mylua_file_script("global_setup.lua"))
         return true;

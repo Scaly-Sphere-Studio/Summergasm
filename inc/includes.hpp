@@ -27,6 +27,8 @@ struct GlobalData {
     std::string resources_folder;
     std::string lua_folder;
     std::string assets_folder;
+    // Ren'Py scripts (.rpy, .txt) played by the dialog node, see Dialog.hpp
+    std::string dialogs_folder;
 
     sol::state lua;
     std::map<std::string, std::unique_ptr<Scene>> lua_scenes;

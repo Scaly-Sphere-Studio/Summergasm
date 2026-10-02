@@ -342,10 +342,10 @@ private:
 };
 
 // ── Script ───────────────────────────────────────────────────────────────
-Script Script::load(std::string const& path)
+Script Script::load(std::string const& path, std::string const& image_dir)
 {
     Script s;
-    s._dir = std::filesystem::path(path).parent_path().string();
+    s._dir = image_dir.empty() ? std::filesystem::path(path).parent_path().string() : image_dir;
     Compiler(s, readLines(path)).run();
     return s;
 }
