@@ -8,6 +8,7 @@
 //   scene tag attr         scene expression "#rrggbb"
 //   show tag attr [at left|center|right]         hide tag
 //   swap tag1 tag2         (the two characters exchange their places in line)
+//   flip tag left|center|right   (turns around to the back of that side's line)
 //   "narration"            who "dialogue"       who attr "dialogue"
 //   menu:  "choice": <block>
 //   default var = value    $ var = value        $ who.name = "New name"
@@ -87,18 +88,18 @@ struct Character {
 
 // ── Compiled statements ──────────────────────────────────────────────────
 struct Statement {
-    enum class Kind { Say, Scene, Show, Hide, Swap, Menu, Jump, Goto, Return, Set, Play, Stop, Signal };
+    enum class Kind { Say, Scene, Show, Hide, Swap, Flip, Menu, Jump, Goto, Return, Set, Play, Stop, Signal };
     enum class Op { Assign, Add, Sub };
     Kind kind;
     int line = 0;                   // source line, for error messages
     std::string who;                // Say: speaker id (empty = narration) / Set: variable / Play,Stop: channel / Swap: second tag
-    std::string text;               // Say: raw text / Jump: label / Show,Hide,Swap,Scene: tag / Play: file / Signal: name
+    std::string text;               // Say: raw text / Jump: label / Show,Hide,Swap,Flip,Scene: tag / Play: file / Signal: name
     Value value;                    // Set
     Op op = Op::Assign;             // Set
     bool loop = false;              // Play
     std::vector<Value> args;        // Signal
     std::vector<std::string> attrs; // Show/Scene/Say image attributes
-    std::optional<Pos> pos;         // Show `at ...`
+    std::optional<Pos> pos;         // Show `at ...` / Flip: destination
     std::optional<uint32_t> color;  // Scene expression "#hex"
     struct Choice { std::string text; size_t target; };
     std::vector<Choice> choices;    // Menu

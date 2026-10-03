@@ -129,17 +129,18 @@ struct ImagePlane {
     glm::vec2 foot{ 0.f };      // bottom center
     float height = 0.f;
     bool mirror = false;        // flipped horizontally
+    float turn = 1.f;           // 0..1: width, while turning around
     float tilt = 0.f;           // degrees, around the sprite's center
     bool visible = true;
 
-    void set(SSS::GL::Texture::Shared t, glm::vec2 f, float h, bool m = false, float tilt_deg = 0.f);
+    void set(SSS::GL::Texture::Shared t, glm::vec2 f, float h, bool m = false, float tilt_deg = 0.f, float turn_w = 1.f);
     void hide() { set(nullptr, foot, height); }
     void refresh();
 
 private:
     struct Key {
         void const* tex = nullptr; int tw = -1, th = -1; glm::vec2 f{ -1.f }; float h = -1.f;
-        bool mirror = false; float tilt = 0.f; bool visible = false;
+        bool mirror = false; float tilt = 0.f; float turn = 1.f; bool visible = false;
         bool operator==(Key const&) const = default;
     } _applied;
 };

@@ -52,6 +52,8 @@ label start:
 
     t "Ah bon ? Je pensais qu'on était discrets."
 
+    flip t right   # Tom se retourne et file de l'autre côté
+
     c "Tom, vous avez partagé **la même glace** tous les jours."
 
     t "C'était pour %%économiser%%."

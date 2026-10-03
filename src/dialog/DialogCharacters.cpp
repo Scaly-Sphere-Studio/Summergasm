@@ -96,11 +96,12 @@ void DialogCharacters::_animate()
         float const e = t * t * (3.f - 2.f * t);                    // smoothstep
         Pose const& a = *s.from;
         float const dir = s.to.foot.x < a.foot.x ? -1.f : 1.f;
-        // Faces its new side from halfway
+        // Turns around to face its new side: narrows to nothing, then widens mirrored
+        float const turn = a.mirror == s.to.mirror ? 1.f : std::abs(std::cos(t * 3.14159265f));
         _sprites[i].set(_sprites[i].tex,
             glm::mix(a.foot, s.to.foot, e), glm::mix(a.height, s.to.height, e),
             t < 0.5f ? a.mirror : s.to.mirror,
-            dir * SPRITE_TILT_DEG * std::sin(t * 3.14159265f));
+            dir * SPRITE_TILT_DEG * std::sin(t * 3.14159265f), turn);
     }
 }
 

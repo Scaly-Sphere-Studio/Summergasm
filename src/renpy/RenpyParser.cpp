@@ -326,6 +326,12 @@ private:
             st.who = word(2);
             if (st.text.empty() || st.who.empty()) fail(l.line, "swap needs two characters");
         }
+        else if (kw == "flip") {
+            auto& st = _emit(Kind::Flip, l.line);
+            st.text = word(1);
+            st.pos = parsePos(word(2));
+            if (st.text.empty() || !st.pos) fail(l.line, "expected `flip tag left|center|right`");
+        }
         else if (kw == "jump") {
             _emit(Kind::Jump, l.line).text = word(1);
         }
@@ -627,6 +633,17 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             if (a != state.sprites.end() && b != state.sprites.end() && a != b) {
                 std::iter_swap(a, b);           // exchange the places in the line...
                 std::swap(a->pos, b->pos);      // ...and the sides they stand on
+            }
+            ++pc;
+            break;
+        }
+        case Kind::Flip: {
+            // Goes to the other side, behind the ones already standing there
+            auto it = std::find_if(state.sprites.begin(), state.sprites.end(),
+                [&](Sprite const& s) { return s.tag == st.text; });
+            if (it != state.sprites.end() && it->pos != *st.pos) {
+                it->pos = *st.pos;
+                std::rotate(it, std::next(it), state.sprites.end());
             }
             ++pc;
             break;
