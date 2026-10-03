@@ -44,6 +44,8 @@ label start:
 
     t "Euh... je suis juste là, hein."
 
+    swap l t   # Tom passe devant Léa
+
     l "%%Camille !%%"
 
     c "Quoi ? Depuis **trois semaines** vous ne vous quittez plus. Tout le camping l'a remarqué."

@@ -7,6 +7,7 @@
 //   label name:            jump name            return
 //   scene tag attr         scene expression "#rrggbb"
 //   show tag attr [at left|center|right]         hide tag
+//   swap tag1 tag2         (the two characters exchange their places in line)
 //   "narration"            who "dialogue"       who attr "dialogue"
 //   menu:  "choice": <block>
 //   default var = value    $ var = value        $ who.name = "New name"
@@ -86,12 +87,12 @@ struct Character {
 
 // ── Compiled statements ──────────────────────────────────────────────────
 struct Statement {
-    enum class Kind { Say, Scene, Show, Hide, Menu, Jump, Goto, Return, Set, Play, Stop, Signal };
+    enum class Kind { Say, Scene, Show, Hide, Swap, Menu, Jump, Goto, Return, Set, Play, Stop, Signal };
     enum class Op { Assign, Add, Sub };
     Kind kind;
     int line = 0;                   // source line, for error messages
-    std::string who;                // Say: speaker id (empty = narration) / Set: variable / Play,Stop: channel
-    std::string text;               // Say: raw text / Jump: label / Show,Hide,Scene: tag / Play: file / Signal: name
+    std::string who;                // Say: speaker id (empty = narration) / Set: variable / Play,Stop: channel / Swap: second tag
+    std::string text;               // Say: raw text / Jump: label / Show,Hide,Swap,Scene: tag / Play: file / Signal: name
     Value value;                    // Set
     Op op = Op::Assign;             // Set
     bool loop = false;              // Play

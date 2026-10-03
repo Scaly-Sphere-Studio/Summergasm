@@ -7,7 +7,8 @@ namespace dialog {
 
 // Sprites of the characters on screen. Characters who are not talking are
 // drawn in black & white; characters sharing a position line up (the ones
-// behind shifted inward and scaled down).
+// behind shifted inward and scaled down). The ones on the right side face the
+// center (mirrored). A character whose place changes moves there, leaning.
 class DialogCharacters : public DialogNode {
 public:
     void build(DialogContext& ctx) override;
@@ -19,7 +20,25 @@ protected:
     void _refreshVisibility() override;
 
 private:
+    void _animate();
+
+    struct Pose {
+        glm::vec2 foot{ 0.f };
+        float height = 0.f;
+        bool mirror = false;
+        bool operator==(Pose const&) const = default;
+    };
+    // Where a character stands (_slots[i] is for _sprites[i]) and, while it
+    // moves, where it comes from.
+    struct Slot {
+        std::string tag;
+        Pose to;
+        std::optional<Pose> from;
+        Clock::time_point start;
+    };
+
     std::vector<ImagePlane> _sprites;
+    std::vector<Slot> _slots;
 };
 
 // Dialogue box: speaker name, line revealed character per character (the

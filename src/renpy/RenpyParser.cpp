@@ -320,6 +320,12 @@ private:
         else if (kw == "hide") {
             _emit(Kind::Hide, l.line).text = word(1);
         }
+        else if (kw == "swap") {
+            auto& st = _emit(Kind::Swap, l.line);
+            st.text = word(1);
+            st.who = word(2);
+            if (st.text.empty() || st.who.empty()) fail(l.line, "swap needs two characters");
+        }
         else if (kw == "jump") {
             _emit(Kind::Jump, l.line).text = word(1);
         }
@@ -611,6 +617,20 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             std::erase_if(state.sprites, [&](Sprite const& s) { return s.tag == st.text; });
             ++pc;
             break;
+        case Kind::Swap: {
+            // Each one takes the other's slot (same index in the line, same side)
+            auto const find = [&](std::string const& tag) {
+                return std::find_if(state.sprites.begin(), state.sprites.end(),
+                    [&](Sprite const& s) { return s.tag == tag; });
+            };
+            auto a = find(st.text), b = find(st.who);
+            if (a != state.sprites.end() && b != state.sprites.end() && a != b) {
+                std::iter_swap(a, b);           // exchange the places in the line...
+                std::swap(a->pos, b->pos);      // ...and the sides they stand on
+            }
+            ++pc;
+            break;
+        }
         case Kind::Jump:
         case Kind::Goto:
             pc = st.target;

@@ -166,19 +166,21 @@ SSS::GL::Texture::Shared TextureCache::solid(uint32_t rgb)
 }
 
 // ── Sprite planes ────────────────────────────────────────────────────────
-void ImagePlane::set(SSS::GL::Texture::Shared t, glm::vec2 f, float h)
+void ImagePlane::set(SSS::GL::Texture::Shared t, glm::vec2 f, float h, bool m, float tilt_deg)
 {
     if (t != tex) plane->setTexture(t);
     tex = std::move(t);
     foot = f;
     height = h;
+    mirror = m;
+    tilt = tilt_deg;
 }
 
 void ImagePlane::refresh()
 {
     int tw = 0, th = 0;
     if (tex) tex->getCurrentDimensions(tw, th);
-    Key const key{ tex.get(), tw, th, foot, height, visible };
+    Key const key{ tex.get(), tw, th, foot, height, mirror, tilt, visible };
     if (key == _applied) return;
     _applied = key;
 
@@ -190,7 +192,9 @@ void ImagePlane::refresh()
 
     // Fit the height, standing on the foot position
     float const k = height / th;
-    plane->setScaling(glm::vec3(std::min(tw, th) * k));
+    float const s = std::min(tw, th) * k;
+    plane->setScaling(glm::vec3(mirror ? -s : s, s, s));
+    plane->setRotation(glm::vec3(0.f, 0.f, tilt));
     plane->setTranslation(glm::vec3(foot.x, foot.y - height / 2.f, 0.f));
 }
 

@@ -50,6 +50,11 @@ struct Layout {
 inline constexpr size_t MAX_SPRITES = 6;
 inline constexpr size_t MAX_CHOICES = 6;
 
+// Characters moving to another place (`swap`): duration, and how far they lean
+// toward their destination on the way
+inline constexpr float SPRITE_MOVE_TIME = 0.22f;  // seconds
+inline constexpr float SPRITE_TILT_DEG  = 8.f;
+
 // "Continue" arrow press feedback
 inline constexpr float ARROW_SNAP_PX   = 5.f;     // how far it snaps down
 inline constexpr float ARROW_SNAP_TIME = 0.18f;   // seconds to ease back up
@@ -123,15 +128,18 @@ struct ImagePlane {
     SSS::GL::Texture::Shared tex;
     glm::vec2 foot{ 0.f };      // bottom center
     float height = 0.f;
+    bool mirror = false;        // flipped horizontally
+    float tilt = 0.f;           // degrees, around the sprite's center
     bool visible = true;
 
-    void set(SSS::GL::Texture::Shared t, glm::vec2 f, float h);
+    void set(SSS::GL::Texture::Shared t, glm::vec2 f, float h, bool m = false, float tilt_deg = 0.f);
     void hide() { set(nullptr, foot, height); }
     void refresh();
 
 private:
     struct Key {
-        void const* tex = nullptr; int tw = -1, th = -1; glm::vec2 f{ -1.f }; float h = -1.f; bool visible = false;
+        void const* tex = nullptr; int tw = -1, th = -1; glm::vec2 f{ -1.f }; float h = -1.f;
+        bool mirror = false; float tilt = 0.f; bool visible = false;
         bool operator==(Key const&) const = default;
     } _applied;
 };
