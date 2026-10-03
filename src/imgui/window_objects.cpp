@@ -627,7 +627,7 @@ void print_window_objects()
         ImGui::TreePop();
     }
 
-    print_env("Lua Globals", g->lua.globals());
+    print_env("Lua Globals", g->lua().globals());
     for (auto const& [key, scene] : g->lua_scenes) {
         if (!scene)
             continue;

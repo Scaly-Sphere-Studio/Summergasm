@@ -5,13 +5,17 @@
 #include <functional>
 #include <optional>
 
+namespace renpy { struct Signal; }
+
 // Ren'Py dialog node, ported from the renpy_scene example of the
 // Documentation: plays .rpy scripts (see src/renpy/RenpyParser.h) in a
 // visual-novel UI drawn by its own UIRenderer, added to the main window over
-// whatever the host scene draws. The node only shows the characters, the
-// dialogue box, the menu choices and its settings & log (see
-// src/dialog/DialogNodes.hpp): the background of the script's `scene`
-// statements is left to the host (see background*()).
+// whatever the host scene draws: the characters, the dialogue box, the menu choices and its
+// settings & log (see src/dialog/DialogNodes.hpp).
+//
+// The script talks to the host through signals (see setOnSignal()), and its
+// variables are the game's (see GameState.hpp): they're kept between
+// conversations and saved with the game.
 //
 // Idle until start(), it can play any number of conversations one after the
 // other, and updates itself while one is playing. The UI is rebuilt when the window is resized, the story going on
@@ -77,6 +81,20 @@ public:
 
     // Called once a conversation is over, after stop()
     void setOnFinished(std::function<void()> callback);
+
+    // Signals of the script, sent as the story reaches them. The dialog only
+    // reports them: it draws no background and plays no sound, the host
+    // interprets them (see SignalManager.hpp). The return value tells whether
+    // the host handled the signal, it changes nothing for the dialog. Going
+    // back sends the state signals again (the previous background & music),
+    // not the one-shot ones.
+    //   background  { "image path" } | { 0xRRGGBB } | {}   state: `scene`
+    //   music       { "file", loop } | {}                   state: `play music`, `stop music`
+    //   sound       { "file" } | {}                         one-shot: `play sound`, `stop sound`
+    //   <name>      { args... }                             one-shot: `signal name args...`
+    // The callback may stop the dialog, or start another conversation.
+    using SignalCallback = std::function<bool(renpy::Signal const& signal)>;
+    void setOnSignal(SignalCallback callback);
 
     // Background set by the current step's `scene`, for the host to draw:
     // an image file (absolute path), or a 0xRRGGBB color. Both empty when

@@ -6,7 +6,8 @@ then
     print(filename, "init start")
 
     -- Background of the script's `scene` statements: the Dialog node only
-    -- shows the characters, the text and the choices. Its renderer is added
+    -- shows the characters, the text and the choices, and reports the
+    -- background as a signal. This scene draws it: its renderer is added
     -- first, so that it's drawn behind the dialog.
     bg_plane = GL.Plane.new(GL.Texture.new())
     bg_plane.translation = vec3.new(0, 0, -1)
@@ -16,6 +17,16 @@ then
     bg_textures = {}    -- by image path or color, loaded once
     bg_key = nil        -- of the texture shown
     bg_applied = nil    -- window & texture sizes its scaling was computed for
+    bg_image, bg_color = nil, nil   -- asked by the script, see the signal below
+
+    -- { "image path" } | { 0xRRGGBB } | {}, sent again when going back.
+    -- Registered before the dialog starts, removed when the scene unloads.
+    bg_handler = signals.on("background", function (name, value)
+        bg_image, bg_color = nil, nil
+        if (type(value) == "string") then bg_image = value
+        elseif (type(value) == "number") then bg_color = value end
+        return true
+    end)
 
     -- Texture of an image path, or of a 0xRRGGBB color (black when none)
     function bg_texture (image, color)
@@ -37,7 +48,7 @@ then
     -- Follows the dialog's current step, covering the window. Images load
     -- asynchronously: the scaling is applied once their size is known.
     function update_background ()
-        local key, tex = bg_texture(conversation.background_image, conversation.background_color)
+        local key, tex = bg_texture(bg_image, bg_color)
         if (key ~= bg_key)
         then
             bg_plane.texture = tex
@@ -67,6 +78,9 @@ then
 elseif (is_unloading)
 then
     if (conversation ~= nil) then conversation:stop() end
+    -- The script's music (`music` signal) belongs to the story: fade it out
+    stop_music()
+    signals.off(bg_handler)
     window:removeRenderer(bg_renderer)
 
 elseif (is_running)

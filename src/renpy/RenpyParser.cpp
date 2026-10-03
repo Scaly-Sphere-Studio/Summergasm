@@ -142,7 +142,29 @@ std::optional<Pos> parsePos(std::string const& s)
     return std::nullopt;
 }
 
+// "text", 12, -3, True, False
+std::optional<Value> parseValue(Token const& t)
+{
+    if (t.is_string) return t.value;
+    if (t.value == "True")  return true;
+    if (t.value == "False") return false;
+    std::string_view const digits = std::string_view(t.value).substr(t.value.starts_with('-') ? 1 : 0);
+    if (!digits.empty() && std::all_of(digits.begin(), digits.end(),
+        [](char c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+        try { return int64_t(std::stoll(t.value)); }
+        catch (...) {}
+    }
+    return std::nullopt;
+}
+
 } // namespace
+
+std::string toString(Value const& value)
+{
+    if (auto const* s = std::get_if<std::string>(&value)) return *s;
+    if (auto const* b = std::get_if<bool>(&value)) return *b ? "True" : "False";
+    return std::to_string(std::get<int64_t>(value));
+}
 
 // ── Compiler ─────────────────────────────────────────────────────────────
 class Compiler {
@@ -186,6 +208,15 @@ private:
         return -1;
     }
 
+    // `kw var = value` or `kw var += value` (-=), the value being supported
+    static bool _assignment(std::vector<Token> const& toks, bool is_default)
+    {
+        bool const assign  = toks.size() == 4 && toks[2].is("=");
+        bool const augment = !is_default && toks.size() == 5 && (toks[2].is("+") || toks[2].is("-"))
+                          && toks[3].is("=");
+        return (assign || augment) && parseValue(toks.back());
+    }
+
     void _skipChildren(SrcLine const& parent)
     {
         while (_i < _lines.size() && _lines[_i].indent > parent.indent)
@@ -222,7 +253,8 @@ private:
             bool const all_words = std::none_of(toks.begin(), toks.begin() + k,
                 [](Token const& t) { return t.is_string || isPunct(t.value[0]); });
             if (!all_words || first.value == "define" || first.value == "image"
-                || first.value == "scene" || first.value == "show")
+                || first.value == "scene" || first.value == "show"
+                || first.value == "play" || first.value == "signal")
                 break;
             auto& st = _emit(Kind::Say, l.line);
             st.who = first.value;
@@ -297,14 +329,44 @@ private:
         else if (kw == "menu") {
             _menu(l);
         }
-        else if ((kw == "default" || kw == "$") && toks.size() == 4
-            && !toks[1].is_string && toks[2].is("=") && toks[3].is_string) {
-            // default var = "text"  |  $ var = "text"  |  $ who.name = "text"
-            if (kw == "default") _s._defaults[toks[1].value] = toks[3].value;
+        else if (kw == "play" || kw == "stop") {
+            // play music|sound "file" [loop|noloop] [fadein x]  |  stop music|sound [fadeout x]
+            std::string const channel = word(1);
+            if (channel != "music" && channel != "sound")
+                fail(l.line, "expected `music` or `sound` after `" + kw + "`");
+            auto& st = _emit(kw == "play" ? Kind::Play : Kind::Stop, l.line);
+            st.who = channel;
+            if (kw == "stop") return;
+            if (toks.size() < 3 || !toks[2].is_string)
+                fail(l.line, "expected `play " + channel + " \"file\"`");
+            st.text = _s.resolveAudio(toks[2].value);
+            st.loop = channel == "music";
+            for (size_t k = 3; k < toks.size(); ++k) {
+                if (toks[k].is("loop"))   st.loop = true;
+                if (toks[k].is("noloop")) st.loop = false;
+            }
+        }
+        else if (kw == "signal") {
+            // signal name [args...]: any other word is a string argument
+            auto& st = _emit(Kind::Signal, l.line);
+            st.text = word(1);
+            if (st.text.empty()) fail(l.line, "signal without a name");
+            for (size_t k = 2; k < toks.size(); ++k)
+                st.args.push_back(parseValue(toks[k]).value_or(toks[k].value));
+        }
+        else if ((kw == "default" || kw == "$") && !toks[1].is_string && _assignment(toks, kw == "default")) {
+            // default var = value  |  $ var = value  |  $ var += 1  |  $ who.name = "text"
+            auto const value = parseValue(toks.back());
+            Statement::Op const op = toks[2].is("+") ? Statement::Op::Add
+                                   : toks[2].is("-") ? Statement::Op::Sub : Statement::Op::Assign;
+            if (op != Statement::Op::Assign && !std::holds_alternative<int64_t>(*value))
+                fail(l.line, "only integers can be added or subtracted");
+            if (kw == "default") _s._defaults[toks[1].value] = *value;
             else {
                 auto& st = _emit(Kind::Set, l.line);
                 st.who = toks[1].value;
-                st.text = toks[3].value;
+                st.value = *value;
+                st.op = op;
             }
         }
         else {
@@ -342,12 +404,19 @@ private:
 };
 
 // ── Script ───────────────────────────────────────────────────────────────
-Script Script::load(std::string const& path, std::string const& image_dir)
+Script Script::load(std::string const& path, std::string const& image_dir, std::string const& audio_dir)
 {
     Script s;
-    s._dir = image_dir.empty() ? std::filesystem::path(path).parent_path().string() : image_dir;
+    std::string const script_dir = std::filesystem::path(path).parent_path().string();
+    s._dir = image_dir.empty() ? script_dir : image_dir;
+    s._audio_dir = audio_dir.empty() ? script_dir : audio_dir;
     Compiler(s, readLines(path)).run();
     return s;
+}
+
+std::string Script::resolveAudio(std::string const& file) const
+{
+    return (std::filesystem::path(_audio_dir) / file).string();
 }
 
 Character const* Script::character(std::string const& id) const
@@ -380,9 +449,11 @@ Sprite const* SceneState::find(std::string const& tag) const
 }
 
 // ── Player ───────────────────────────────────────────────────────────────
-Player::Player(Script const& script, MarkupStyle style) : _script(script), _style(std::move(style))
+Player::Player(Script const& script, MarkupStyle style, Vars vars) : _script(script), _style(std::move(style))
 {
-    _run(script.entry(), {}, script.defaults());
+    for (auto const& [name, value] : script.defaults())
+        vars.try_emplace(name, value);
+    _run(script.entry(), {}, std::move(vars));
 }
 
 void Player::next()
@@ -436,7 +507,7 @@ std::string Player::interpolate(std::string_view text) const
 std::string Player::_name(Character const& c, Vars const& vars) const
 {
     auto const it = vars.find(c.id + ".name");
-    return it == vars.end() ? c.name : it->second;
+    return it == vars.end() ? c.name : toString(it->second);
 }
 
 std::string Player::_interpolate(std::string_view text, Vars const& vars) const
@@ -452,7 +523,7 @@ std::string Player::_interpolate(std::string_view text, Vars const& vars) const
         if (auto const* c = _script.character(plain ? expr.substr(0, expr.size() - 5) : expr))
             return Interpolated{ _name(*c, vars), plain ? std::nullopt : c->color };
         if (auto const it = vars.find(expr); it != vars.end())
-            return Interpolated{ it->second, std::nullopt };
+            return Interpolated{ toString(it->second), std::nullopt };
         return std::nullopt;
     }, names);
 }
@@ -473,6 +544,7 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
     // A line said right before a menu is its question: it is shown with the
     // choices, as a single step (it is not typed twice).
     std::optional<Step> question;
+    std::vector<Signal> signals;
 
     // Guards against `label a: jump a` style loops without any dialogue.
     for (int guard = 0; pc < stmts.size() && guard < 100000; ++guard) {
@@ -500,6 +572,7 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
                 break;
             }
             step.scene = std::move(state);
+            step.signals = std::move(signals);
             _history.push_back({ pc, std::move(step), std::move(vars) });
             return;
         }
@@ -509,6 +582,7 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             for (auto const& c : st.choices)
                 step.choices.push_back(_interpolate(c.text, vars));
             step.scene = std::move(state);
+            step.signals = std::move(signals);
             _history.push_back({ pc, std::move(step), std::move(vars) });
             return;
         }
@@ -544,8 +618,34 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
         case Kind::Return:
             pc = stmts.size();
             break;
-        case Kind::Set:
-            vars[st.who] = st.text;
+        case Kind::Set: {
+            if (st.op == Statement::Op::Assign) {
+                vars[st.who] = st.value;
+            }
+            else {
+                // A missing (or non integer) variable counts as 0
+                Value& var = vars[st.who];
+                int64_t const* current = std::get_if<int64_t>(&var);
+                if (!current && var != Value())
+                    std::cerr << "[renpy] line " << st.line << ": " << st.who << " is not an integer, reset to 0\n";
+                int64_t const delta = std::get<int64_t>(st.value);
+                var = (current ? *current : 0) + (st.op == Statement::Op::Add ? delta : -delta);
+            }
+            ++pc;
+            break;
+        }
+        case Kind::Play:
+            if (st.who == "music") state.music = { st.text, st.loop };
+            else signals.push_back({ "sound", { st.text } });
+            ++pc;
+            break;
+        case Kind::Stop:
+            if (st.who == "music") state.music = {};
+            else signals.push_back({ "sound", {} });
+            ++pc;
+            break;
+        case Kind::Signal:
+            signals.push_back({ st.text, st.args });
             ++pc;
             break;
         }
@@ -554,6 +654,7 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
     Step end;
     end.kind = Step::Kind::End;
     end.scene = std::move(state);
+    end.signals = std::move(signals);
     _history.push_back({ pc, std::move(end), std::move(vars) });
 }
 

@@ -3,6 +3,7 @@
 // This is the container: it plays the conversation and dispatches it to its
 // parts (src/dialog/), which share one UIRenderer.
 #include "Dialog.hpp"
+#include "GameState.hpp"
 #include "dialog/DialogNodes.hpp"
 
 #include <algorithm>
@@ -27,6 +28,16 @@ struct Dialog::Impl {
     // click that opened the dialog is not its first "next line".
     bool skip_input = false;
     std::function<void()> on_finished;
+    SignalCallback on_signal;
+    // Incremented by start() & stop(): a signal callback may have changed
+    // the conversation
+    uint64_t generation = 0;
+
+    // State signaled so far ("background" & "music"), to signal its changes
+    renpy::Background signaled_background;
+    renpy::Music signaled_music;
+    // Variables written to the game state so far
+    renpy::Player::Vars synced_vars;
 
     // Conversations being played, updated by Dialog::updateAll()
     static inline std::vector<Impl*> running;
@@ -49,9 +60,14 @@ struct Dialog::Impl {
     void build(int w, int h);
     void destroy();
     void rebuildIfResized();
-    // false when the step is the End and there's no end text: the
-    // conversation is over (stopped)
-    bool present(bool animate);
+    // A new step (or the current one, once rebuilt). forward: the story
+    // moved on (sends the step's one-shot signals). false when the
+    // conversation was stopped or replaced: by a signal callback, or as the
+    // step is the End and there's no end text
+    bool present(bool animate, bool forward);
+    void syncVars();
+    // false if the callback stopped or replaced the conversation
+    bool signal(renpy::Signal const& signal);
     void finish();
 };
 
@@ -141,13 +157,16 @@ void Dialog::Impl::start(std::string const& name)
 {
     SSS::GL::Context const context = ctx.window.setContext();
     // Loaded first: if it throws, the current conversation goes on.
-    // Images are looked up in the assets folder.
-    auto new_script = std::make_unique<renpy::Script>(
-        renpy::Script::load(findScript(name).string(), fs::absolute(g->assets_folder).string()));
+    // Images are looked up in the assets folder, music & sounds in the sounds one.
+    auto new_script = std::make_unique<renpy::Script>(renpy::Script::load(findScript(name).string(),
+        fs::absolute(g->assets_folder).string(), fs::absolute(g->sounds_folder).string()));
 
     stop();
+    ++generation;
     script = std::move(new_script);
-    player = std::make_unique<renpy::Player>(*script);
+    // Starts with the game's values, the script's `default`s set the missing ones
+    synced_vars = renpy::Player::Vars(game_state::vars().begin(), game_state::vars().end());
+    player = std::make_unique<renpy::Player>(*script, renpy::MarkupStyle{}, synced_vars);
     ctx.player = player.get();
     skip_input = true;
     running.push_back(this);
@@ -155,7 +174,7 @@ void Dialog::Impl::start(std::string const& name)
     // Not built while minimized (0 x 0): a 1 x 1 UI is rebuilt at the first update
     auto const [w, h] = ctx.window.getDimensions();
     build(std::max(w, 1), std::max(h, 1));
-    present(true);
+    present(true, true);
 }
 
 void Dialog::Impl::stop()
@@ -166,10 +185,14 @@ void Dialog::Impl::stop()
     std::erase(running, this);
     player.reset();
     script.reset();
+    ++generation;
     ctx.player = nullptr;
     ctx.typing = false;
     ctx.settings.log_open = false;
     hidden = false;
+    signaled_background = {};
+    signaled_music = {};
+    synced_vars.clear();
 }
 
 void Dialog::Impl::finish()
@@ -211,18 +234,74 @@ void Dialog::Impl::rebuildIfResized()
         return;
     destroy();
     build(w, h);
-    if (!present(false)) return;
+    if (!present(false, false)) return;
     if (ctx.settings.log_open) log.setOpen(ctx, true);
 }
 
-bool Dialog::Impl::present(bool animate)
+bool Dialog::Impl::present(bool animate, bool forward)
 {
+    // Signal callbacks may read the game's values
+    syncVars();
+
+    // Copied: a callback may destroy the player
+    renpy::SceneState const scene = player->current().scene;
+    if (scene.background != signaled_background) {
+        signaled_background = scene.background;
+        renpy::Signal sig{ "background", {} };
+        if (scene.background.color)               sig.args.push_back(int64_t(*scene.background.color));
+        else if (!scene.background.image.empty()) sig.args.push_back(scene.background.image);
+        if (!signal(sig)) return false;
+    }
+    if (scene.music != signaled_music) {
+        signaled_music = scene.music;
+        renpy::Signal sig{ "music", {} };
+        if (!scene.music.file.empty()) sig.args = { scene.music.file, scene.music.loop };
+        if (!signal(sig)) return false;
+    }
+    if (forward) {
+        auto const signals = player->current().signals;
+        for (auto const& sig : signals)
+            if (!signal(sig)) return false;
+    }
+
     auto const& step = player->current();
     if (step.kind == renpy::Step::Kind::End && ctx.end_text.empty()) {
         finish();
         return false;
     }
     for (DialogNode* n : nodes()) n->present(ctx, step, animate);
+    return true;
+}
+
+// Writes the variables changed since the last step (going back too) to the
+// game state. Renamed characters (`$ who.name = ...`) stay in the conversation.
+void Dialog::Impl::syncVars()
+{
+    auto const& vars = player->vars();
+    for (auto const& [name, value] : vars) {
+        if (name.ends_with(".name")) continue;
+        auto const it = synced_vars.find(name);
+        if (it == synced_vars.end() || it->second != value)
+            game_state::set(name, value);
+    }
+    synced_vars = vars;
+}
+
+bool Dialog::Impl::signal(renpy::Signal const& sig)
+{
+    uint64_t const gen = generation;
+    if (on_signal) {
+        try {
+            on_signal(sig);
+        }
+        catch (std::exception const& e) {
+            LOG_CTX_ERR("Dialog.on_signal", e.what());
+        }
+        if (gen != generation) return false;
+    }
+
+    // The dialog only reports what the script says: the host interprets it
+    // (see SignalManager.hpp), unhandled signals are ignored
     return true;
 }
 
@@ -316,7 +395,8 @@ void Dialog::Impl::update()
         return;
     }
 
-    if (changed && !present(animate))
+    // Only going back doesn't animate
+    if (changed && !present(animate, animate))
         return;
     for (DialogNode* n : nodes()) n->update(ctx, input);
 }
@@ -372,6 +452,11 @@ std::string const& Dialog::getEndText() const noexcept { return _impl->ctx.end_t
 void Dialog::setOnFinished(std::function<void()> callback)
 {
     _impl->on_finished = std::move(callback);
+}
+
+void Dialog::setOnSignal(SignalCallback callback)
+{
+    _impl->on_signal = std::move(callback);
 }
 
 std::string Dialog::backgroundImage() const

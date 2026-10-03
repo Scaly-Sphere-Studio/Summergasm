@@ -106,8 +106,11 @@ SSS::GL::Texture::Shared makeSolid(SSS::RGBA32 color);
 class TextureCache {
 public:
     SSS::GL::Texture::Shared get(std::string const& path);
+    // Plain 0xRRGGBB color
+    SSS::GL::Texture::Shared solid(uint32_t rgb);
 private:
     std::unordered_map<std::string, SSS::GL::Texture::Shared> _cache;
+    std::unordered_map<uint32_t, SSS::GL::Texture::Shared> _solids;
 };
 
 // ── Sprite planes ────────────────────────────────────────────────────────

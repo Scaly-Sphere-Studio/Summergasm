@@ -8,14 +8,18 @@
 #include <nlohmann/json.hpp>
 #pragma warning(pop)
 
-#define SOL_ALL_SAFETIES_ON 1
-#include <sol/sol.hpp>
+// sol2 is heavy: see lua_include.hpp
+namespace sol { class state; }
 
 void exitSummergasm(int status);
 
 class Scene;
 
 struct GlobalData {
+    // Defined in main.cpp, where sol::state is a complete type
+    GlobalData();
+    ~GlobalData();
+
     SSS::GL::Window* window;
     SSS::GL::Window* ui_window;
 
@@ -29,9 +33,17 @@ struct GlobalData {
     std::string assets_folder;
     // Ren'Py scripts (.rpy, .txt) played by the dialog node, see Dialog.hpp
     std::string dialogs_folder;
+    // Sounds (one-shots, can overlap) & musics (one at a time, crossfaded),
+    // see the audio doc. The dialogs' `play` statements look in sounds_folder.
+    std::string sounds_folder;
+    std::string musics_folder;
+    // Saved games, see GameState.hpp
+    std::string saves_folder;
 
-    sol::state lua;
+    // Defined in lua_include.hpp
+    sol::state& lua() const;
     std::map<std::string, std::unique_ptr<Scene>> lua_scenes;
+    std::unique_ptr<sol::state> _lua;
 
     std::vector<std::string> texts;
 

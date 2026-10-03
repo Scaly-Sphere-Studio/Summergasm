@@ -9,8 +9,12 @@
 //   show tag attr [at left|center|right]         hide tag
 //   "narration"            who "dialogue"       who attr "dialogue"
 //   menu:  "choice": <block>
-//   default var = "text"   $ var = "text"       $ who.name = "New name"
+//   default var = value    $ var = value        $ who.name = "New name"
+//   $ var += 1             $ var -= 1           (values: "text", 12, True, False)
+//   play music "file" [loop|noloop]   play sound "file"   stop music|sound
+//   signal name [args...]  (SSS: any event for the host, see Step::signals)
 // Ignored (silently): other default / $ ..., python blocks, with, pause.
+// Audio files are resolved relative to the script's audio folder.
 //
 // On top of Ren'Py, dialogue text accepts three SSS effect markers, converted
 // to SSS::TR inline formats by toTRMarkup():
@@ -20,7 +24,7 @@
 // Ren'Py's `{color=#rrggbb}...{/color}` colors any text, and `[...]` is
 // interpolated at runtime (see Player::interpolate):
 //   [who]  Character's current name, in its color     [who.name]  same, uncolored
-//   [var]  value of a `default` / `$` string variable
+//   [var]  value of a `default` / `$` variable
 
 #include <cstdint>
 #include <functional>
@@ -28,9 +32,24 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace renpy {
+
+// ── Values ───────────────────────────────────────────────────────────────
+// Variables and signal arguments: "text", 12, True / False
+using Value = std::variant<std::string, int64_t, bool>;
+// As interpolated in the text: booleans are "True" / "False"
+std::string toString(Value const& value);
+
+// One-shot event of the script, for the host (see Step::signals):
+//   sound       { file } (`play sound`), or {} (`stop sound`)
+//   <name>      { args... } (`signal name args...`)
+struct Signal {
+    std::string name;
+    std::vector<Value> args;
+};
 
 // ── Scene state ──────────────────────────────────────────────────────────
 enum class Pos { Left, Center, Right };
@@ -38,6 +57,7 @@ enum class Pos { Left, Center, Right };
 struct Background {
     std::optional<uint32_t> color;  // 0xRRGGBB for `scene expression "#hex"`
     std::string image;              // resolved file path otherwise (empty = black)
+    bool operator==(Background const&) const = default;
 };
 
 struct Sprite {
@@ -46,9 +66,16 @@ struct Sprite {
     Pos pos = Pos::Center;
 };
 
+struct Music {
+    std::string file;               // resolved file path (empty = no music)
+    bool loop = true;
+    bool operator==(Music const&) const = default;
+};
+
 struct SceneState {
     Background background;
     std::vector<Sprite> sprites;    // draw order
+    Music music;                    // `play music`, until `stop music`
     Sprite const* find(std::string const& tag) const;
 };
 
@@ -59,11 +86,16 @@ struct Character {
 
 // ── Compiled statements ──────────────────────────────────────────────────
 struct Statement {
-    enum class Kind { Say, Scene, Show, Hide, Menu, Jump, Goto, Return, Set };
+    enum class Kind { Say, Scene, Show, Hide, Menu, Jump, Goto, Return, Set, Play, Stop, Signal };
+    enum class Op { Assign, Add, Sub };
     Kind kind;
     int line = 0;                   // source line, for error messages
-    std::string who;                // Say: speaker id (empty = narration) / Set: variable
-    std::string text;               // Say: raw text / Jump: label / Show,Hide,Scene: tag / Set: value
+    std::string who;                // Say: speaker id (empty = narration) / Set: variable / Play,Stop: channel
+    std::string text;               // Say: raw text / Jump: label / Show,Hide,Scene: tag / Play: file / Signal: name
+    Value value;                    // Set
+    Op op = Op::Assign;             // Set
+    bool loop = false;              // Play
+    std::vector<Value> args;        // Signal
     std::vector<std::string> attrs; // Show/Scene/Say image attributes
     std::optional<Pos> pos;         // Show `at ...`
     std::optional<uint32_t> color;  // Scene expression "#hex"
@@ -75,27 +107,30 @@ struct Statement {
 class Script {
 public:
     // Throws std::runtime_error on I/O or syntax errors.
-    // Image files are resolved relative to image_dir, by default the
-    // script's directory.
-    static Script load(std::string const& path, std::string const& image_dir = {});
+    // Image & audio files are resolved relative to image_dir & audio_dir, by
+    // default the script's directory.
+    static Script load(std::string const& path, std::string const& image_dir = {},
+                       std::string const& audio_dir = {});
 
     std::vector<Statement> const& statements() const { return _stmts; }
     size_t entry() const { return _entry; }
     Character const* character(std::string const& id) const;
     std::unordered_map<std::string, Character> const& characters() const { return _characters; }
-    // Initial values of the `default var = "text"` variables.
-    std::unordered_map<std::string, std::string> const& defaults() const { return _defaults; }
+    // Initial values of the `default var = value` variables.
+    std::unordered_map<std::string, Value> const& defaults() const { return _defaults; }
     // Looks up "tag attr..." in `image` statements, else falls back to
     // "<dir>/tag_attr.png" (Ren'Py's file naming convention).
     std::string resolveImage(std::string const& tag, std::vector<std::string> const& attrs) const;
+    // Audio file of `play`, relative to the audio folder.
+    std::string resolveAudio(std::string const& file) const;
 
 private:
-    std::string _dir;
+    std::string _dir, _audio_dir;
     std::vector<Statement> _stmts;
     std::unordered_map<std::string, Character> _characters;
     std::unordered_map<std::string, std::string> _images;   // "tag attr" -> path
     std::unordered_map<std::string, size_t> _labels;
-    std::unordered_map<std::string, std::string> _defaults;
+    std::unordered_map<std::string, Value> _defaults;
     size_t _entry = 0;
 
     friend class Compiler;
@@ -145,6 +180,9 @@ struct Step {
     std::string text;                   // SSS::TR markup, ready for parseString()
     std::vector<std::string> choices;   // SSS::TR markup, Menu only
     SceneState scene;
+    // One-shot events run on the way to this step, in script order (after
+    // the previous step). The scene is a state: compare it to the previous one.
+    std::vector<Signal> signals;
 };
 
 // A line of the log (Player::log()): a said line, or the choice picked in a menu.
@@ -159,9 +197,11 @@ struct LogEntry {
 // variables, so going back is a simple pop of the history.
 class Player {
 public:
-    using Vars = std::unordered_map<std::string, std::string>;
+    using Vars = std::unordered_map<std::string, Value>;
 
-    explicit Player(Script const& script, MarkupStyle style = {});
+    // vars: initial variables (e.g. a saved game). The script's `default`s
+    // only set the ones missing.
+    explicit Player(Script const& script, MarkupStyle style = {}, Vars vars = {});
 
     Step const& current() const { return _history.back().step; }
     void next();                    // Say -> following step

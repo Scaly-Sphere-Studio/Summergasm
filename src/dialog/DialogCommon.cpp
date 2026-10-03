@@ -1,4 +1,5 @@
 #include "DialogCommon.hpp"
+#include "lua_include.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -157,6 +158,13 @@ SSS::GL::Texture::Shared TextureCache::get(std::string const& path)
     return _cache[path] = tex;
 }
 
+SSS::GL::Texture::Shared TextureCache::solid(uint32_t rgb)
+{
+    auto& tex = _solids[rgb];
+    if (!tex) tex = makeSolid(rgba(rgb));
+    return tex;
+}
+
 // ── Sprite planes ────────────────────────────────────────────────────────
 void ImagePlane::set(SSS::GL::Texture::Shared t, glm::vec2 f, float h)
 {
@@ -243,7 +251,7 @@ bool hasGlyphs(std::string const& text)
 
 SSS::GL::Window& mainWindow()
 {
-    SSS::GL::Window* const window = g->lua["window"].get_or<SSS::GL::Window*>(nullptr);
+    SSS::GL::Window* const window = g->lua()["window"].get_or<SSS::GL::Window*>(nullptr);
     if (!window)
         SSS::throw_exc("Dialog: the main window doesn't exist yet");
     return *window;

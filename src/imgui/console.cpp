@@ -100,7 +100,7 @@ void ConsoleMemory::pushCmd(std::string const& buffer)
     }
 
     sol::environment const& env = *mylua_console_env;
-    sol::table globals = g->lua.globals();
+    sol::table globals = g->lua().globals();
     sol::function const tostring = globals["tostring"];
     auto const to_string = [&](sol::object const& obj) -> std::string {
         return tostring(obj).get<std::string>();
@@ -132,12 +132,12 @@ void ConsoleMemory::pushCmd(std::string const& buffer)
     sol::protected_function f;
     std::string load_error;
     {
-        sol::load_result expr = g->lua.load("return " + cmd, "console");
+        sol::load_result expr = g->lua().load("return " + cmd, "console");
         if (expr.valid())
             f = expr;
     }
     if (!f.valid()) {
-        sol::load_result stmt = g->lua.load(cmd, "console");
+        sol::load_result stmt = g->lua().load(cmd, "console");
         if (stmt.valid())
             f = stmt;
         else
@@ -205,13 +205,13 @@ void ConsoleAutocomplete::callback(ImGuiInputTextCallbackData* data, std::string
         sol::environment const env = *mylua_console_env;
         sol::table t = env;
         if (!table.empty()) {
-            auto res = g->lua.safe_script("return " + table, env, sol::script_pass_on_error);
+            auto res = g->lua().safe_script("return " + table, env, sol::script_pass_on_error);
             if (!res.valid() || (res.get_type() != sol::type::table &&
                 res.get_type() != sol::type::userdata))
                 return;
             t = res;
         }
-        all_keys = std::make_unique<LuaConsoleData const>(g->lua, t, env, table);
+        all_keys = std::make_unique<LuaConsoleData const>(g->lua(), t, env, table);
     }
 
     if (!last_key.empty()) {

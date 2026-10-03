@@ -1,5 +1,10 @@
 #include "mylua.hpp"
 #include "Dialog.hpp"
+#include "GameState.hpp"
+#include "SignalManager.hpp"
+#include "renpy/RenpyParser.h"
+
+#include <cmath>
 
 using namespace SSS;
 
@@ -51,11 +56,11 @@ static std::vector<std::string> scenes_order;
 Scene::Scene(std::string const& filename_) try
     : filename(filename_), path(g->lua_folder + filename_)
 {
-    env = std::make_unique<sol::environment>(g->lua, sol::create, g->lua.globals());
+    env = std::make_unique<sol::environment>(g->lua(), sol::create, g->lua().globals());
     if (!env->valid()) {
         throw_exc("Could not initialize environment properly.");
     }
-    auto result = g->lua.load_file(path);
+    auto result = g->lua().load_file(path);
     if (!result.valid()) {
         auto err = result.get<sol::error>();
         throw_exc(CONTEXT_MSG("Couldn't load file", err.what()));
@@ -63,7 +68,7 @@ Scene::Scene(std::string const& filename_) try
     script = readFile(path);
     size_t const n = filename.find('.');
     std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
-    g->lua["scenes"][name] = *env;
+    g->lua()["scenes"][name] = *env;
     (*env)["filename"] = filename;
     (*env)["is_loading"] = true;
     (*env)["is_running"] = false;
@@ -99,18 +104,18 @@ Scene::~Scene()
     run();
     size_t const n = filename.find('.');
     std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
-    g->lua["scenes"][name] = sol::nil;
+    g->lua()["scenes"][name] = sol::nil;
     // Don't leave the console pointing to a deleted env
     if (mylua_console_env == env.get())
-        g->lua["console_reset_env"]();
+        g->lua()["console_reset_env"]();
     empty_table(*env);
     env.reset();
-    g->lua.collect_garbage();
+    g->lua().collect_garbage();
 }
 
 bool Scene::run()
 {
-    auto result = g->lua.do_string(script, *env);
+    auto result = g->lua().do_string(script, *env);
     if (!result.valid()) {
         sol::error const err = result;
         LOG_CTX_ERR(filename, err.what());
@@ -145,7 +150,7 @@ static std::string complete_script_name(std::string const& name)
 bool mylua_file_script(std::string const& path)
 {
     std::string const real_path = g->lua_folder + complete_script_name(path);
-    auto result = g->lua.safe_script_file(real_path, sol::script_pass_on_error);
+    auto result = g->lua().safe_script_file(real_path, sol::script_pass_on_error);
     if (!result.valid()) {
         sol::error err = result;
         std::cout << "\n" << err.what() << "\n\n";
@@ -173,6 +178,14 @@ void mylua_free_dialog()
 
 // Stops the previous conversation, resets the node's options and plays the
 // given one, see Dialog::start()
+// A dialog node reporting its signals to the signal manager
+static std::unique_ptr<Dialog> new_dialog()
+{
+    auto d = std::make_unique<Dialog>();
+    d->setOnSignal(signals::dispatch);
+    return d;
+}
+
 static Dialog* mylua_dialog(std::string const& name)
 {
     if (!shared_dialog)
@@ -180,12 +193,58 @@ static Dialog* mylua_dialog(std::string const& name)
     Dialog& dialog = *shared_dialog;
     dialog.stop();
     dialog.setOnFinished(nullptr);
+    dialog.setOnSignal(signals::dispatch);
     dialog.setEndText({});
-    for (auto const part : { Dialog::Part::Characters, Dialog::Part::Box, Dialog::Part::Choices, Dialog::Part::Controls })
+    for (auto const part : { Dialog::Part::Characters, Dialog::Part::Box,
+                             Dialog::Part::Choices, Dialog::Part::Controls })
         dialog.setPartShown(part, true);
     dialog.start(name);
     return &dialog;
 }
+// Game values (see GameState.hpp) in Lua: strings, integers & booleans
+static sol::object to_lua(sol::state_view lua, game_state::Value const& value)
+{
+    return std::visit([&](auto const& v) { return sol::make_object(lua, v); }, value);
+}
+
+// Calls f(name, args...) for a signal, true if it returned true
+static bool call_lua_signal_handler(sol::protected_function const& f, renpy::Signal const& signal, char const* context)
+{
+    sol::state_view const lua = f.lua_state();
+    std::vector<sol::object> args;
+    for (auto const& arg : signal.args)
+        args.push_back(to_lua(lua, arg));
+    sol::protected_function_result const result = f(signal.name, sol::as_args(args));
+    if (!result.valid()) {
+        sol::error const err = result;
+        LOG_CTX_ERR(context, err.what());
+        return false;
+    }
+    return result.get_type() == sol::type::boolean && result.get<bool>();
+}
+
+static game_state::Value from_lua(sol::object const& object)
+{
+    switch (object.get_type()) {
+    case sol::type::string:
+        return object.as<std::string>();
+    case sol::type::boolean:
+        return object.as<bool>();
+    case sol::type::number: {
+        double const number = object.as<double>();
+        if (number == std::floor(number))
+            return static_cast<int64_t>(number);
+        break;
+    }
+    default:
+        break;
+    }
+    SSS::throw_exc("game values are strings, integers or booleans");
+}
+
+// game.vars: index it to read & write the game values, nil erases one
+struct GameVars {};
+
 static std::vector<std::function<void()>> pending_requests;
 
 static bool defer_request(std::function<void()> request)
@@ -194,6 +253,13 @@ static bool defer_request(std::function<void()> request)
         return false;
     pending_requests.emplace_back(std::move(request));
     return true;
+}
+
+// Absolute paths are kept, others are looked up in the given folder
+static std::string resolve_audio(std::string const& folder, std::string const& file)
+{
+    std::filesystem::path const path(file);
+    return path.is_absolute() ? file : (std::filesystem::path(folder) / path).string();
 }
 
 bool mylua_run_active_scenes()
@@ -330,7 +396,7 @@ static void mylua_list_scenes()
         else if (scene)
             scenes += " (running)";
     }
-    g->lua["print"]("Scenes: " + scenes);
+    g->lua()["print"]("Scenes: " + scenes);
 }
 
 void lua_setup_other_libs(sol::state& lua);
@@ -363,10 +429,10 @@ std::map<std::string, sol::type> mylua_get_keys(sol::environment const& env) try
     auto ret = get_keys_from_table(env);
     for (auto& [key, type] : ret) {
         if (type == sol::type::userdata) {
-            sol::userdata data = g->lua.safe_script("return " + key, env);
+            sol::userdata data = g->lua().safe_script("return " + key, env);
             auto const append = get_keys_from_table(data[sol::metatable_key]);
             for (auto const& [subkey, subtype] : append) {
-                sol::protected_function_result res = g->lua.safe_script(
+                sol::protected_function_result res = g->lua().safe_script(
                     "return " + key + "." + subkey, env, sol::script_pass_on_error);
                 if (res.valid() && res.get_type() != sol::type::function) {
                     ret[key + "." + subkey] = subtype;
@@ -396,6 +462,9 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
     { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
     { "dialog",             { "name",         "Play resources/dialogs/<name>[.rpy|.txt] (or a direct path) over the current scene, replacing the previous one. Returns the Dialog" } },
+    { "game.save",          { "[name]",       "Save the game values (game.vars) in saves/<name>.json, default: save" } },
+    { "game.load",          { "[name]",       "Load the game values of saves/<name>.json, default: save" } },
+    { "game.reset",         { "",             "Erase every game value (game.vars)" } },
     { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
     { "console_reset_env",  { "",           "Run console commands in the global env" } },
 };
@@ -403,7 +472,7 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
 // Returns "name(arg1, arg2, ...)" for Lua functions, or an empty string otherwise
 static std::string lua_function_signature(std::string const& name, sol::function const& f)
 {
-    sol::table const debug = g->lua["debug"];
+    sol::table const debug = g->lua()["debug"];
     sol::table const info = debug["getinfo"](f, "Su");
     if (info["what"].get_or<std::string>("") != "Lua")
         return std::string();
@@ -422,7 +491,7 @@ static std::string lua_function_signature(std::string const& name, sol::function
 
 static void mylua_help(sol::optional<std::string> filter)
 {
-    sol::function const print = g->lua["print"];
+    sol::function const print = g->lua()["print"];
     auto const matches = [&](std::string const& name) {
         return !filter || name.find(*filter) != std::string::npos;
     };
@@ -456,7 +525,7 @@ static void mylua_help(sol::optional<std::string> filter)
         }
     };
     add_functions(*mylua_console_env);
-    add_functions(g->lua.globals());
+    add_functions(g->lua().globals());
     if (!functions.empty()) {
         print("Lua functions:");
         for (auto const& [name, signature] : functions)
@@ -472,8 +541,9 @@ static void mylua_help(sol::optional<std::string> filter)
 bool setup_lua()
 {
     mylua_register_scripts();
-    g->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::debug);
-    sol::state& lua = g->lua;
+    signals::installDefaults();
+    g->lua().open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::debug);
+    sol::state& lua = g->lua();
     lua_setup_other_libs(lua);
 
     lua["file_script"] = mylua_file_script;
@@ -487,6 +557,27 @@ bool setup_lua()
     lua["list_scenes"] = mylua_list_scenes;
     lua["menu"] = []() {
         return !mylua_return_to_menu();
+    };
+    // Sounds overlap freely, only one music plays at a time (crossfaded).
+    // Like scene requests, they are run by the main loop (see defer_request()).
+    // Names are relative to the sounds / musics folders.
+    lua["play_sound"] = [](std::string const& file, sol::optional<int> volume) {
+        std::string const path = resolve_audio(g->sounds_folder, file);
+        int const vol = volume.value_or(100);
+        if (!defer_request([path, vol]() { SSS::Audio::Mixer::playSound(path, vol); }))
+            SSS::Audio::Mixer::playSound(path, vol);
+    };
+    lua["play_music"] = [](std::string const& file, sol::optional<bool> loop, sol::optional<float> fade) {
+        std::string const path = resolve_audio(g->musics_folder, file);
+        bool const lp = loop.value_or(true);
+        float const fd = fade.value_or(SSS::Audio::Mixer::default_fade);
+        if (!defer_request([path, lp, fd]() { SSS::Audio::Mixer::playMusic(path, lp, fd); }))
+            SSS::Audio::Mixer::playMusic(path, lp, fd);
+    };
+    lua["stop_music"] = [](sol::optional<float> fade) {
+        float const fd = fade.value_or(SSS::Audio::Mixer::default_fade);
+        if (!defer_request([fd]() { SSS::Audio::Mixer::stopMusic(fd); }))
+            SSS::Audio::Mixer::stopMusic(fd);
     };
     lua["dialog"] = mylua_dialog;
     lua["help"] = mylua_help;
@@ -502,7 +593,7 @@ bool setup_lua()
         mylua_console_env = &scene->getEnv();
     };
     lua["console_reset_env"] = []() {
-        mylua_console_env = reinterpret_cast<sol::environment*>(&g->lua.globals());
+        mylua_console_env = reinterpret_cast<sol::environment*>(&g->lua().globals());
     };
     lua["console_reset_env"]();
 
@@ -522,9 +613,9 @@ bool setup_lua()
     // (see also dialog(name), playing on a shared node).
     // Started dialogs are updated by the main loop (Dialog::updateAll).
     auto dialog = lua.new_usertype<Dialog>("Dialog", sol::factories(
-        []() { return std::make_unique<Dialog>(); },
+        []() { return new_dialog(); },
         [](std::string const& name) {
-            auto d = std::make_unique<Dialog>();
+            auto d = new_dialog();
             d->start(name);
             return d;
         }
@@ -572,12 +663,61 @@ bool setup_lua()
             }
         });
     });
+    // function (name, args...) or nil: this dialog's own handler of the
+    // script's signals, called before the signal manager's (see signals).
+    // Returns true when it handled the signal.
+    dialog["on_signal"] = sol::writeonly_property([](Dialog& d, sol::object callback) {
+        if (!callback.is<sol::protected_function>()) {
+            d.setOnSignal(signals::dispatch);
+            return;
+        }
+        d.setOnSignal([f = callback.as<sol::protected_function>()](renpy::Signal const& signal) {
+            if (call_lua_signal_handler(f, signal, "Dialog.on_signal"))
+                return true;
+            return signals::dispatch(signal);
+        });
+    });
+
+    // Signal manager: handlers of the script's signals, see SignalManager.hpp.
+    // function (name, args...) returning true when it handled the signal.
+    // Handlers of a scene must be removed with off() when it unloads.
+    auto signals_table = lua["signals"].get_or_create<sol::table>();
+    signals_table["on"] = [](std::string const& name, sol::protected_function f) {
+        return signals::on(name, [f](renpy::Signal const& signal) {
+            return call_lua_signal_handler(f, signal, "signals");
+        });
+    };
+    signals_table["off"] = &signals::off;
+
+    // Game values, see GameState.hpp
+    auto game_vars = lua.new_usertype<GameVars>("GameVars", sol::no_constructor);
+    game_vars[sol::meta_function::index] = [](GameVars const&, std::string const& name, sol::this_state s) -> sol::object {
+        if (auto const value = game_state::get(name)) return to_lua(s, *value);
+        return sol::lua_nil;
+    };
+    game_vars[sol::meta_function::new_index] = [](GameVars&, std::string const& name, sol::object value) {
+        if (value.is<sol::lua_nil_t>()) game_state::erase(name);
+        else game_state::set(name, from_lua(value));
+    };
+    // pairs(game.vars), on a copy
+    game_vars[sol::meta_function::pairs] = [](GameVars const&, sol::this_state s) {
+        sol::state_view lua(s);
+        sol::table copy = lua.create_table();
+        for (auto const& [name, value] : game_state::vars())
+            copy[name] = to_lua(lua, value);
+        return std::make_tuple(lua["next"].get<sol::object>(), copy, sol::lua_nil);
+    };
+    sol::table game = lua.create_named_table("game");
+    game["vars"] = GameVars{};
+    game["save"] = [](sol::optional<std::string> name) { return game_state::save(name.value_or("save")); };
+    game["load"] = [](sol::optional<std::string> name) { return game_state::load(name.value_or("save")); };
+    game["reset"] = game_state::reset;
 
     if (mylua_file_script("global_setup.lua"))
         return true;
 
-    g->window = g->lua["window"];
-    g->ui_window = g->lua["ui_window"];
+    g->window = g->lua()["window"];
+    g->ui_window = g->lua()["ui_window"];
 
     name_env_objects(lua.globals());
 

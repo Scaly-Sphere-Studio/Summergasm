@@ -19,6 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="src\callbacks.cpp" />
     <ClCompile Include="src\Dialog.cpp" />
     <ClCompile Include="src\dialog\DialogCommon.cpp" />
@@ -31,6 +34,8 @@
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\imgui\console.cpp" />
+    <ClCompile Include="src\GameState.cpp" />
+    <ClCompile Include="src\SignalManager.cpp" />
     <ClCompile Include="src\LuaConsoleData.cpp" />
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -40,10 +45,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\Dialog.hpp" />
+    <ClInclude Include="inc\GameState.hpp" />
+    <ClInclude Include="inc\SignalManager.hpp" />
     <ClInclude Include="src\dialog\DialogCommon.hpp" />
     <ClInclude Include="src\dialog\DialogNodes.hpp" />
     <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\includes.hpp" />
+    <ClInclude Include="inc\lua_include.hpp" />
+    <ClInclude Include="inc\pch.h" />
     <ClInclude Include="inc\Summergasm.hpp" />
     <ClInclude Include="inc\mylua.hpp" />
     <ClInclude Include="inc\Parallax.hpp" />
@@ -159,6 +168,9 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;SSS_LUA;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -184,6 +196,9 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;SSS_LUA;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -210,6 +225,9 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;SSS_LUA;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -235,6 +253,9 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;SSS_LUA;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\inc</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <ObjectFileName>$(IntDir)/obj/</ObjectFileName>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

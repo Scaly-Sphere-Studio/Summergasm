@@ -1,5 +1,9 @@
 #include "Summergasm.hpp"
 #include "Dialog.hpp"
+#include "SignalManager.hpp"
+
+GlobalData::GlobalData() : _lua(std::make_unique<sol::state>()) {}
+GlobalData::~GlobalData() = default;
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
@@ -9,8 +13,10 @@ void exitSummergasm(int status)
 {
     free_imgui_objects();
     mylua_free_dialog();
+    // Lua handlers must go before the Lua state does
+    signals::clear();
     g->lua_scenes.clear();
-    g->lua.collect_garbage();
+    g->lua().collect_garbage();
     g->ui_window->close();
     g->window->close();
     g.reset();
@@ -26,10 +32,10 @@ void exitSummergasm(int status)
 // that it stays on top of any renderer added by scenes
 static void update_watermark()
 {
-    sol::object const obj = g->lua["watermark_renderer"];
+    sol::object const obj = g->lua()["watermark_renderer"];
     if (!obj.is<SSS::GL::RendererBase*>())
         return;
-    g->lua["update_watermark"]();
+    g->lua()["update_watermark"]();
     auto const renderer = obj.as<SSS::GL::RendererBase*>()->getSharedBase();
     auto const& renderers = g->window->getRenderers();
     if (renderers.empty() || renderers.back() != renderer) {
@@ -53,6 +59,9 @@ int main(void) try
         g->lua_folder = g->resources_folder + "lua/";
         g->assets_folder = g->resources_folder + "assets/";
         g->dialogs_folder = g->resources_folder + "dialogs/";
+        g->sounds_folder = g->resources_folder + "sounds/";
+        g->musics_folder = g->resources_folder + "musics/";
+        g->saves_folder = g->home_folder + "saves/";
         SSS::GL::Texture::setResourceFolder(g->assets_folder);
     }
 
@@ -76,6 +85,8 @@ int main(void) try
         mylua_run_active_scenes();
         // Started by the scenes, before scroll_y is reset (scrolls their log)
         Dialog::updateAll();
+        // Music fades & audio events, after the scenes' play_music() requests
+        SSS::Audio::update();
         g->scroll_y = 0.0;
         update_watermark();
         g->window->drawObjects();

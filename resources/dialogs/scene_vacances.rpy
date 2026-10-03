@@ -21,6 +21,9 @@ default choix_lea = ""
 
 label start:
 
+    # Les musiques sont dans resources/musics/, les sons dans resources/sounds/
+    play music "../musics/Botanical.mp3" loop
+
     scene expression "#f6a55c"   # coucher de soleil
 
     "La plage se vide doucement. Le ciel devient ~~orange, puis rose.~~"
