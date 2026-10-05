@@ -40,11 +40,9 @@ label start:
 
     c "Tu réfléchis à un certain ~~Tom~~, peut-être ?"
 
-    show t at left   # derrière Léa : les personnages d'un même côté font la queue
+    show t at center   # derrière Léa : les personnages d'un même côté font la queue
 
     t "Euh... je suis juste là, hein."
-
-    swap l t   # Tom passe devant Léa
 
     l "%%Camille !%%"
 
@@ -52,13 +50,13 @@ label start:
 
     t "Ah bon ? Je pensais qu'on était discrets."
 
-    flip t right   # Tom se retourne et file de l'autre côté
-
     c "Tom, vous avez partagé **la même glace** tous les jours."
 
-    t "C'était pour %%économiser%%."
+    flip t left   # Tom se retourne et file de l'autre côté
 
-    l "(rires) ~~Menteur.~~"
+    t & l "C'était pour %%économiser%%."   # Tom et Léa parlent en même temps
+
+    c "(rires) ~~Menteurs.~~"
 
     scene expression "#e8765f"   # le ciel rougit
     show l at left

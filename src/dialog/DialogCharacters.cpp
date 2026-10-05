@@ -38,7 +38,8 @@ void DialogCharacters::present(DialogContext& ctx, renpy::Step const& step, bool
                         : sp.pos == renpy::Pos::Right ? -1.f
                         : (k % 2 ? 1.f : -1.f);
         // Characters who are not talking (all of them during narration) are drawn in black & white.
-        bool const talking = step.kind != Kind::End && !step.speaker.empty() && sp.tag == step.speaker;
+        bool const talking = step.kind != Kind::End && std::any_of(step.speakers.begin(), step.speakers.end(),
+            [&](renpy::Speaker const& s) { return s.id == sp.tag; });
         auto tex = ctx.textures.get(sp.image);
         tex->setGrayscale(!talking);
         // The ones on the right side face the center

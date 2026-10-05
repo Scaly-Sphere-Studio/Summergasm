@@ -57,7 +57,8 @@ void DialogLog::setOpen(DialogContext& ctx, bool open)
         if (e.choice)
             str += renpy::colored("\xC2\xBB " + e.text, 0xf2b632);   // "» choice", in gold
         else if (!e.speaker_name.empty())       // spoken: indented under the name
-            str += renpy::colored(e.speaker_name, e.speaker_color.value_or(0xc9bfe8)) + "\n" + LOG_INDENT + e.text;
+            str += (e.speaker_markup.empty() ? renpy::colored(e.speaker_name, e.speaker_color.value_or(0xc9bfe8))
+                                             : e.speaker_markup) + "\n" + LOG_INDENT + e.text;
         else
             str += e.text;
     }

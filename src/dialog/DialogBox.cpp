@@ -60,11 +60,19 @@ void DialogBox::present(DialogContext& ctx, renpy::Step const& step, bool animat
     setVisible(_name, _enabled && _has_name);
     if (_has_name) {
         SSS::TR::Format fmt = _name_fmt;
-        if (step.speaker_color) fmt.text_color = trColor(*step.speaker_color);
-        _name->setText(step.speaker_name, fmt);
+        if (step.speakers.size() == 1 && step.speaker_color) fmt.text_color = trColor(*step.speaker_color);
+        _name->setText(step.speaker_markup, fmt);
 
-        auto const* sprite = step.scene.find(step.speaker);
-        auto const side = sprite ? sprite->pos : renpy::Pos::Left;
+        // Everyone on the same side: the name goes there, else in the middle
+        std::optional<renpy::Pos> common;
+        bool mixed = false;
+        for (auto const& sp : step.speakers) {
+            auto const* sprite = step.scene.find(sp.id);
+            renpy::Pos const p = sprite ? sprite->pos : renpy::Pos::Left;
+            if (common && *common != p) mixed = true;
+            common = p;
+        }
+        auto const side = mixed ? renpy::Pos::Center : common.value_or(renpy::Pos::Left);
         float const y = L.box_top + L.pad * 0.5f;
         if (side == renpy::Pos::Right)
             place(_name, SSS::AnchorMode::TopRight, { L.box_left + L.box_w - L.pad, y });

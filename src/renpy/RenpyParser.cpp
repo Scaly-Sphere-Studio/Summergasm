@@ -77,7 +77,7 @@ struct Token {
     bool is(std::string_view v) const { return !is_string && value == v; }
 };
 
-bool isPunct(char c) { return c == ':' || c == '=' || c == '(' || c == ')' || c == ','; }
+bool isPunct(char c) { return c == ':' || c == '=' || c == '(' || c == ')' || c == ',' || c == '&'; }
 
 // Ren'Py string escapes. Unknown escapes (\* \~ \%) are kept for toTRMarkup().
 std::string unescape(std::string_view s)
@@ -242,7 +242,7 @@ private:
             return k < toks.size() && !toks[k].is_string ? toks[k].value : std::string();
         };
 
-        // Say: "text"  |  who [attrs...] "text"
+        // Say: "text"  |  who [attrs...] "text"  |  who & who2 ... "text" (SSS: speaking together)
         if (first.is_string) {
             auto& st = _emit(Kind::Say, l.line);
             st.text = first.value;
@@ -251,14 +251,20 @@ private:
         for (size_t k = 1; k < toks.size(); ++k) {
             if (!toks[k].is_string) continue;
             bool const all_words = std::none_of(toks.begin(), toks.begin() + k,
-                [](Token const& t) { return t.is_string || isPunct(t.value[0]); });
+                [](Token const& t) { return t.is_string || (isPunct(t.value[0]) && !t.is("&")); });
             if (!all_words || first.value == "define" || first.value == "image"
                 || first.value == "scene" || first.value == "show"
                 || first.value == "play" || first.value == "signal")
                 break;
             auto& st = _emit(Kind::Say, l.line);
             st.who = first.value;
-            for (size_t a = 1; a < k; ++a) st.attrs.push_back(toks[a].value);
+            size_t a = 1;
+            for (; a < k && !toks[a].is("&"); ++a) st.attrs.push_back(toks[a].value);
+            for (; a < k; a += 2) {
+                if (!toks[a].is("&") || a + 1 >= k || toks[a + 1].is("&"))
+                    fail(l.line, "expected `who & who2 \"text\"`");
+                st.others.push_back(toks[a + 1].value);
+            }
             st.text = toks[k].value;
             return;
         }
@@ -504,7 +510,7 @@ std::vector<LogEntry> Player::log() const
         if (s.kind == Step::Kind::End)
             continue;
         if (!s.text.empty())        // a menu without a question has no text
-            entries.push_back({ s.speaker.empty() ? "" : s.speaker_name, s.speaker_color, s.text });
+            entries.push_back({ s.speaker.empty() ? "" : s.speaker_name, s.speaker_color, s.text, false, s.speaker_markup });
         if (f.chosen && *f.chosen < s.choices.size())
             entries.push_back({ "", std::nullopt, s.choices[*f.chosen], true });
     }
@@ -570,12 +576,20 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             Step step;
             step.kind = Step::Kind::Say;
             step.speaker = st.who;
-            if (auto const* c = _script.character(st.who)) {
-                step.speaker_name = _name(*c, vars);
-                step.speaker_color = c->color;
-            }
-            else {
-                step.speaker_name = st.who;
+            if (!st.who.empty()) {
+                std::vector<std::string> ids{ st.who };
+                ids.insert(ids.end(), st.others.begin(), st.others.end());
+                for (auto const& id : ids) {
+                    Speaker sp{ id, id, std::nullopt };
+                    if (auto const* c = _script.character(id)) {
+                        sp.name = _name(*c, vars);
+                        sp.color = c->color;
+                    }
+                    step.speakers.push_back(std::move(sp));
+                }
+                step.speaker_name = step.speakers.front().name;
+                step.speaker_color = step.speakers.front().color;
+                step.speaker_markup = speakersMarkup(step.speakers);
             }
             step.text = _interpolate(st.text, vars);
             if (size_t const next = following(pc); next < stmts.size() && stmts[next].kind == Kind::Menu) {
@@ -718,6 +732,16 @@ bool isWordByte(char c)
 std::string colored(std::string_view markup, uint32_t rgb)
 {
     return '{' + colorJson(rgb) + '}' + std::string(markup) + "{{}}";
+}
+
+std::string speakersMarkup(std::vector<Speaker> const& speakers)
+{
+    std::string out;
+    for (auto const& sp : speakers) {
+        if (!out.empty()) out += " & ";
+        out += sp.color ? colored(sp.name, *sp.color) : sp.name;
+    }
+    return out;
 }
 
 std::string toTRMarkup(std::string_view text, MarkupStyle const& style, Resolver const& resolve,

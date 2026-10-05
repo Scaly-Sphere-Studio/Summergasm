@@ -10,6 +10,7 @@
 //   swap tag1 tag2         (the two characters exchange their places in line)
 //   flip tag left|center|right   (turns around to the back of that side's line)
 //   "narration"            who "dialogue"       who attr "dialogue"
+//   who1 & who2 "dialogue" (SSS: several characters speaking at once)
 //   menu:  "choice": <block>
 //   default var = value    $ var = value        $ who.name = "New name"
 //   $ var += 1             $ var -= 1           (values: "text", 12, True, False)
@@ -99,6 +100,7 @@ struct Statement {
     bool loop = false;              // Play
     std::vector<Value> args;        // Signal
     std::vector<std::string> attrs; // Show/Scene/Say image attributes
+    std::vector<std::string> others;// Say: the other speakers of `a & b "text"`
     std::optional<Pos> pos;         // Show `at ...` / Flip: destination
     std::optional<uint32_t> color;  // Scene expression "#hex"
     struct Choice { std::string text; size_t target; };
@@ -173,12 +175,22 @@ std::string toTRMarkup(std::string_view text, MarkupStyle const& style = {},
 std::string colored(std::string_view markup, uint32_t rgb);
 
 // ── Runtime ──────────────────────────────────────────────────────────────
+struct Speaker {
+    std::string id;                     // Character id
+    std::string name;                   // its current name (may be renamed by `$ who.name = ...`)
+    std::optional<uint32_t> color;
+};
+// "Tom & Léa", each name in its color (SSS::TR markup)
+std::string speakersMarkup(std::vector<Speaker> const& speakers);
+
 struct Step {
     enum class Kind { Say, Menu, End };
     Kind kind = Kind::End;
-    std::string speaker;                // Character id, empty for narration
-    std::string speaker_name;           // its current name (may be renamed by `$ who.name = ...`)
+    std::string speaker;                // Character id, empty for narration (the first one when several speak)
+    std::string speaker_name;           // its current name
     std::optional<uint32_t> speaker_color;
+    std::vector<Speaker> speakers;      // everyone speaking (`a & b "text"`), empty for narration
+    std::string speaker_markup;         // their names together, SSS::TR markup
     std::string text;                   // SSS::TR markup, ready for parseString()
     std::vector<std::string> choices;   // SSS::TR markup, Menu only
     SceneState scene;
@@ -193,6 +205,7 @@ struct LogEntry {
     std::optional<uint32_t> speaker_color;
     std::string text;                   // SSS::TR markup
     bool choice = false;
+    std::string speaker_markup;         // all the speakers' names, colored (SSS::TR markup)
 };
 
 // Walks the script. Every produced Step stores its own SceneState and
