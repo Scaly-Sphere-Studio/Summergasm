@@ -539,7 +539,7 @@ static void mylua_help(sol::optional<std::string> filter)
     if (filter)
         return;
     mylua_list_scenes();
-    print("Libraries: GL, TR, Audio, Parallax, vec3... (Tab to autocomplete, e.g. GL.Plane.)");
+    print("Libraries: GL, TR, Audio, SceneRenderer, vec3... (Tab to autocomplete, e.g. GL.Plane.)");
 }
 
 bool setup_lua()
@@ -613,16 +613,38 @@ bool setup_lua()
     };
     lua["console_reset_env"]();
 
-    auto parallax = lua.new_usertype<Parallax>("Parallax", sol::factories(
-        []() { return Parallax::create(); },
-        [](GL::Camera* cam) { return Parallax::create(GL::Camera::get(cam)); },
-        [](GL::Camera* cam, bool clear) { return Parallax::create(GL::Camera::get(cam), clear); }
+    // Not bound by SSS::GL, needed by Camera:rotate (pitch, yaw in degrees)
+    auto vec2 = lua.new_usertype<glm::vec2>("vec2", sol::constructors<
+        glm::vec2(),
+        glm::vec2(float),
+        glm::vec2(float, float)
+    >());
+    vec2["x"] = &glm::vec2::x;
+    vec2["y"] = &glm::vec2::y;
+
+    // Whole 3D scene of planes, see SceneRenderer.hpp
+    auto scene_renderer = lua.new_usertype<SceneRenderer>("SceneRenderer", sol::factories(
+        []() { return SceneRenderer::create(); },
+        [](GL::Camera* cam) { return SceneRenderer::create(GL::Camera::get(cam)); }
     ), sol::base_classes, sol::bases<GL::PlaneRenderer, GL::RendererBase, Base>());
-    parallax["width"] = sol::property(&Parallax::getWidth);
-    parallax["speed"] = &Parallax::speed;
-    parallax["pause"] = &Parallax::pause;
-    parallax["play"] = &Parallax::play;
-    parallax["toggle"] = &Parallax::toggle;
+    scene_renderer["addPlane"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        ren.addPlane(GL::Plane::get(plane));
+    };
+    scene_renderer["addScrollLayer"] = [](SceneRenderer& ren, std::vector<GL::Plane*> planes) {
+        std::vector<GL::Plane::Shared> vec;
+        vec.reserve(planes.size());
+        for (GL::Plane* plane : planes)
+            vec.push_back(GL::Plane::get(plane));
+        ren.addScrollLayer(vec);
+    };
+    scene_renderer["clearScrollLayers"] = &SceneRenderer::clearScrollLayers;
+    scene_renderer["scroll_layer_count"] = sol::property(&SceneRenderer::getScrollLayerCount);
+    scene_renderer["scroll_speed"] = &SceneRenderer::scroll_speed;
+    scene_renderer["depth_sort"] = &SceneRenderer::depth_sort;
+    scene_renderer["is_playing"] = sol::property(&SceneRenderer::isPlaying);
+    scene_renderer["pause"] = &SceneRenderer::pause;
+    scene_renderer["play"] = &SceneRenderer::play;
+    scene_renderer["toggle"] = &SceneRenderer::toggle;
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once

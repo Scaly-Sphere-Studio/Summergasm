@@ -73,6 +73,18 @@ function drag_plane_fixed (plane)
     end
 end
 
+-- Distance at which a perspective camera sees 1 world unit as 1 pixel on the
+-- z = 0 plane (zoom excluded)
+function perspective_distance (camera, win_h)
+    return (win_h / 2) / math.tan(math.rad(camera.fov / 2))
+end
+
+-- Scale factor so a plane at depth z keeps its pixel size when seen from a
+-- perspective camera at distance D (see perspective_distance, z = 0 is exact)
+function depth_scale (D, z)
+    return (D - z) / D
+end
+
 function move_camera (camera, speed)
     if (window:keyIsHeld(GL.KEY_UP)) then
         camera:move(vec3.new(0, speed, 0))

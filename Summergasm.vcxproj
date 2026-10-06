@@ -43,7 +43,7 @@
     <ClCompile Include="src\LuaConsoleData.cpp" />
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\Parallax.cpp" />
+    <ClCompile Include="src\SceneRenderer.cpp" />
     <ClCompile Include="src\renpy\RenpyParser.cpp" />
     <ClCompile Include="src\setup_lua.cpp" />
   </ItemGroup>
@@ -61,7 +61,7 @@
     <ClInclude Include="inc\pch.h" />
     <ClInclude Include="inc\Summergasm.hpp" />
     <ClInclude Include="inc\mylua.hpp" />
-    <ClInclude Include="inc\Parallax.hpp" />
+    <ClInclude Include="inc\SceneRenderer.hpp" />
     <ClInclude Include="src\renpy\RenpyParser.h" />
   </ItemGroup>
   <ItemGroup>

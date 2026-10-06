@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lua_include.hpp"
-#include "Parallax.hpp"
+#include "SceneRenderer.hpp"
 
 class Scene {
 public:

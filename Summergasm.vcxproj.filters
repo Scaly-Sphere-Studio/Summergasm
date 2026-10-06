@@ -61,7 +61,7 @@
     <ClCompile Include="src\setup_lua.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Parallax.cpp">
+    <ClCompile Include="src\SceneRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\LuaConsoleData.cpp">
@@ -126,7 +126,7 @@
     <ClInclude Include="inc\includes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="inc\Parallax.hpp">
+    <ClInclude Include="inc\SceneRenderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="inc\SignalManager.hpp">

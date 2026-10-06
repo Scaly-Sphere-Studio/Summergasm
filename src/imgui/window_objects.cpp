@@ -408,14 +408,15 @@ static void print_object(SSS::GL::PlaneRenderer& renderer)
     print_planes(renderer);
 }
 template<>
-static void print_object(Parallax& renderer)
+static void print_object(SceneRenderer& renderer)
 {
     print_object<SSS::Base>(renderer);
-    ImGui::Text("Width: %f", renderer.getWidth());
+    ImGui::Text("Scroll layers: %zu", renderer.getScrollLayerCount());
     bool is_playing = renderer.isPlaying();
     if (ImGui::Checkbox("Play", &is_playing))
         renderer.toggle();
-    InputFloatWasEdited("Speed", &renderer.speed, 0.01f);
+    InputFloatWasEdited("Scroll speed", &renderer.scroll_speed, 0.01f);
+    ImGui::Checkbox("Depth sort", &renderer.depth_sort);
     print_planes(renderer);
 }
 
@@ -532,8 +533,8 @@ static void print_env(char const* name, sol::environment const& env)
         else if (value.is<GL::Plane>()) {
             print_tab_object<GL::Plane>(value, ImColor(0.8f, 0.3f, 0.3f));
         }
-        else if (value.is<Parallax>()) {
-            print_tab_object<Parallax>(value, ImColor(0.7f, 0.f, 0.8f));
+        else if (value.is<SceneRenderer>()) {
+            print_tab_object<SceneRenderer>(value, ImColor(0.7f, 0.f, 0.8f));
         }
         else if (value.is<GL::PlaneRenderer>()) {
             print_tab_object<GL::PlaneRenderer>(value, ImColor(0.7f, 0.f, 0.8f));
