@@ -2,6 +2,7 @@
 // Shared pieces of the dialog node (see Dialog.hpp): layout, SDF textures,
 // text helpers, and the DialogNode base its parts derive from (DialogNodes.hpp).
 #include "includes.hpp"
+#include "CharacterData.hpp"
 #include "../renpy/RenpyParser.h"
 
 #include <SSS/SceneGraph/Node_UI.h>
@@ -55,6 +56,52 @@ inline constexpr size_t MAX_CHOICES = 6;
 inline constexpr float SPRITE_MOVE_TIME = 0.22f;  // seconds
 inline constexpr float SPRITE_TILT_DEG  = 8.f;
 
+// Speech bubble tails, rising from the top of the dialogue box toward the
+// speaker's mouth (pixels). Its base, on the box, is TAIL_REACH_PX from the
+// mouth on the side the mouth faces, plus up to TAIL_PUSH_PX with the
+// intensity. A straight tail is at most TAIL_LEN_PX long: it only hints at the
+// speaker. A broken one reaches the mouth, its point TAIL_GAP_PX off it along
+// the mouth's direction. Neither goes above the middle of the screen. It
+// widens from its point (TAIL_W_TIP) to the box (TAIL_W_BOX).
+inline constexpr float TAIL_GAP_PX    = 22.f;
+inline constexpr float TAIL_LEN_PX    = 170.f;    // out of the box
+inline constexpr float TAIL_REACH_PX  = 90.f;
+inline constexpr float TAIL_PUSH_PX   = 260.f;
+inline constexpr float TAIL_W_TIP     = 0.f;    // under 1 px: only the anti-aliasing is drawn
+inline constexpr float TAIL_W_BOX     = 90.f;
+// Base anchored this deep in the box: its wide end, slanted, never shows out of it
+inline constexpr float TAIL_INSET_PX  = 1.5f * TAIL_W_BOX;
+// The base is rolled around its place, up to TAIL_JITTER_PX away, plus up to
+// TAIL_JITTER_INTENSITY_PX with the intensity. Rolled again when the speakers change.
+inline constexpr float TAIL_JITTER_PX           = 30.f;
+inline constexpr float TAIL_JITTER_INTENSITY_PX = 120.f;
+// Several characters speaking at once: least distance between their bases
+inline constexpr float TAIL_SPREAD_PX = 2.5f * TAIL_W_BOX;
+// Broken (angry) tails zigzag around a ballistic curve: corners between the
+// point and the box, and how far they stand from the curve
+inline constexpr int   BROKEN_CORNERS = 4;
+inline constexpr float BROKEN_AMP_PX  = 18.f;
+// Rolled: corners shifted along the curve by up to this fraction of the space
+// between two of them, their distance from it varying by +/- this fraction
+inline constexpr float BROKEN_SHIFT   = 0.3f;
+inline constexpr float BROKEN_AMP_VAR = 0.5f;
+// A lone speaker's mouth turned away from its base (the dot of its direction
+// and the way to the base under TAIL_BEND_DOT, e.g. a character facing out,
+// its base held back by the end of the box): the tail leaves the mouth along its
+// direction, TAIL_BEND_ARM times the mouth-to-base distance, and comes down
+// into the box from TAIL_BEND_RISE_PX above it. Either style then reaches the
+// mouth; a straight one is a smooth curve of TAIL_BEND_POINTS.
+inline constexpr float TAIL_BEND_DOT     = 0.5f;
+inline constexpr float TAIL_BEND_ARM     = 0.4f;
+inline constexpr float TAIL_BEND_RISE_PX = 60.f;
+inline constexpr int   TAIL_BEND_POINTS = 24;
+
+// Debug overlay of the mouths (console: debug_mouths()): a circle on each
+// mouth, and a line along its direction, out of the circle.
+inline bool debug_mouths = false;
+inline constexpr float DEBUG_MOUTH_R  = 14.f;
+inline constexpr float DEBUG_DIR_LEN  = 3.f * DEBUG_MOUTH_R;
+
 // "Continue" arrow press feedback
 inline constexpr float ARROW_SNAP_PX   = 5.f;     // how far it snaps down
 inline constexpr float ARROW_SNAP_TIME = 0.18f;   // seconds to ease back up
@@ -83,6 +130,14 @@ inline constexpr char const* LOG_INDENT = "      ";
 // Fill color of the dialogue and choice panels.
 inline constexpr uint32_t PANEL_RGB = 0x14101e;
 
+// Dialogue box (and the speech bubble tails): a plain creamy white squircle,
+// dark text. Its corners take this share of its height, and are superellipses
+// of this exponent (2: circular arcs, higher: squarer).
+inline constexpr uint32_t BOX_RGB          = 0xfdf6e6;
+inline constexpr uint32_t BOX_TEXT_RGB     = 0x4a3b52;
+inline constexpr float    BOX_CORNER       = 0.45f;
+inline constexpr float    BOX_SQUIRCLE_N   = 4.f;
+
 // ── Textures ──────────────────────────────────────────────────────────────
 SSS::RGBA32 rgba(uint32_t rgb, uint8_t a = 255);
 // SDF primitive colors are normalized floats.
@@ -92,6 +147,10 @@ glm::vec4 color(uint32_t rgb, float a = 1.f);
 // plane holding it keeps the add order, so the text still draws on top.
 SSS::GL::Texture::Shared makePanel(int w, int h, float radius, float border,
     glm::vec4 fill, glm::vec4 edge, glm::vec4 inner_line);
+// Squircle-cornered panel, rasterized on the CPU (no SDF primitive for it):
+// a rectangle whose corners of the given radius are superellipse arcs,
+// |x|^n + |y|^n = 1. Anti-aliased edges.
+SSS::GL::Texture::Shared makeSquircle(int w, int h, float radius, float n, uint32_t rgb);
 // Small triangle pointing down, shown when the text can be continued.
 SSS::GL::Texture::Shared makeContinueArrow(glm::vec4 fill, glm::vec4 edge);
 
@@ -136,6 +195,10 @@ struct ImagePlane {
     void set(SSS::GL::Texture::Shared t, glm::vec2 f, float h, bool m = false, float tilt_deg = 0.f, float turn_w = 1.f);
     void hide() { set(nullptr, foot, height); }
     void refresh();
+    // Image space (normalized, origin at the top-left of the file's image)
+    // to UI pixels, as the sprite is drawn: nullopt while not shown.
+    // toScreen(p, 0) maps a direction (normalized, null when degenerate).
+    std::optional<glm::vec2> toScreen(glm::vec2 p, float w = 1.f) const;
 
 private:
     struct Key {
@@ -205,11 +268,18 @@ struct DialogContext {
 
     SSS::GL::Window& window;
     TextureCache textures;
+    // Mouth & tail of each character (resources/characters/<id>.json)
+    CharacterData characters;
     Settings settings;
     // Shown on the story's End step (TR markup), "" to finish right away
     std::string end_text;
 
     std::optional<Layout> L;
+    // Drawn in this order: ui_back (the sprites & the dialogue box), lines
+    // (the speech bubble tails, no camera: see DialogTails), then ui (the
+    // rest: the name & text over the tails, choices, controls, log).
+    SSS::GL::UIRenderer::Shared ui_back;
+    SSS::GL::LineRenderer::Shared lines;
     SSS::GL::UIRenderer::Shared ui;
     renpy::Player const* player = nullptr;
 
@@ -246,7 +316,8 @@ class DialogNode {
 public:
     virtual ~DialogNode() = default;
 
-    // Creates the planes & text nodes in ctx.ui, for the layout ctx.L
+    // Creates the planes & text nodes in ctx.ui (ctx.ui_back for the ones
+    // under the speech bubble tails), for the layout ctx.L
     virtual void build(DialogContext& ctx) = 0;
     // Releases every GL object (while the GL context is current)
     virtual void destroy() = 0;

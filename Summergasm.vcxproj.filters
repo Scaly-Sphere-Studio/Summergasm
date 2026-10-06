@@ -91,6 +91,12 @@
     <ClCompile Include="src\dialog\DialogLog.cpp">
       <Filter>Source Files\dialog</Filter>
     </ClCompile>
+    <ClCompile Include="src\dialog\DialogTails.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dialog\CharacterData.cpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClCompile>
     <ClCompile Include="src\renpy\RenpyParser.cpp">
       <Filter>Source Files\renpy</Filter>
     </ClCompile>
@@ -132,6 +138,9 @@
     <ClInclude Include="src\dialog\DialogNodes.hpp">
       <Filter>Source Files\dialog</Filter>
     </ClInclude>
+    <ClInclude Include="src\dialog\CharacterData.hpp">
+      <Filter>Source Files\dialog</Filter>
+    </ClInclude>
     <ClInclude Include="src\renpy\RenpyParser.h">
       <Filter>Source Files\renpy</Filter>
     </ClInclude>
@@ -156,6 +165,15 @@
       <Filter>Resource Files\Lua</Filter>
     </None>
     <None Include="resources\dialogs\scene_vacances.rpy">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\characters\c.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\characters\l.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\characters\t.json">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="resources\lua\model_functions.lua">

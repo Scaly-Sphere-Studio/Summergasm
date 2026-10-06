@@ -44,9 +44,9 @@ label start:
 
     t "Euh... je suis juste là, hein."
 
-    l "%%Camille !%%"
+    l "%%Camille !%%" (tail="broken", intensity=1)   # bulle "en colère", poussée loin de Léa
 
-    c "Quoi ? Depuis **trois semaines** vous ne vous quittez plus. Tout le camping l'a remarqué."
+    c "Quoi ? Depuis **trois semaines** vous ne vous quittez plus. Tout le camping l'a remarqué." (tail="broken")
 
     t "Ah bon ? Je pensais qu'on était discrets."
 

@@ -157,6 +157,14 @@ std::optional<Value> parseValue(Token const& t)
     return std::nullopt;
 }
 
+// "attr1 attr2"
+std::string joinAttrs(std::vector<std::string> const& attrs)
+{
+    std::string out;
+    for (auto const& a : attrs) out += (out.empty() ? "" : " ") + a;
+    return out;
+}
+
 } // namespace
 
 std::string toString(Value const& value)
@@ -266,6 +274,7 @@ private:
                 st.others.push_back(toks[a + 1].value);
             }
             st.text = toks[k].value;
+            _sayArgs(st, toks, k + 1, l.line);
             return;
         }
 
@@ -392,6 +401,30 @@ private:
             if (kw != "default" && kw != "$" && kw != "with" && kw != "pause")
                 std::cerr << "[renpy] line " << l.line << ": ignored `" << kw << "`\n";
             _skipChildren(l);
+        }
+    }
+
+    // `(tail="straight"|"broken", intensity=0.8)` after a say line's text
+    static void _sayArgs(Statement& st, std::vector<Token> const& toks, size_t k, int line)
+    {
+        if (k >= toks.size()) return;
+        if (!toks[k].is("(") || !toks.back().is(")"))
+            fail(line, "expected `(key=value, ...)` after the text");
+        for (++k; k + 2 < toks.size(); k += 4) {
+            std::string const& key = toks[k].value;
+            Token const& val = toks[k + 2];
+            if (toks[k].is_string || !toks[k + 1].is("=") || !(toks[k + 3].is(",") || toks[k + 3].is(")")))
+                fail(line, "expected `(key=value, ...)` after the text");
+            if (key == "tail") {
+                if (!val.is_string || (val.value != "straight" && val.value != "broken"))
+                    fail(line, "expected tail=\"straight\" or tail=\"broken\"");
+                st.tail = val.value;
+            }
+            else if (key == "intensity") {
+                try { st.intensity = std::stof(val.value); }
+                catch (...) { fail(line, "expected a number for intensity"); }
+            }
+            else fail(line, "unknown say argument `" + key + "` (expected tail, intensity)");
         }
     }
 
@@ -572,10 +605,15 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             // `who attr "text"` also changes the speaker's shown image.
             if (!st.who.empty() && !st.attrs.empty())
                 for (auto& sp : state.sprites)
-                    if (sp.tag == st.who) sp.image = _script.resolveImage(st.who, st.attrs);
+                    if (sp.tag == st.who) {
+                        sp.image = _script.resolveImage(st.who, st.attrs);
+                        sp.expression = joinAttrs(st.attrs);
+                    }
             Step step;
             step.kind = Step::Kind::Say;
             step.speaker = st.who;
+            step.tail = st.tail;
+            step.tail_intensity = st.intensity;
             if (!st.who.empty()) {
                 std::vector<std::string> ids{ st.who };
                 ids.insert(ids.end(), st.others.begin(), st.others.end());
@@ -623,11 +661,12 @@ void Player::_run(size_t pc, SceneState state, Vars vars)
             auto it = std::find_if(state.sprites.begin(), state.sprites.end(),
                 [&](Sprite const& s) { return s.tag == st.text; });
             if (it == state.sprites.end()) {
-                state.sprites.push_back({ st.text, _script.resolveImage(st.text, st.attrs), Pos::Center });
+                state.sprites.push_back({ st.text, _script.resolveImage(st.text, st.attrs), joinAttrs(st.attrs), Pos::Center });
                 it = std::prev(state.sprites.end());
             }
             else if (!st.attrs.empty()) {
                 it->image = _script.resolveImage(st.text, st.attrs);
+                it->expression = joinAttrs(st.attrs);
             }
             if (st.pos) it->pos = *st.pos;
             ++pc;

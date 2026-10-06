@@ -58,6 +58,13 @@ public:
     // loop once the scenes ran. When a story is over, its dialog stops and
     // calls its finished callback.
     static void updateAll();
+    // Reads resources/characters/*.json again (mouths & speech bubble tails),
+    // for every started dialog
+    static void reloadCharacterData();
+    // Shows each character's mouth & its direction, as the speech bubble
+    // tails use them (console: debug_mouths()). Turning it on reloads the files.
+    static void setDebugMouths(bool on);
+    static bool debugMouths() noexcept;
 
     // Stop / resume drawing: everything is kept as is (line, choices, log),
     // and the story waits while hidden.

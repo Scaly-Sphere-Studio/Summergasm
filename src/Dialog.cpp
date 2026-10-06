@@ -48,7 +48,9 @@ struct Dialog::Impl {
     DialogChoices    choices;
     DialogControls   controls;
     DialogLog        log;
-    std::array<DialogNode*, 5> nodes() { return { &characters, &box, &choices, &controls, &log }; }
+    // In its own renderer, over the others
+    DialogTails      tails{ characters, box, choices };
+    std::array<DialogNode*, 6> nodes() { return { &characters, &box, &choices, &controls, &log, &tails }; }
     DialogNode& node(Part part);
 
     void start(std::string const& path);
@@ -59,6 +61,19 @@ struct Dialog::Impl {
 
     void build(int w, int h);
     void destroy();
+    // The UI's renderers, in draw order (see DialogContext)
+    void addRenderers()
+    {
+        ctx.window.addRenderer(ctx.ui_back);
+        ctx.window.addRenderer(ctx.lines);
+        ctx.window.addRenderer(ctx.ui);
+    }
+    void removeRenderers()
+    {
+        ctx.window.removeRenderer(ctx.ui_back);
+        ctx.window.removeRenderer(ctx.lines);
+        ctx.window.removeRenderer(ctx.ui);
+    }
     void rebuildIfResized();
     // A new step (or the current one, once rebuilt). forward: the story
     // moved on (sends the step's one-shot signals). false when the
@@ -164,6 +179,8 @@ void Dialog::Impl::start(std::string const& name)
     stop();
     ++generation;
     script = std::move(new_script);
+    // Characters' files may have been edited since
+    ctx.characters.reload();
     // Starts with the game's values, the script's `default`s set the missing ones
     synced_vars = renpy::Player::Vars(game_state::vars().begin(), game_state::vars().end());
     player = std::make_unique<renpy::Player>(*script, renpy::MarkupStyle{}, synced_vars);
@@ -205,9 +222,12 @@ void Dialog::Impl::finish()
 void Dialog::Impl::build(int w, int h)
 {
     ctx.L.emplace(float(w), float(h));
+    ctx.ui_back = SSS::GL::UIRenderer::create();
+    ctx.ui_back->updateResolution(ctx.L->W, ctx.L->H);
+    ctx.lines = SSS::GL::LineRenderer::create();
     ctx.ui = SSS::GL::UIRenderer::create();
     ctx.ui->updateResolution(ctx.L->W, ctx.L->H);
-    if (!hidden) ctx.window.addRenderer(ctx.ui);
+    if (!hidden) addRenderers();
     for (DialogNode* n : nodes()) n->build(ctx);
 }
 
@@ -218,10 +238,10 @@ void Dialog::Impl::destroy()
     for (auto it = all.rbegin(); it != all.rend(); ++it) (*it)->destroy();
     // Deletes the text nodes popped by the parts (nothing else calls it)
     SSS::SceneGraph::update();
-    if (ctx.ui) {
-        if (!hidden) ctx.window.removeRenderer(ctx.ui);
-        ctx.ui.reset();
-    }
+    if (ctx.ui && !hidden) removeRenderers();
+    ctx.ui_back.reset();
+    ctx.lines.reset();
+    ctx.ui.reset();
     ctx.L.reset();
 }
 
@@ -311,7 +331,7 @@ void Dialog::Impl::hide()
     SSS::GL::Context const context = ctx.window.setContext();
     // Not typed unseen
     if (ctx.typing) box.finishLine(ctx);
-    ctx.window.removeRenderer(ctx.ui);
+    removeRenderers();
     hidden = true;
 }
 
@@ -320,7 +340,7 @@ void Dialog::Impl::show()
     if (!player || !hidden) return;
     SSS::GL::Context const context = ctx.window.setContext();
     hidden = false;
-    ctx.window.addRenderer(ctx.ui);
+    addRenderers();
     // Auto mode & choices delays start over
     ctx.shown_at = Clock::now();
     skip_input = true;
@@ -429,6 +449,19 @@ void Dialog::updateAll()
         }
     }
 }
+
+void Dialog::reloadCharacterData()
+{
+    for (Impl* d : Impl::running) d->ctx.characters.reload();
+}
+
+void Dialog::setDebugMouths(bool on)
+{
+    if (on) reloadCharacterData();
+    dialog::debug_mouths = on;
+}
+
+bool Dialog::debugMouths() noexcept { return dialog::debug_mouths; }
 
 bool Dialog::isActive() const noexcept  { return _impl->player != nullptr; }
 bool Dialog::isHidden() const noexcept  { return _impl->hidden; }

@@ -8,15 +8,16 @@ void DialogBox::build(DialogContext& ctx)
 {
     Layout const& L = *ctx.L;
 
-    _box = SSS::GL::Plane::create(makePanel(int(L.box_w), int(L.box_h), 18.f, 3.f,
-        color(PANEL_RGB, 0.85f), color(0xc9bfe8), color(0xf2b632, 0.45f)));
+    // Plain, opaque: the speech bubble tails, of the same color, merge into it
+    _box = SSS::GL::Plane::create(makeSquircle(int(L.box_w), int(L.box_h),
+        BOX_CORNER * L.box_h, BOX_SQUIRCLE_N, BOX_RGB));
     _box->setScaling(glm::vec3(L.box_h));   // smaller side = height, width follows the ratio
     _box->setTranslation(glm::vec3(L.W / 2.f, L.box_top + L.box_h / 2.f, 0.f));
-    ctx.ui->addPlane(_box);
+    ctx.ui_back->addPlane(_box);       // under the speech bubble tails
 
     // Shown at the bottom of the dialogue box while the player can go forward
     // (hidden on menus); snaps down on each "next line" input.
-    _arrow = SSS::GL::Plane::create(makeContinueArrow(color(0xf2b632), color(PANEL_RGB)));
+    _arrow = SSS::GL::Plane::create(makeContinueArrow(color(0xe8a0b4), color(BOX_TEXT_RGB)));
     _arrow->setScaling(glm::vec3(20.f));    // texture's smaller side, drawn 1:1
     _arrow->setAlpha(0.f);
     _arrow_y = L.box_top + L.box_h - L.pad * 0.8f;
@@ -24,12 +25,12 @@ void DialogBox::build(DialogContext& ctx)
     ctx.ui->addPlane(_arrow);
 
     // Text nodes add their own plane to the UIRenderer on construction.
-    _name_fmt = textFormat(28);
+    _name_fmt = textFormat(28, BOX_TEXT_RGB);
     _name = ctx.makeText(_name_fmt);
 
     // Node_Text::setWrappingMin() only sets a minimum; the max wrap width
     // lives on the underlying TR::Area.
-    _text = ctx.makeText(textFormat(24));
+    _text = ctx.makeText(textFormat(24, BOX_TEXT_RGB));
     _area = _text->model->getTextArea();
     _area->setWrappingMaxWidth(int(L.box_w - 2.f * L.pad));
     place(_text, SSS::AnchorMode::TopLeft, { L.box_left + L.pad, L.box_top + L.pad + 40.f });
@@ -59,25 +60,16 @@ void DialogBox::present(DialogContext& ctx, renpy::Step const& step, bool animat
     _has_name = !step.speaker.empty() && step.kind != Kind::End;
     setVisible(_name, _enabled && _has_name);
     if (_has_name) {
-        SSS::TR::Format fmt = _name_fmt;
-        if (step.speakers.size() == 1 && step.speaker_color) fmt.text_color = trColor(*step.speaker_color);
-        _name->setText(step.speaker_markup, fmt);
+        // Each name in its character's color (dark without one)
+        _name->setText(step.speaker_markup, _name_fmt);
 
-        // Everyone on the same side: the name goes there, else in the middle
-        std::optional<renpy::Pos> common;
-        bool mixed = false;
-        for (auto const& sp : step.speakers) {
-            auto const* sprite = step.scene.find(sp.id);
-            renpy::Pos const p = sprite ? sprite->pos : renpy::Pos::Left;
-            if (common && *common != p) mixed = true;
-            common = p;
-        }
-        auto const side = mixed ? renpy::Pos::Center : common.value_or(renpy::Pos::Left);
+        // On the right of the box when the (first) speaker stands on the
+        // right, else on the left
+        auto const* sprite = step.scene.find(step.speakers.front().id);
+        bool const right = sprite && sprite->pos == renpy::Pos::Right;
         float const y = L.box_top + L.pad * 0.5f;
-        if (side == renpy::Pos::Right)
+        if (right)
             place(_name, SSS::AnchorMode::TopRight, { L.box_left + L.box_w - L.pad, y });
-        else if (side == renpy::Pos::Center)
-            place(_name, SSS::AnchorMode::CenterTop, { L.W / 2.f, y });
         else
             place(_name, SSS::AnchorMode::TopLeft, { L.box_left + L.pad, y });
     }

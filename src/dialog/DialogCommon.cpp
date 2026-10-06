@@ -2,6 +2,7 @@
 #include "lua_include.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -43,6 +44,27 @@ SSS::GL::Texture::Shared makePanel(int w, int h, float radius, float border,
     line.innerRadius = 0.6f;                // filled box -> outline of that half-thickness
 
     return SSS::GL::Texture::createSDF({ box, line }, w, h);
+}
+
+SSS::GL::Texture::Shared makeSquircle(int w, int h, float radius, float n, uint32_t rgb)
+{
+    radius = std::min({ radius, w / 2.f, h / 2.f });
+    std::vector<SSS::RGBA32> px(size_t(w) * h, rgba(rgb, 0));
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            // Pixel center, from the nearest corner's center (0 out of the corners)
+            float const dx = std::max(std::abs(x + 0.5f - w / 2.f) - (w / 2.f - radius), 0.f);
+            float const dy = std::max(std::abs(y + 0.5f - h / 2.f) - (h / 2.f - radius), 0.f);
+            // Superellipse "radius" of the pixel: its distance to the edge, close
+            // enough near it for a one pixel anti-aliasing
+            float const r = radius * std::pow(std::pow(dx / radius, n) + std::pow(dy / radius, n), 1.f / n);
+            float const a = std::clamp(radius - r + 0.5f, 0.f, 1.f);
+            if (a > 0.f) px[size_t(y) * w + x] = rgba(rgb, uint8_t(std::lround(a * 255.f)));
+        }
+    }
+    auto tex = SSS::GL::Texture::create();
+    tex->editRawPixels(px.data(), w, h);
+    return tex;
 }
 
 SSS::GL::Texture::Shared makeContinueArrow(glm::vec4 fill, glm::vec4 edge)
@@ -197,6 +219,24 @@ void ImagePlane::refresh()
     plane->setScaling(glm::vec3((mirror ? -s : s) * turn, s, s));
     plane->setRotation(glm::vec3(0.f, 0.f, tilt));
     plane->setTranslation(glm::vec3(foot.x, foot.y - height / 2.f, 0.f));
+}
+
+std::optional<glm::vec2> ImagePlane::toScreen(glm::vec2 p, float w) const
+{
+    int tw = 0, th = 0;
+    if (tex) tex->getCurrentDimensions(tw, th);
+    if (!visible || tw <= 0 || th <= 0 || height <= 0.f)
+        return std::nullopt;
+    // Same transform as refresh(): centered, scaled to the height (mirrored,
+    // narrowed while turning), then tilted around the center.
+    float const width = tw * height / th;
+    glm::mat4 m = glm::translate(glm::mat4(1.f), glm::vec3(foot.x, foot.y - height / 2.f, 0.f));
+    m = glm::rotate(m, glm::radians(tilt), glm::vec3(0.f, 0.f, 1.f));
+    m = glm::scale(m, glm::vec3((mirror ? -width : width) * turn, height, 1.f));
+    glm::vec2 const out(m * glm::vec4(p - 0.5f * w, 0.f, w));
+    if (w != 0.f) return out;
+    float const len = glm::length(out);
+    return len > 1e-4f ? out / len : glm::vec2(0.f);
 }
 
 // ── Text helpers ──────────────────────────────────────────────────────────

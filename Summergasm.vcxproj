@@ -30,6 +30,8 @@
     <ClCompile Include="src\dialog\DialogChoices.cpp" />
     <ClCompile Include="src\dialog\DialogControls.cpp" />
     <ClCompile Include="src\dialog\DialogLog.cpp" />
+    <ClCompile Include="src\dialog\DialogTails.cpp" />
+    <ClCompile Include="src\dialog\CharacterData.cpp" />
     <ClCompile Include="src\imgui\audio.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
@@ -49,6 +51,7 @@
     <ClInclude Include="inc\SignalManager.hpp" />
     <ClInclude Include="src\dialog\DialogCommon.hpp" />
     <ClInclude Include="src\dialog\DialogNodes.hpp" />
+    <ClInclude Include="src\dialog\CharacterData.hpp" />
     <ClInclude Include="inc\imgui.hpp" />
     <ClInclude Include="inc\includes.hpp" />
     <ClInclude Include="inc\lua_include.hpp" />
@@ -66,6 +69,9 @@
     <None Include="resources\lua\menu.lua" />
     <None Include="resources\lua\model_functions.lua" />
     <None Include="resources\dialogs\scene_vacances.rpy" />
+    <None Include="resources\characters\c.json" />
+    <None Include="resources\characters\l.json" />
+    <None Include="resources\characters\t.json" />
     <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>

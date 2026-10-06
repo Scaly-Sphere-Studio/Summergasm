@@ -1,12 +1,15 @@
 #pragma once
 // The parts of the dialog node, built by the Dialog in this order (= draw
-// order): characters, box, choices, controls, log.
+// order): characters, box, choices, controls, log. The speech bubble tails
+// are drawn by their own renderer, over all of them.
 #include "DialogCommon.hpp"
+
+#include <random>
 
 namespace dialog {
 
 // Sprites of the characters on screen. Characters who are not talking are
-// drawn in black & white; characters sharing a position line up (the ones
+// drawn in black & white (setting: grey_characters); characters sharing a position line up (the ones
 // behind shifted inward and scaled down). The ones on the right side face the
 // center (mirrored). A character whose place changes moves there, leaning.
 class DialogCharacters : public DialogNode {
@@ -16,11 +19,26 @@ public:
     void present(DialogContext& ctx, renpy::Step const& step, bool animate) override;
     void update(DialogContext& ctx, DialogInput& input) override;
 
+    // Mouth of a character on screen (see CharacterData), in UI pixels
+    struct Mouth {
+        std::string tag;
+        bool talking;
+        glm::vec2 pos;
+        glm::vec2 dir;          // normalized
+        glm::vec2 foot;         // the sprite's bottom center
+        ExpressionInfo info;
+    };
+    // The characters shown that have data, front ones last. None while
+    // hidden, nor for one turning around (its direction is meaningless).
+    std::vector<Mouth> mouths(DialogContext& ctx) const;
+
 protected:
     void _refreshVisibility() override;
 
 private:
     void _animate();
+    // Black & white for the ones not talking, if the setting says so
+    void _grey();
 
     struct Pose {
         glm::vec2 foot{ 0.f };
@@ -32,6 +50,8 @@ private:
     // moves, where it comes from.
     struct Slot {
         std::string tag;
+        std::string expression;
+        bool talking = false;
         Pose to;
         std::optional<Pose> from;
         Clock::time_point start;
@@ -41,8 +61,9 @@ private:
     std::vector<Slot> _slots;
 };
 
-// Dialogue box: speaker name, line revealed character per character (the
-// Area's Typewriter print mode) and the "continue" arrow.
+// Dialogue box, a creamy white squircle: speaker name in its color, line
+// revealed character per character (the Area's Typewriter print mode) and the
+// "continue" arrow.
 class DialogBox : public DialogNode {
 public:
     void build(DialogContext& ctx) override;
@@ -151,6 +172,49 @@ private:
     SSS::Node_Text* _title = nullptr;
     SSS::Node_Text* _node = nullptr;
     SSS::TR::Area::Shared _area;
+};
+
+// Speech bubble tails: from the mouth of each character speaking to the top
+// of the dialogue box. Straight, or broken (a zigzag, for angry lines); the
+// intensity pushes their base on the box away from the character. The
+// speaker's expression gives them, a say line may override them (see
+// CharacterData, renpy::Step::tail). They follow the sprites as they move.
+// Drawn by ctx.lines, over the sprites & the box but under the name and the
+// text: hidden while the log or the menu choices are shown, and when turned
+// off in the settings (dialog_tails). With debug_mouths, each mouth on screen is shown too: a
+// circle around it, and a line along its direction.
+class DialogTails : public DialogNode {
+public:
+    DialogTails(DialogCharacters const& characters, DialogBox const& box, DialogChoices const& choices)
+        : _characters(characters), _box(box), _choices(choices) {}
+
+    void build(DialogContext& ctx) override;
+    void destroy() override;
+    void present(DialogContext& ctx, renpy::Step const& step, bool animate) override;
+    void update(DialogContext& ctx, DialogInput& input) override;
+
+private:
+    // Lines drawn together (the debug circle & direction) and what they were built
+    // from: Polyline points can't change, they are rebuilt when that does.
+    struct Shape {
+        std::vector<float> key;
+        std::vector<SSS::GL::Polyline::Shared> lines;
+    };
+
+    DialogCharacters const& _characters;
+    DialogBox const& _box;
+    DialogChoices const& _choices;
+    std::unordered_map<std::string, Shape> _shapes;
+    std::vector<std::string> _order;    // of the shapes in ctx.lines
+    bool _say = false;
+    // The line's override of the speakers' tails
+    std::optional<TailStyle> _style;
+    std::optional<float> _intensity;
+    // The tails' random shape (base & zigzag), rolled again when the speakers change
+    std::vector<std::string> _speakers;
+    std::unordered_map<std::string, uint32_t> _seeds;
+    std::mt19937 _rng{ std::random_device{}() };
+    bool _debug_logged = false;
 };
 
 } // namespace dialog

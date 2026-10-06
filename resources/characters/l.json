@@ -1,0 +1,6 @@
+{
+    "name": "Léa",
+    "expressions": {
+        "neutral": { "mouth": [0.72, 0.33], "mouth_dir": [0.6, 0.8], "tail": "straight", "intensity": 0.0 }
+    }
+}

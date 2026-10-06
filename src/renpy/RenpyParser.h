@@ -11,6 +11,8 @@
 //   flip tag left|center|right   (turns around to the back of that side's line)
 //   "narration"            who "dialogue"       who attr "dialogue"
 //   who1 & who2 "dialogue" (SSS: several characters speaking at once)
+//   who "dialogue" (tail="straight"|"broken", intensity=0.8)
+//                          (SSS: speech bubble tail of the line, see Step::tail)
 //   menu:  "choice": <block>
 //   default var = value    $ var = value        $ who.name = "New name"
 //   $ var += 1             $ var -= 1           (values: "text", 12, True, False)
@@ -66,6 +68,7 @@ struct Background {
 struct Sprite {
     std::string tag;                // also the Character id, e.g. "lea"
     std::string image;              // resolved file path
+    std::string expression;         // image attributes, e.g. "happy" (empty: none given)
     Pos pos = Pos::Center;
 };
 
@@ -103,6 +106,8 @@ struct Statement {
     std::vector<std::string> others;// Say: the other speakers of `a & b "text"`
     std::optional<Pos> pos;         // Show `at ...` / Flip: destination
     std::optional<uint32_t> color;  // Scene expression "#hex"
+    std::optional<std::string> tail;// Say: `(tail="...")`
+    std::optional<float> intensity; // Say: `(intensity=...)`
     struct Choice { std::string text; size_t target; };
     std::vector<Choice> choices;    // Menu
     size_t target = 0;              // Jump/Goto (resolved index)
@@ -193,6 +198,10 @@ struct Step {
     std::string speaker_markup;         // their names together, SSS::TR markup
     std::string text;                   // SSS::TR markup, ready for parseString()
     std::vector<std::string> choices;   // SSS::TR markup, Menu only
+    // Speech bubble tail of the line, `who "text" (tail="broken", intensity=0.8)`.
+    // Unset: the speaker's defaults (see dialog::CharacterData).
+    std::optional<std::string> tail;
+    std::optional<float> tail_intensity;
     SceneState scene;
     // One-shot events run on the way to this step, in script order (after
     // the previous step). The scene is a state: compare it to the previous one.

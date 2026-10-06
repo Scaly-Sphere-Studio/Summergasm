@@ -33,6 +33,9 @@ struct GlobalData {
     std::string assets_folder;
     // Ren'Py scripts (.rpy, .txt) played by the dialog node, see Dialog.hpp
     std::string dialogs_folder;
+    // One <id>.json per Ren'Py character: mouth of each expression, for the
+    // dialog's speech bubble tails (see dialog/CharacterData.hpp)
+    std::string characters_folder;
     // Sounds (one-shots, can overlap) & musics (one at a time, crossfaded),
     // see the audio doc. The dialogs' `play` statements look in sounds_folder.
     std::string sounds_folder;
