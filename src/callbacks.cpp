@@ -38,6 +38,15 @@ void key_callback(GLFWwindow* ptr, int key, int scancode, int action, int mods)
                 window->blockInputs(key);
             }
         }   break;
+        case GLFW_KEY_F7: {
+            // Main window only: the panel is drawn there
+            if (window != g->window) break;
+            g->settings_display = !g->settings_display;
+            if (g->settings_display)
+                window->blockInputs(key);
+            else
+                window->unblockInputs();
+        }   break;
         }
     }
 }

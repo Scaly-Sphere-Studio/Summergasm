@@ -26,6 +26,8 @@ struct GlobalData {
     bool ui_display{ false };
     bool ui_use_separate_window{ false };
     bool console_display{ false };
+    // Player settings panel (F7)
+    bool settings_display{ false };
 
     std::string home_folder;
     std::string resources_folder;

@@ -36,7 +36,9 @@
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\window_objects.cpp" />
     <ClCompile Include="src\imgui\console.cpp" />
+    <ClCompile Include="src\imgui\settings_panel.cpp" />
     <ClCompile Include="src\GameState.cpp" />
+    <ClCompile Include="src\Settings.cpp" />
     <ClCompile Include="src\SignalManager.cpp" />
     <ClCompile Include="src\LuaConsoleData.cpp" />
     <ClCompile Include="src\mylua.cpp" />
@@ -48,6 +50,7 @@
   <ItemGroup>
     <ClInclude Include="inc\Dialog.hpp" />
     <ClInclude Include="inc\GameState.hpp" />
+    <ClInclude Include="inc\Settings.hpp" />
     <ClInclude Include="inc\SignalManager.hpp" />
     <ClInclude Include="src\dialog\DialogCommon.hpp" />
     <ClInclude Include="src\dialog\DialogNodes.hpp" />

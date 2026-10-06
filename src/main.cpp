@@ -1,6 +1,7 @@
 #include "Summergasm.hpp"
 #include "Dialog.hpp"
 #include "SignalManager.hpp"
+#include "Settings.hpp"
 
 GlobalData::GlobalData() : _lua(std::make_unique<sol::state>()) {}
 GlobalData::~GlobalData() = default;
@@ -59,10 +60,12 @@ int main(void) try
         g->lua_folder = g->resources_folder + "lua/";
         g->assets_folder = g->resources_folder + "assets/";
         g->dialogs_folder = g->resources_folder + "dialogs/";
+        g->characters_folder = g->resources_folder + "characters/";
         g->sounds_folder = g->resources_folder + "sounds/";
         g->musics_folder = g->resources_folder + "musics/";
         g->saves_folder = g->home_folder + "saves/";
         SSS::GL::Texture::setResourceFolder(g->assets_folder);
+        settings::load();
     }
 
     static_cast<void>(SSS::Audio::getDevices());
@@ -92,6 +95,8 @@ int main(void) try
         g->window->drawObjects();
         if (g->console_display)
             print_console();
+        if (g->settings_display)
+            print_settings();
         if (g->ui_display)
             print_imgui();
         g->window->printFrame();

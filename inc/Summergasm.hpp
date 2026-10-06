@@ -5,6 +5,8 @@
 // ImGui
 void print_console();
 void print_imgui();
+// Player settings panel (F7), see Settings.hpp
+void print_settings();
 
 // Callbacks
 

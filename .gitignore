@@ -58,3 +58,6 @@ dkms.conf
 
 # Saved games
 saves/
+
+# Player settings
+settings.ini

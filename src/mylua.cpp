@@ -1,6 +1,7 @@
 #include "mylua.hpp"
 #include "Dialog.hpp"
 #include "GameState.hpp"
+#include "Settings.hpp"
 #include "SignalManager.hpp"
 #include "renpy/RenpyParser.h"
 
@@ -462,6 +463,9 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
     { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
     { "dialog",             { "name",         "Play resources/dialogs/<name>[.rpy|.txt] (or a direct path) over the current scene, replacing the previous one. Returns the Dialog" } },
+    { "debug_mouths",       { "[on]",         "Show each character's mouth (circle) & direction (line) used by the speech bubble tails, toggles without argument. Reloads resources/characters/*.json" } },
+    { "dialog_tails",       { "[on]",         "Draw the speech bubble tails, toggles without argument. Saved in settings.ini" } },
+    { "grey_characters",    { "[on]",         "Draw the characters not talking in black & white, toggles without argument. Saved in settings.ini" } },
     { "game.save",          { "[name]",       "Save the game values (game.vars) in saves/<name>.json, default: save" } },
     { "game.load",          { "[name]",       "Load the game values of saves/<name>.json, default: save" } },
     { "game.reset",         { "",             "Erase every game value (game.vars)" } },
@@ -581,6 +585,18 @@ bool setup_lua()
     };
     lua["dialog"] = mylua_dialog;
     lua["help"] = mylua_help;
+    lua["debug_mouths"] = [](sol::optional<bool> on) {
+        Dialog::setDebugMouths(on.value_or(!Dialog::debugMouths()));
+        return Dialog::debugMouths();
+    };
+    lua["dialog_tails"] = [](sol::optional<bool> on) {
+        settings::setDialogTails(on.value_or(!settings::get().dialog_tails));
+        return settings::get().dialog_tails;
+    };
+    lua["grey_characters"] = [](sol::optional<bool> on) {
+        settings::setGreyCharacters(on.value_or(!settings::get().grey_characters));
+        return settings::get().grey_characters;
+    };
     lua["scenes"].get_or_create<sol::table>();
 
     lua["console_set_env"] = [](char const* scene_name) {
