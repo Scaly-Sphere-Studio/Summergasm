@@ -31,6 +31,8 @@ then
         plane.scaling = vec3.new(s, s, 1)
     end)
     scene_renderer:addPlane(sky)
+    -- The sky is its own light
+    scene_renderer:setLightingFactor(sky, 0)
 
     -- Background trail, scrolling behind the train
     local bg_z = -1500
@@ -90,6 +92,75 @@ then
     end
     scene_renderer:addScrollLayer(fg_tiles)
 
+    -- Lighting (sRGB colors, tune them in the inspector: Scene > scene_renderer)
+    scene_renderer.ambient = vec3.new(0.55, 0.55, 0.62)
+
+    -- Sun: far, high, in front of the scene
+    sun = PointLight.new()
+    sun.position = vec3.new(-1500, 1500, 1500)
+    sun.color = vec3.new(1, 0.92, 0.8)
+    sun.intensity = 1.0
+    sun.radius = 9000
+    sun.falloff = 0.5
+    scene_renderer:addLight(sun)
+
+    -- Close colored light by the train, with a wide terminator ramp
+    lamp = PointLight.new()
+    lamp.position = vec3.new(250, 50, 120)
+    lamp.color = vec3.new(1, 0.8, 0.5)
+    lamp.intensity = 1.5
+    lamp.radius = 900
+    lamp.falloff = 2
+    lamp.terminator_color = vec3.new(1, 0.3, 0.2)
+    lamp.terminator_width = 0.4
+    lamp.shadow_color = vec3.new(0.1, 0.05, 0.25)
+    scene_renderer:addLight(lamp)
+
+    local function add_light(position, color, intensity, radius, falloff)
+        local light = PointLight.new()
+        light.position = position
+        light.color = color
+        light.intensity = intensity
+        light.radius = radius
+        light.falloff = falloff
+        scene_renderer:addLight(light)
+        return light
+    end
+
+    -- Magenta glow over the background trail
+    trail_light = add_light(vec3.new(600, 150, -1300), vec3.new(1, 0.25, 0.8), 2.5, 1600, 1.5)
+
+    -- Cyan light left of the train, teal terminator
+    side_light = add_light(vec3.new(-450, 150, 150), vec3.new(0.3, 0.9, 1), 1.8, 700, 2)
+    side_light.terminator_color = vec3.new(0, 0.5, 0.45)
+    side_light.terminator_width = 0.3
+
+    -- Lights riding along the foreground dunes, one per tile (see is_running).
+    -- In front of the dunes (dz > 0) they light them directly; just behind
+    -- them (dz < 0) the dunes are backlit, showing the terminator & shadow
+    -- colors, and the train behind gets their color.
+    -- x & y are offsets from the tile's center, in tile heights.
+    local dune_light_setups = {
+        { color = vec3.new(1, 0.35, 0.15), x = -0.3, y = 0.25, dz = 80 },
+        { color = vec3.new(0.35, 0.55, 1), x = 0.2, y = 0.1, dz = -40,
+          terminator = vec3.new(0.7, 0.2, 1), shadow = vec3.new(0.05, 0.05, 0.3) },
+        { color = vec3.new(0.4, 1, 0.35), x = 0, y = 0.35, dz = 60 },
+        { color = vec3.new(1, 0.8, 0.2), x = -0.15, y = 0.05, dz = -40,
+          terminator = vec3.new(1, 0.25, 0.1), shadow = vec3.new(0.3, 0.05, 0.05) },
+    }
+    dune_lights = {}
+    for i, plane in ipairs(fg_tiles) do
+        local setup = dune_light_setups[(i - 1) % #dune_light_setups + 1]
+        local light = add_light(vec3.new(0, 0, fg_z + setup.dz), setup.color, 2, 500, 1.5)
+        if (setup.terminator)
+        then
+            light.terminator_color = setup.terminator
+            light.terminator_width = 0.5
+            light.shadow_color = setup.shadow
+        end
+        dune_lights[#dune_lights + 1] = { plane = plane, light = light, x = setup.x, y = setup.y, dz = setup.dz }
+    end
+
     window:addRenderer(scene_renderer)
 
     print(filename, "init end")
@@ -110,6 +181,13 @@ then
 
     for _, plane in ipairs(train_parts) do
         drag_plane_fixed(plane)
+    end
+
+    -- Dune lights follow their tile (scrolling & wrapping with it)
+    for _, d in ipairs(dune_lights) do
+        local t = d.plane.translation
+        local h = d.plane.scaling.y
+        d.light.position = vec3.new(t.x + d.x * h, t.y + d.y * h, t.z + d.dz)
     end
 
     if (window:keyIsPressed(GL.KEY_SPACE))

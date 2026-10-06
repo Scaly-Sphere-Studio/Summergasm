@@ -47,6 +47,10 @@ static void update_watermark()
 
 int main(void) try
 {
+    // glad is linked statically: let SSS::GL also load this module's OpenGL
+    // functions when it creates the context (SceneRenderer calls OpenGL)
+    SSS_GL_EXPOSE_OPENGL;
+
     //Log::louden(true);
     //Log::GL::Context::silence(true);
     //Log::GL::Callbacks::louden(true);
@@ -65,6 +69,7 @@ int main(void) try
         g->musics_folder = g->resources_folder + "musics/";
         g->saves_folder = g->home_folder + "saves/";
         SSS::GL::Texture::setResourceFolder(g->assets_folder);
+        SceneRenderer::shaders_folder = g->resources_folder + "shaders/";
         settings::load();
     }
 

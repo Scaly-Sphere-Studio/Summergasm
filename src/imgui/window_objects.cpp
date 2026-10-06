@@ -417,6 +417,38 @@ static void print_object(SceneRenderer& renderer)
         renderer.toggle();
     InputFloatWasEdited("Scroll speed", &renderer.scroll_speed, 0.01f);
     ImGui::Checkbox("Depth sort", &renderer.depth_sort);
+
+    ImGui::SeparatorText("Lighting");
+    ImGui::Checkbox("Lighting", &renderer.lighting);
+    ImGui::ColorEdit3("Ambient", &renderer.ambient.x, ImGuiColorEditFlags_Float);
+    ImGui::Checkbox("Normal maps: green down (DirectX)", &renderer.normal_map_y_down);
+    if (ImGui::Button("Add light"))
+        renderer.addLight(PointLight::create());
+    PointLight::Shared to_remove;
+    for (size_t i = 0; i < renderer.lights.size(); ++i) {
+        auto const& light = renderer.lights[i];
+        if (!light)
+            continue;
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::TreeNode("Light", "Light %zu", i)) {
+            ImGui::Checkbox("Enabled", &light->enabled);
+            ImGui::DragFloat3("Position", &light->position.x, 5.f);
+            ImGui::ColorEdit3("Color", &light->color.x, ImGuiColorEditFlags_Float);
+            ImGui::DragFloat("Intensity", &light->intensity, 0.01f, 0.f, 100.f);
+            ImGui::DragFloat("Radius", &light->radius, 5.f, 0.f, 100000.f);
+            ImGui::DragFloat("Falloff", &light->falloff, 0.01f, 0.f, 16.f);
+            ImGui::ColorEdit3("Terminator color", &light->terminator_color.x, ImGuiColorEditFlags_Float);
+            ImGui::DragFloat("Terminator width", &light->terminator_width, 0.005f, 0.f, 2.f);
+            ImGui::ColorEdit3("Shadow color", &light->shadow_color.x, ImGuiColorEditFlags_Float);
+            if (ImGui::Button("Remove"))
+                to_remove = light;
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (to_remove)
+        renderer.removeLight(to_remove);
+
     print_planes(renderer);
 }
 
@@ -520,6 +552,9 @@ static void print_env(char const* name, sol::environment const& env)
         if (value.get_type() != sol::type::userdata || key.get_type() != sol::type::string)
             continue;
         if (key.as<std::string>().find("sol.") == 0)
+            continue;
+        // e.g. PointLight, vec3: shown by their owner, if any
+        if (!value.is<Base>())
             continue;
         objects[value.as<Base>().getCreationTime()] = value;
     }

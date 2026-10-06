@@ -645,6 +645,46 @@ bool setup_lua()
     scene_renderer["pause"] = &SceneRenderer::pause;
     scene_renderer["play"] = &SceneRenderer::play;
     scene_renderer["toggle"] = &SceneRenderer::toggle;
+    scene_renderer["lighting"] = &SceneRenderer::lighting;
+    scene_renderer["ambient"] = &SceneRenderer::ambient;
+    scene_renderer["lights"] = &SceneRenderer::lights;
+    scene_renderer["addLight"] = &SceneRenderer::addLight;
+    scene_renderer["removeLight"] = &SceneRenderer::removeLight;
+    scene_renderer["normal_map_y_down"] = &SceneRenderer::normal_map_y_down;
+    // setNormalMap(plane, texture | path in the assets folder | nil)
+    scene_renderer["setNormalMap"] = sol::overload(
+        [](SceneRenderer& ren, GL::Plane* plane, GL::Texture* texture) {
+            ren.setNormalMap(GL::Plane::get(plane), texture ? GL::Texture::get(texture) : nullptr);
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, std::string const& path) {
+            ren.setNormalMap(GL::Plane::get(plane), GL::Texture::create(std::filesystem::path{ path }));
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, sol::lua_nil_t) {
+            ren.setNormalMap(GL::Plane::get(plane), nullptr);
+        }
+    );
+    scene_renderer["getNormalMap"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getNormalMap(GL::Plane::get(plane));
+    };
+    scene_renderer["setLightingFactor"] = [](SceneRenderer& ren, GL::Plane* plane, float factor) {
+        ren.setLightingFactor(GL::Plane::get(plane), factor);
+    };
+    scene_renderer["getLightingFactor"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getLightingFactor(GL::Plane::get(plane));
+    };
+
+    // See PointLight in SceneRenderer.hpp
+    auto point_light = lua.new_usertype<PointLight>("PointLight",
+        sol::factories([]() { return PointLight::create(); }));
+    point_light["position"] = &PointLight::position;
+    point_light["color"] = &PointLight::color;
+    point_light["intensity"] = &PointLight::intensity;
+    point_light["radius"] = &PointLight::radius;
+    point_light["falloff"] = &PointLight::falloff;
+    point_light["terminator_color"] = &PointLight::terminator_color;
+    point_light["terminator_width"] = &PointLight::terminator_width;
+    point_light["shadow_color"] = &PointLight::shadow_color;
+    point_light["enabled"] = &PointLight::enabled;
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once
