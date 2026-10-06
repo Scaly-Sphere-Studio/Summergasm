@@ -5,6 +5,7 @@
 #include "SignalManager.hpp"
 #include "renpy/RenpyParser.h"
 
+#include <chrono>
 #include <cmath>
 
 using namespace SSS;
@@ -67,6 +68,8 @@ Scene::Scene(std::string const& filename_) try
         throw_exc(CONTEXT_MSG("Couldn't load file", err.what()));
     }
     script = readFile(path);
+    std::error_code ec;
+    watched_time = std::filesystem::last_write_time(path, ec);
     size_t const n = filename.find('.');
     std::string const name = n < filename.size() ? filename.substr(0, n) : filename;
     g->lua()["scenes"][name] = *env;
@@ -339,6 +342,75 @@ bool mylua_unload_scene(std::string const& scene_name)
     return false;
 }
 
+// The file is compiled first: a script that doesn't compile leaves the running
+// scene untouched. The scene keeps its place in the loading order (so the
+// current scene stays current), and the console stays in its env.
+bool mylua_reload_scene(std::string const& scene_name)
+{
+    // Empty name: reload the current (last loaded) scene
+    if (scene_name.empty()) {
+        if (scenes_order.empty()) {
+            LOG_FUNC_WRN("No scene is running");
+            return true;
+        }
+        return mylua_reload_scene(scenes_order.back());
+    }
+    std::string const script_name = complete_script_name(scene_name);
+    if (g->lua_scenes.count(script_name) == 0) {
+        LOG_FUNC_CTX_WRN("Given script wasn't registered", script_name);
+        return true;
+    }
+    if (defer_request([script_name]() { mylua_reload_scene(script_name); }))
+        return false;
+    auto& scene = g->lua_scenes[script_name];
+    if (!scene) {
+        LOG_FUNC_CTX_WRN("Given scene was not running", script_name);
+        return true;
+    }
+    sol::load_result const compiled = g->lua().load_file(scene->getPath());
+    if (!compiled.valid()) {
+        sol::error const err = compiled;
+        LOG_CTX_ERR(script_name, std::string("Not reloaded, the script doesn't compile:\n") + err.what());
+        return true;
+    }
+    bool const console_in_scene = mylua_console_env == &scene->getEnv();
+    size_t const order = std::find(scenes_order.begin(), scenes_order.end(), script_name) - scenes_order.begin();
+    scene.reset();
+    scene = std::make_unique<Scene>(script_name);
+    std::erase(scenes_order, script_name);
+    scenes_order.insert(scenes_order.begin() + std::min(order, scenes_order.size()), script_name);
+    if (console_in_scene)
+        mylua_console_env = &scene->getEnv();
+    LOG_CTX_MSG("Scene reloaded", script_name);
+    return false;
+}
+
+// Toggled by auto_reload([on])
+static bool watch_scenes = true;
+
+void mylua_watch_scenes()
+{
+    static auto next_check = std::chrono::steady_clock::now();
+    auto const now = std::chrono::steady_clock::now();
+    if (!watch_scenes || scenes_order.empty() || now < next_check)
+        return;
+    next_check = now + std::chrono::seconds(1);
+    std::string const current = scenes_order.back();
+    Scene& scene = *g->lua_scenes.at(current);
+    std::error_code ec;
+    auto const time = std::filesystem::last_write_time(scene.getPath(), ec);
+    if (ec || time == scene.watched_time)
+        return;
+    // Once per change: a script that doesn't compile waits for the next save
+    scene.watched_time = time;
+    try {
+        mylua_reload_scene(current);
+    }
+    catch (std::exception const& e) {
+        LOG_FUNC_ERR(e.what());
+    }
+}
+
 // Unloads every scene but the menu, and loads the menu if needed
 bool mylua_return_to_menu()
 {
@@ -460,7 +532,9 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "file_script",        { "path",       "Run resources/lua/<path>.lua once" } },
     { "load_scene",         { "scene_name",   "Load & run a scene, unloads the menu (alias: ls <scene>)" } },
     { "unload_scene",       { "[scene_name]", "Unload a scene, default: current one (alias: us [scene])" } },
-    { "list_scenes",        { "",             "List scenes & which are running (alias: ls)" } },
+    { "reload_scene",       { "[scene_name]", "Reload a scene if its script compiles, default: current one (alias: rs [scene])" } },
+    { "auto_reload",        { "[on]",         "Reload the current scene when its file changes (if it compiles), toggles without argument. On by default" } },
+    { "list_scenes",       { "",             "List scenes & which are running (alias: ls)" } },
     { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
     { "dialog",             { "name",         "Play resources/dialogs/<name>[.rpy|.txt] (or a direct path) over the current scene, replacing the previous one. Returns the Dialog" } },
     { "debug_mouths",       { "[on]",         "Show each character's mouth (circle) & direction (line) used by the speech bubble tails, toggles without argument. Reloads resources/characters/*.json" } },
@@ -557,6 +631,13 @@ bool setup_lua()
     };
     lua["unload_scene"] = [](sol::optional<std::string> scene_name) {
         return !mylua_unload_scene(scene_name.value_or(""));
+    };
+    lua["reload_scene"] = [](sol::optional<std::string> scene_name) {
+        return !mylua_reload_scene(scene_name.value_or(""));
+    };
+    lua["auto_reload"] = [](sol::optional<bool> on) {
+        watch_scenes = on.value_or(!watch_scenes);
+        return watch_scenes;
     };
     lua["list_scenes"] = mylua_list_scenes;
     lua["menu"] = []() {
@@ -672,6 +753,21 @@ bool setup_lua()
     scene_renderer["getLightingFactor"] = [](SceneRenderer& ren, GL::Plane* plane) {
         return ren.getLightingFactor(GL::Plane::get(plane));
     };
+    scene_renderer["shadows"] = &SceneRenderer::shadows;
+    scene_renderer["shadow_map_size"] = &SceneRenderer::shadow_map_size;
+    scene_renderer["shadow_fit_margin"] = &SceneRenderer::shadow_fit_margin;
+    scene_renderer["setCastShadow"] = [](SceneRenderer& ren, GL::Plane* plane, bool cast) {
+        ren.setCastShadow(GL::Plane::get(plane), cast);
+    };
+    scene_renderer["getCastShadow"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getCastShadow(GL::Plane::get(plane));
+    };
+    scene_renderer["setShadowTransmission"] = [](SceneRenderer& ren, GL::Plane* plane, float transmission) {
+        ren.setShadowTransmission(GL::Plane::get(plane), transmission);
+    };
+    scene_renderer["getShadowTransmission"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getShadowTransmission(GL::Plane::get(plane));
+    };
 
     // See PointLight in SceneRenderer.hpp
     auto point_light = lua.new_usertype<PointLight>("PointLight",
@@ -685,6 +781,19 @@ bool setup_lua()
     point_light["terminator_width"] = &PointLight::terminator_width;
     point_light["shadow_color"] = &PointLight::shadow_color;
     point_light["enabled"] = &PointLight::enabled;
+    // follow = plane | nil, see PointLight::follow
+    point_light["follow"] = sol::property(
+        [](PointLight& light) { return std::dynamic_pointer_cast<GL::Plane>(light.follow.lock()); },
+        [](PointLight& light, sol::object plane) {
+            light.follow = plane.is<GL::Plane*>() ? GL::Plane::get(plane.as<GL::Plane*>()) : nullptr;
+        }
+    );
+    point_light["follow_offset"] = &PointLight::follow_offset;
+    point_light["cast_shadows"] = &PointLight::cast_shadows;
+    point_light["shadow_direction"] = &PointLight::shadow_direction;
+    point_light["shadow_fov"] = &PointLight::shadow_fov;
+    point_light["shadow_bias"] = &PointLight::shadow_bias;
+    point_light["shadow_softness"] = &PointLight::shadow_softness;
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once

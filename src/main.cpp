@@ -8,6 +8,13 @@ GlobalData::~GlobalData() = default;
 
 std::unique_ptr<GlobalData> g = std::make_unique<GlobalData>();
 
+// Laptops with a dedicated GPU: ask the NVIDIA Optimus & AMD switchable
+// graphics drivers for it, instead of the integrated one
+extern "C" {
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 void free_imgui_objects();
 
 void exitSummergasm(int status)
@@ -90,6 +97,7 @@ int main(void) try
         // Back to the menu (scenes are switched outside of GLFW callbacks), or quit from it
         if (std::exchange(g->escape_pressed, false) && !mylua_on_escape())
             glfwSetWindowShouldClose(g->window->getGLFWwindow(), GLFW_TRUE);
+        mylua_watch_scenes();
         mylua_run_active_scenes();
         // Started by the scenes, before scroll_y is reset (scrolls their log)
         Dialog::updateAll();

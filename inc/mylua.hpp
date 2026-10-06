@@ -16,6 +16,10 @@ public:
 
 	bool run();
 	auto& getEnv() const noexcept { return *env; };
+	auto const& getPath() const noexcept { return path; };
+
+	// Last write time of the file seen by mylua_watch_scenes()
+	std::filesystem::file_time_type watched_time;
 private:
 	std::unique_ptr<sol::environment> env;
 	std::string const path;
@@ -60,6 +64,9 @@ bool mylua_file_script(std::string const& path);
 bool mylua_run_active_scenes();
 bool mylua_load_scene(std::string const& scene_name);
 bool mylua_unload_scene(std::string const& scene_name);
+bool mylua_reload_scene(std::string const& scene_name);
+// Reloads the current scene when its file changed (checked once per second)
+void mylua_watch_scenes();
 bool mylua_return_to_menu();
 bool mylua_on_escape();
 // Destroys the node of dialog(name), before the window is closed
