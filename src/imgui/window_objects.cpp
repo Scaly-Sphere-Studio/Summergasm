@@ -422,6 +422,9 @@ static void print_object(SceneRenderer& renderer)
     ImGui::Checkbox("Lighting", &renderer.lighting);
     ImGui::ColorEdit3("Ambient", &renderer.ambient.x, ImGuiColorEditFlags_Float);
     ImGui::Checkbox("Normal maps: green down (DirectX)", &renderer.normal_map_y_down);
+    ImGui::Checkbox("Shadows", &renderer.shadows);
+    ImGui::InputInt("Shadow map size", &renderer.shadow_map_size, 256, 1024);
+    ImGui::DragFloat("Shadow fit margin", &renderer.shadow_fit_margin, 0.01f, 0.f, 2.f);
     if (ImGui::Button("Add light"))
         renderer.addLight(PointLight::create());
     PointLight::Shared to_remove;
@@ -440,6 +443,13 @@ static void print_object(SceneRenderer& renderer)
             ImGui::ColorEdit3("Terminator color", &light->terminator_color.x, ImGuiColorEditFlags_Float);
             ImGui::DragFloat("Terminator width", &light->terminator_width, 0.005f, 0.f, 2.f);
             ImGui::ColorEdit3("Shadow color", &light->shadow_color.x, ImGuiColorEditFlags_Float);
+            ImGui::Checkbox("Cast shadows", &light->cast_shadows);
+            if (light->cast_shadows) {
+                ImGui::DragFloat3("Shadow direction", &light->shadow_direction.x, 0.01f);
+                ImGui::DragFloat("Shadow FOV", &light->shadow_fov, 0.5f, 1.f, 170.f);
+                ImGui::DragFloat("Shadow bias", &light->shadow_bias, 0.01f, 0.f, 50.f);
+                ImGui::DragFloat("Shadow softness", &light->shadow_softness, 0.05f, 0.f, 20.f);
+            }
             if (ImGui::Button("Remove"))
                 to_remove = light;
             ImGui::TreePop();

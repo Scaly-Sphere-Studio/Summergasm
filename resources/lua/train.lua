@@ -33,6 +33,7 @@ then
     scene_renderer:addPlane(sky)
     -- The sky is its own light
     scene_renderer:setLightingFactor(sky, 0)
+    scene_renderer:setCastShadow(sky, false)
 
     -- Background trail, scrolling behind the train
     local bg_z = -1500
@@ -45,10 +46,9 @@ then
     }
     for _, plane in ipairs(bg_tiles) do
         plane.translation = vec3.new(0, 0, bg_z)
-        -- Called on every texture content update (several times while
-        -- loading): set absolute values, not relative scale()/translate()
-        plane:setTextureCallback(function(plane)
-            local w, h = plane.texture:getDimensions()
+        -- Not in setTextureCallback: GL resets the scaling to the image size
+        -- once loaded, after the callback
+        scale_when_loaded(plane, function(plane, w, h)
             local s = h * depth_scale(D, bg_z)
             plane.scaling = vec3.new(s, s, 1)
             local t = plane.translation
@@ -56,6 +56,29 @@ then
         end)
     end
     scene_renderer:addScrollLayer(bg_tiles)
+
+    -- Dune layers between the background trail and the train, catching the
+    -- sun's shadows. scale: on screen, relative to the image size;
+    -- bottom: on screen, in pixels from the window's center
+    local function add_dune_layer(names, z, scale, bottom)
+        local tiles = {}
+        for _, name in ipairs(names) do
+            local plane = GL.Plane.new("train/train trail_beach_" .. name .. ".png")
+            plane.translation = vec3.new(0, 0, z)
+            scale_when_loaded(plane, function(plane, w, h)
+                local k = depth_scale(D, z)
+                local s = h * scale
+                plane.scaling = vec3.new(s * k, s * k, 1)
+                local t = plane.translation
+                plane.translation = vec3.new(t.x, (bottom + s / 2) * k, z)
+            end)
+            tiles[#tiles + 1] = plane
+        end
+        scene_renderer:addScrollLayer(tiles)
+        return tiles
+    end
+    mid_far_tiles = add_dune_layer({ "07", "17", "07", "16" }, -1000, 0.6, -win_h / 2)
+    mid_near_tiles = add_dune_layer({ "15", "18", "17", "16", "15", "17" }, -500, 0.42, -win_h / 2 + 80)
 
     -- Train parts, from back to front, each at its own depth
     wheels = GL.Plane.new("train/train_result_4.png")
@@ -65,7 +88,7 @@ then
     train_parts = { wheels, wheel_protection, motor, wagon  }
     for i, plane in ipairs(train_parts) do
         plane.hitbox = GL.PlaneHitbox.Alpha
-        plane.translation = vec3.new(0, 0, i - 1)
+        plane.translation = vec3.new(0, 0, (i - 1)*20)
         scale_when_loaded(plane, vec3.new(400, 400, 400))
         scene_renderer:addPlane(plane)
     end
@@ -95,14 +118,28 @@ then
     -- Lighting (sRGB colors, tune them in the inspector: Scene > scene_renderer)
     scene_renderer.ambient = vec3.new(0.55, 0.55, 0.62)
 
-    -- Sun: far, high, in front of the scene
+    -- Sun: slightly higher than the train, between it and the dunes behind.
+    -- Planes face the camera: straight from above, each dune's shadow would
+    -- fall behind itself. Coming from the left, the shadows slide right,
+    -- into the gaps between the dunes behind and past the fence posts.
+    -- The train, in front of the sun, is backlit: warm terminator rim.
     sun = PointLight.new()
-    sun.position = vec3.new(-1500, 1500, 1500)
+    sun.position = vec3.new(0, 100, 800)
     sun.color = vec3.new(1, 0.92, 0.8)
-    sun.intensity = 1.0
+    sun.intensity = 1.5
     sun.radius = 9000
     sun.falloff = 0.5
+    sun.terminator_color = vec3.new(1, 0.45, 0.2)
+    sun.terminator_width = 0.35
+    -- Shadows toward the dunes behind, filled with a deep blue
+    sun.cast_shadows = true
+    sun.shadow_direction = vec3.new(1400, -500, -1200)
+    sun.shadow_fov = 140
+    sun.shadow_bias = 1
+    sun.shadow_softness = 1.5
+    sun.shadow_color = vec3.new(0.12, 0.1, 0.3)
     scene_renderer:addLight(sun)
+    scene_renderer.shadow_map_size = 2048
 
     -- Close colored light by the train, with a wide terminator ramp
     lamp = PointLight.new()
@@ -114,6 +151,10 @@ then
     lamp.terminator_color = vec3.new(1, 0.3, 0.2)
     lamp.terminator_width = 0.4
     lamp.shadow_color = vec3.new(0.1, 0.05, 0.25)
+    -- Train parts are 1 unit apart: bias below that
+    lamp.cast_shadows = true
+    lamp.shadow_fov = 140
+    lamp.shadow_bias = 0.3
     scene_renderer:addLight(lamp)
 
     local function add_light(position, color, intensity, radius, falloff)
@@ -134,6 +175,13 @@ then
     side_light = add_light(vec3.new(-450, 150, 150), vec3.new(0.3, 0.9, 1), 1.8, 700, 2)
     side_light.terminator_color = vec3.new(0, 0.5, 0.45)
     side_light.terminator_width = 0.3
+    side_light.cast_shadows = true
+    side_light.shadow_fov = 140
+    side_light.shadow_bias = 0.3
+
+    -- Colored shadows: planes letting light through, tinted by their texels
+    -- (0 = opaque, 1 = colored glass), e.g.
+    -- scene_renderer:setShadowTransmission(some_glass_plane, 0.8)
 
     -- Lights riding along the foreground dunes, one per tile (see is_running).
     -- In front of the dunes (dz > 0) they light them directly; just behind
@@ -152,6 +200,8 @@ then
     for i, plane in ipairs(fg_tiles) do
         local setup = dune_light_setups[(i - 1) % #dune_light_setups + 1]
         local light = add_light(vec3.new(0, 0, fg_z + setup.dz), setup.color, 2, 500, 1.5)
+        -- Moved with the tile by the renderer, after scrolling (no lag)
+        light.follow = plane
         if (setup.terminator)
         then
             light.terminator_color = setup.terminator
@@ -183,11 +233,10 @@ then
         drag_plane_fixed(plane)
     end
 
-    -- Dune lights follow their tile (scrolling & wrapping with it)
+    -- Dune lights' offsets from their tile, in tile heights (known once loaded)
     for _, d in ipairs(dune_lights) do
-        local t = d.plane.translation
         local h = d.plane.scaling.y
-        d.light.position = vec3.new(t.x + d.x * h, t.y + d.y * h, t.z + d.dz)
+        d.light.follow_offset = vec3.new(d.x * h, d.y * h, d.dz)
     end
 
     if (window:keyIsPressed(GL.KEY_SPACE))
