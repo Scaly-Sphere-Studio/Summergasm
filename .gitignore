@@ -61,3 +61,5 @@ saves/
 
 # Player settings
 settings.ini
+
+**/__pycache__
