@@ -228,6 +228,8 @@ SceneRenderer::~SceneRenderer()
         glDeleteTextures(1, &_shadow_color);
     if (_shadow_white != 0)
         glDeleteTextures(1, &_shadow_white);
+    if (_shadow_depth_sampler != 0)
+        glDeleteSamplers(1, &_shadow_depth_sampler);
 }
 
 bool SceneRenderer::_isDrawn(std::shared_ptr<SSS::GL::PlaneBase> const& plane)
@@ -292,7 +294,7 @@ bool SceneRenderer::_computeViewSlab(std::array<glm::vec3, 8>& corners) const
 // visible shadow is cut by the frustum's edges. Otherwise, it's the whole
 // cone toward shadow_direction.
 glm::mat4 SceneRenderer::_shadowViewProjection(PointLight const& light, bool has_slab,
-    std::array<glm::vec3, 8> const& slab) const
+    std::array<glm::vec3, 8> const& slab, glm::vec4& frustum) const
 {
     auto const look = [&](glm::vec3 dir) {
         if (glm::length(dir) < 1e-4f)
@@ -344,8 +346,13 @@ glm::mat4 SceneRenderer::_shadowViewProjection(PointLight const& light, bool has
             z_far = std::min(z_far, depth_max * 1.05f);
         }
     }
-    if (tan_max.x <= tan_min.x || tan_max.y <= tan_min.y || z_far <= z_near)
+    if (tan_max.x <= tan_min.x || tan_max.y <= tan_min.y || z_far <= z_near) {
+        frustum = glm::vec4(1.f, 2.f, 0.f, 0.f);
         return glm::perspective(glm::radians(1.f), 1.f, 1.f, 2.f) * view;
+    }
+    // A world width w at depth d spans w / (d * (tan_max - tan_min)) in uv
+    glm::vec2 const light_uv = std::max(light.size, 0.f) / (tan_max - tan_min);
+    frustum = glm::vec4(z_near, z_far, light_uv);
     return glm::frustum(tan_min.x * z_near, tan_max.x * z_near,
         tan_min.y * z_near, tan_max.y * z_near, z_near, z_far) * view;
 }
@@ -408,10 +415,12 @@ void SceneRenderer::_cullLights(glm::ivec4 const& viewport)
                 std::max(light->terminator_width, 0.f)),
             glm::vec4(to_linear(light->shadow_color, light->intensity), 0.f),
             glm::mat4(1.f),
-            glm::vec4(-1.f, 0.f, 0.f, 0.f)
+            glm::vec4(-1.f, 0.f, 0.f, 0.f),
+            glm::vec4(0.f)
         };
         if (shadows && light->cast_shadows && shadow_layers < max_shadow_lights) {
-            gpu_light.shadow_vp = _shadowViewProjection(*light, has_slab, slab);
+            gpu_light.shadow_vp = _shadowViewProjection(*light, has_slab, slab,
+                gpu_light.shadow_frustum);
             gpu_light.shadow_params = glm::vec4(static_cast<float>(shadow_layers++),
                 std::max(light->shadow_bias, 0.f), std::max(light->shadow_softness, 0.f), 0.f);
         }
@@ -610,9 +619,16 @@ void SceneRenderer::_allocateShadowMaps(int layers)
         static constexpr GLfloat white[4] = { 1.f, 1.f, 1.f, 1.f };
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA16F, 1, 1, 1, 0, GL_RGBA, GL_FLOAT, white);
         set_shadow_map_params(false);
+        // Same depth layers, read as depths instead of compared
+        glGenSamplers(1, &_shadow_depth_sampler);
+        glSamplerParameteri(_shadow_depth_sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glSamplerParameteri(_shadow_depth_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glSamplerParameteri(_shadow_depth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(_shadow_depth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(_shadow_depth_sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
     }
 
-    int const size = std::clamp(shadow_map_size, 64, 8192);
+    int const size =std::clamp(shadow_map_size, 64, 8192);
     if (size != _shadow_size) {
         _shadow_size = size;
         _shadow_layers = 0;
@@ -754,10 +770,15 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
     glBindTexture(GL_TEXTURE_2D_ARRAY, _translucent_casters ? _shadow_color : _shadow_white);
     glUniform1i(shader.getUniformLocation("u_ShadowDepth"), shadow_unit);
     glUniform1i(shader.getUniformLocation("u_ShadowColor"), shadow_unit + 1);
+    glActiveTexture(GL_TEXTURE0 + shadow_unit + 2);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadow_depth);
+    glBindSampler(shadow_unit + 2, _shadow_depth_sampler);
+    glUniform1i(shader.getUniformLocation("u_ShadowDepthRaw"), shadow_unit + 2);
 
     if (clear_depth_buffer)
         glClear(GL_DEPTH_BUFFER_BIT);
     _drawBatches(shader);
+    glBindSampler(shadow_unit + 2, 0);
     _vao.unbind();
     glActiveTexture(GL_TEXTURE0);
 }

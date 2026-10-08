@@ -6,6 +6,11 @@
 // Shadows fade out over this part of the shadow map's sides (in uv), instead
 // of stopping hard at the edge of the light's cone
 #define SHADOW_EDGE_FADE 0.15
+// Soft shadows (PCSS): taps of the blocker search & of the filter, and the
+// largest radius of both, in shadow map texels
+#define BLOCKER_TAPS 20
+#define PCF_TAPS 24
+#define PCSS_MAX_RADIUS 32.0
 
 out vec4 FragColor;
 
@@ -37,6 +42,7 @@ struct Light {
     vec4 shadow;
     mat4 shadow_vp;         // light's view projection
     vec4 shadow_params;     // layer (-1: none), bias, softness (texels)
+    vec4 shadow_frustum;    // z_near, z_far, light size in uv * depth (x, y)
 };
 layout(std430, binding = 2) readonly buffer Lights { Light lights[]; };
 // Per screen tile: offset & count of its lights in light_indices
@@ -54,6 +60,8 @@ uniform ivec4 u_TileInfo;
 // Shadow maps, one layer per shadow casting light (see SceneRenderer.hpp)
 uniform sampler2DArrayShadow u_ShadowDepth;
 uniform sampler2DArray u_ShadowColor;
+// Same as u_ShadowDepth, read without comparison
+uniform sampler2DArray u_ShadowDepthRaw;
 
 // Depth slope of the receiving plane in the shadow map: its depth is affine
 // in the shadow map's uv (planes stay planes through a projection), which
@@ -76,8 +84,27 @@ vec2 receiverDepthSlope(Light l, vec3 p, vec3 uvz)
     return vec2(d1.z * d2.y - d1.y * d2.z, d1.x * d2.z - d1.z * d2.x) / det;
 }
 
+// Sample i of n spread evenly over the unit disk (golden angle spiral),
+// rotated by angle
+vec2 vogelDisk(int i, int n, float angle)
+{
+    float r = sqrt((float(i) + 0.5) / float(n));
+    float theta = float(i) * 2.39996323 + angle;
+    return r * vec2(cos(theta), sin(theta));
+}
+
+// Per pixel noise in [0, 1): rotates the disks, trading banding for grain
+float interleavedGradientNoise(vec2 pixel)
+{
+    return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+
 // Light reaching the fragment through the casters: 1 = lit, 0 = shadowed,
-// colored = through translucent casters
+// colored = through translucent casters.
+// Soft shadows (PCSS) of a light of size w: a caster at depth d_b (from the
+// light) shadows a receiver at depth d_r with a penumbra
+// w * (d_r - d_b) / d_b wide. The casters' average depth is searched around
+// the fragment, then the shadow is filtered over that penumbra.
 vec3 shadowFilter(Light l, vec3 Ldir)
 {
     float layer = l.shadow_params.x;
@@ -93,27 +120,66 @@ vec3 shadowFilter(Light l, vec3 Ldir)
     if (any(lessThan(uvz, vec3(0))) || any(greaterThan(uvz, vec3(1))))
         return vec3(1);
 
-    // Opaque casters: 3x3 PCF, each tap being a 2x2 bilinear comparison
-    // against the receiver's depth at the tap
     vec2 texel = 1.0 / vec2(textureSize(u_ShadowDepth, 0).xy);
-    vec2 offset_step = l.shadow_params.z * texel;
+    vec2 max_radius = PCSS_MAX_RADIUS * texel;
     vec2 slope = receiverDepthSlope(l, p, uvz);
-    // Bilinear comparisons use texels up to half a texel away
+    // Taps use texels up to half a texel away (bilinear or nearest)
     float slope_bias = 0.5 * dot(abs(slope), texel);
-    float visibility = 0.0;
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            vec2 offset = vec2(x, y) * offset_step;
-            float ref = uvz.z + dot(slope, offset) - slope_bias;
-            visibility += texture(u_ShadowDepth, vec4(uvz.xy + offset, layer, ref));
-        }
-    }
-    visibility /= 9.0;
-
-    // Translucent casters, only when nearer to the light than the fragment
-    vec4 t = texture(u_ShadowColor, vec3(uvz.xy, layer));
+    float angle = interleavedGradientNoise(gl_FragCoord.xy) * _TWO_PI;
+    // Distance (/ radius) to the light, compared to the translucent casters'
     float dist = length(l.position_radius.xyz - p) / l.position_radius.w;
-    vec3 transmittance = dist > t.a ? t.rgb : vec3(1);
+    // Depths along the light's view axis: the receiver's is clip.w
+    float z_near = l.shadow_frustum.x;
+    float z_far = l.shadow_frustum.y;
+    vec2 light_uv = l.shadow_frustum.zw;
+    float d_r = clip.w;
+
+    vec2 radius = l.shadow_params.z * texel;
+    if (light_uv.x > 0.0 && light_uv.y > 0.0) {
+        // Blocker search, over the light seen from the fragment: the
+        // penumbra of a caster at the near plane
+        vec2 search = min(light_uv * (d_r - z_near) / (z_near * d_r), max_radius);
+        float blockers = 0.0;
+        float depth_sum = 0.0;
+        for (int i = 0; i < BLOCKER_TAPS; ++i) {
+            vec2 offset = vogelDisk(i, BLOCKER_TAPS, angle) * search;
+            vec3 uvl = vec3(uvz.xy + offset, layer);
+            float d = texture(u_ShadowDepthRaw, uvl).r;
+            if (d < uvz.z + dot(slope, offset) - slope_bias) {
+                // Window depth to view depth
+                depth_sum += z_near * z_far / (z_far - d * (z_far - z_near));
+                blockers += 1.0;
+            }
+            // Translucent casters, at the same ratio of the receiver's depth
+            float t = texture(u_ShadowColor, uvl).a;
+            if (t < dist) {
+                depth_sum += d_r * t / dist;
+                blockers += 1.0;
+            }
+        }
+        // Nothing between the light and the fragment
+        if (blockers == 0.0)
+            return vec3(1);
+        float d_b = depth_sum / blockers;
+        vec2 penumbra = light_uv * max(d_r - d_b, 0.0) / (max(d_b, 1e-4) * d_r);
+        radius = max(radius, penumbra);
+    }
+    radius = min(radius, max_radius);
+
+    // Opaque casters: each tap is a 2x2 bilinear comparison against the
+    // receiver's depth at the tap. Translucent casters only tint when nearer
+    // to the light than the fragment.
+    float visibility = 0.0;
+    vec3 transmittance = vec3(0);
+    for (int i = 0; i < PCF_TAPS; ++i) {
+        vec2 offset = vogelDisk(i, PCF_TAPS, angle) * radius;
+        float ref = uvz.z + dot(slope, offset) - slope_bias;
+        visibility += texture(u_ShadowDepth, vec4(uvz.xy + offset, layer, ref));
+        vec4 t = texture(u_ShadowColor, vec3(uvz.xy + offset, layer));
+        transmittance += dist > t.a ? t.rgb : vec3(1);
+    }
+    visibility /= float(PCF_TAPS);
+    transmittance /= float(PCF_TAPS);
     vec2 edge = min(uvz.xy, 1.0 - uvz.xy);
     float fade = smoothstep(0.0, SHADOW_EDGE_FADE, min(edge.x, edge.y));
     return mix(vec3(1), visibility * transmittance, fade);

@@ -794,6 +794,7 @@ bool setup_lua()
     point_light["shadow_fov"] = &PointLight::shadow_fov;
     point_light["shadow_bias"] = &PointLight::shadow_bias;
     point_light["shadow_softness"] = &PointLight::shadow_softness;
+    point_light["size"] = &PointLight::size;
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once

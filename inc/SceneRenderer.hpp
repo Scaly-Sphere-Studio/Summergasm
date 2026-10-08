@@ -44,8 +44,12 @@ struct PointLight
     // Offset of the receivers toward the light, in world units, against
     // self-shadowing (planes 1 unit apart need < 1)
     float shadow_bias{ 0.5f };
-    // Penumbra size, in shadow map texels
+    // Minimum penumbra size, in shadow map texels
     float shadow_softness{ 1.5f };
+    // Radius of the light source, in world units (0: point light). Penumbras
+    // widen with it and with the distance between casters and receivers:
+    // sharp where a caster touches the receiver, softer farther away.
+    float size{ 0.f };
 };
 
 // Renders a whole 3D scene of planes seen through a (perspective) camera.
@@ -195,8 +199,10 @@ private:
         glm::vec4 shadow;               // linear, intensity applied
         glm::mat4 shadow_vp;            // light's view projection
         glm::vec4 shadow_params;        // layer (-1: none), bias, softness
+        // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
+        glm::vec4 shadow_frustum;
     };
-    static_assert(sizeof(GPUInstance) == 40 && sizeof(GPULight) == 144);
+    static_assert(sizeof(GPUInstance) == 40 && sizeof(GPULight) == 160);
 
     // Instanced draw: instances [first, first + count) and their textures,
     // bound to units [0, textures.size())
@@ -221,8 +227,9 @@ private:
     // shadow casting planes (with shadow_fit_margin), fitted by shadow maps.
     // Returns false without camera or planes.
     bool _computeViewSlab(std::array<glm::vec3, 8>& corners) const;
+    // Also returns the frustum's z_near, z_far & light size in uv * depth
     glm::mat4 _shadowViewProjection(PointLight const& light, bool has_slab,
-        std::array<glm::vec3, 8> const& slab) const;
+        std::array<glm::vec3, 8> const& slab, glm::vec4& frustum) const;
 
     // Instances, lights, tile ranges, light indices
     std::array<GLuint, 4> _ssbos{};
@@ -236,6 +243,8 @@ private:
     GLuint _shadow_depth{ 0 };
     GLuint _shadow_color{ 0 };
     GLuint _shadow_white{ 0 };
+    // Reads the depth layers without comparison (blocker search)
+    GLuint _shadow_depth_sampler{ 0 };
     int _shadow_size{ 0 };
     int _shadow_layers{ 0 };
     int _shadow_color_layers{ 0 };
