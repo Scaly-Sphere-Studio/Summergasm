@@ -35,6 +35,20 @@ then
     scene_renderer:setLightingFactor(sky, 0)
     scene_renderer:setCastShadow(sky, false)
 
+    local nuage_z = sky_z + 500
+    local nuage_scaling = 0.7
+    nuage = GL.Plane.new("train/nuage.png")
+    nuage.translation = vec3.new(0, 0, nuage_z)
+    scale_when_loaded(nuage, function(plane, w, h)
+        local s = math.max(win_h, win_w * h / w) * depth_scale(D, nuage_z)
+        plane.scaling = vec3.new(s * nuage_scaling, s * nuage_scaling, 1) 
+    end)
+    scene_renderer:addPlane(nuage)
+    -- The sky is its own light
+    scene_renderer:setLightingFactor(nuage, 0)
+    scene_renderer:setCastShadow(nuage, false)
+
+
     -- Background trail, scrolling behind the train
     local bg_z = -1500
     local bg_tiles = {
@@ -88,7 +102,7 @@ then
     train_parts = { wheels, wheel_protection, motor, wagon  }
     for i, plane in ipairs(train_parts) do
         plane.hitbox = GL.PlaneHitbox.Alpha
-        plane.translation = vec3.new(0, 0, (i - 1)*20)
+        plane.translation = vec3.new(0, -200, (i - 1)*20)
         scale_when_loaded(plane, vec3.new(400, 400, 400))
         scene_renderer:addPlane(plane)
     end
@@ -124,19 +138,21 @@ then
     -- into the gaps between the dunes behind and past the fence posts.
     -- The train, in front of the sun, is backlit: warm terminator rim.
     sun = PointLight.new()
-    sun.position = vec3.new(0, 100, 800)
+    sun.position = vec3.new(500, 200, 2500)
     sun.color = vec3.new(1, 0.92, 0.8)
     sun.intensity = 1.5
     sun.radius = 9000
     sun.falloff = 0.5
     sun.terminator_color = vec3.new(1, 0.45, 0.2)
-    sun.terminator_width = 0.35
+    sun.terminator_width = 0
     -- Shadows toward the dunes behind, filled with a deep blue
     sun.cast_shadows = true
     sun.shadow_direction = vec3.new(1400, -500, -1200)
     sun.shadow_fov = 140
     sun.shadow_bias = 1
     sun.shadow_softness = 1.5
+    -- Large source: shadows soften as they stretch away from their casters
+    sun.size = 0
     sun.shadow_color = vec3.new(0.12, 0.1, 0.3)
     scene_renderer:addLight(sun)
     scene_renderer.shadow_map_size = 2048
@@ -155,6 +171,7 @@ then
     lamp.cast_shadows = true
     lamp.shadow_fov = 140
     lamp.shadow_bias = 0.3
+    lamp.size = 20
     scene_renderer:addLight(lamp)
 
     local function add_light(position, color, intensity, radius, falloff)
@@ -178,6 +195,7 @@ then
     side_light.cast_shadows = true
     side_light.shadow_fov = 140
     side_light.shadow_bias = 0.3
+    side_light.size = 20
 
     -- Colored shadows: planes letting light through, tinted by their texels
     -- (0 = opaque, 1 = colored glass), e.g.
