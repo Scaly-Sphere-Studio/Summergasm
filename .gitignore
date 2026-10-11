@@ -64,3 +64,4 @@ settings.ini
 
 **/__pycache__
 **/.vscode/
+**/assets
