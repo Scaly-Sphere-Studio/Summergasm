@@ -5,6 +5,7 @@
 #include "SignalManager.hpp"
 #include "renpy/RenpyParser.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 
@@ -266,9 +267,26 @@ static std::string resolve_audio(std::string const& folder, std::string const& f
     return path.is_absolute() ? file : (std::filesystem::path(folder) / path).string();
 }
 
+// Frame clock, as Lua globals: dt (seconds since the previous frame, capped
+// so a stall (loading, window drag) doesn't make animations jump) & time
+// (seconds since the first frame, the sum of every dt)
+static void update_lua_clock()
+{
+    using clock = std::chrono::steady_clock;
+    static clock::time_point last = clock::now();
+    static double time = 0.0;
+    clock::time_point const now = clock::now();
+    double const dt = std::min(std::chrono::duration<double>(now - last).count(), 0.1);
+    last = now;
+    time += dt;
+    g->lua()["dt"] = dt;
+    g->lua()["time"] = time;
+}
+
 bool mylua_run_active_scenes()
 {
     bool ret = false;
+    update_lua_clock();
     scenes_running = true;
     for (auto const& pair : g->lua_scenes) {
         if (pair.second)
@@ -624,6 +642,9 @@ bool setup_lua()
     sol::state& lua = g->lua();
     lua_setup_other_libs(lua);
 
+    // Frame clock, updated before the scenes run, see update_lua_clock()
+    lua["dt"] = 0.0;
+    lua["time"] = 0.0;
     lua["file_script"] = mylua_file_script;
     // C++ functions return true on error, Lua ones return true on success
     lua["load_scene"] = [](std::string const& scene_name) {
