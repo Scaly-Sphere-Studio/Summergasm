@@ -476,6 +476,18 @@ Character const* Script::character(std::string const& id) const
     return it == _characters.end() ? nullptr : &it->second;
 }
 
+void Script::setCharacterColor(std::string const& id, std::optional<uint32_t> color)
+{
+    auto const it = _characters.find(id);
+    if (it != _characters.end())
+        it->second.color = color;
+}
+
+void Script::setCharacterImagePrefix(std::string const& id, std::string prefix)
+{
+    _image_prefixes[id] = std::move(prefix);
+}
+
 std::string Script::resolveImage(std::string const& tag, std::vector<std::string> const& attrs) const
 {
     std::string key = tag;
@@ -487,8 +499,18 @@ std::string Script::resolveImage(std::string const& tag, std::vector<std::string
         for (auto const& [k, file] : _images)
             if (k.starts_with(tag + " "))
                 return file;
-    std::string file = key;
-    std::replace(file.begin(), file.end(), ' ', '_');
+    std::string file;
+    if (!attrs.empty()) {
+        if (auto const prefix = _image_prefixes.find(tag); prefix != _image_prefixes.end()) {
+            file = prefix->second;
+            for (auto const& attr : attrs)
+                file += "_" + attr;
+        }
+    }
+    if (file.empty()) {
+        file = key;
+        std::replace(file.begin(), file.end(), ' ', '_');
+    }
     return (std::filesystem::path(_dir) / (file + ".png")).string();
 }
 

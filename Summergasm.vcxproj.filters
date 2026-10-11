@@ -176,13 +176,16 @@
     <None Include="resources\dialogs\scene_vacances.rpy">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="resources\characters\c.json">
+    <None Include="resources\characters\aliases.json">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="resources\characters\l.json">
+    <None Include="resources\characters\camille.json">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="resources\characters\t.json">
+    <None Include="resources\characters\lea.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\characters\tom.json">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="resources\lua\model_functions.lua">

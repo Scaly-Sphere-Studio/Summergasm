@@ -24,8 +24,9 @@
 // On top of Ren'Py, dialogue text accepts three SSS effect markers, converted
 // to SSS::TR inline formats by toTRMarkup():
 //   **bold**   ~~wave~~   %%shake%%        (escape with \*, \~, \%)
-// The name of every Character defined with a color is found in the text at
-// runtime and drawn in that color ("Léa" -> pink "Léa"), whole words only.
+// The name of every Character defined with a color (optionally overridden by
+// character metadata) is found in the text at runtime and drawn in that color
+// ("Léa" -> pink "Léa"), whole words only.
 // Ren'Py's `{color=#rrggbb}...{/color}` colors any text, and `[...]` is
 // interpolated at runtime (see Player::interpolate):
 //   [who]  Character's current name, in its color     [who.name]  same, uncolored
@@ -125,6 +126,8 @@ public:
     size_t entry() const { return _entry; }
     Character const* character(std::string const& id) const;
     std::unordered_map<std::string, Character> const& characters() const { return _characters; }
+    void setCharacterColor(std::string const& id, std::optional<uint32_t> color);
+    void setCharacterImagePrefix(std::string const& id, std::string prefix);
     // Initial values of the `default var = value` variables.
     std::unordered_map<std::string, Value> const& defaults() const { return _defaults; }
     // Looks up "tag attr..." in `image` statements, else falls back to
@@ -138,6 +141,7 @@ private:
     std::vector<Statement> _stmts;
     std::unordered_map<std::string, Character> _characters;
     std::unordered_map<std::string, std::string> _images;   // "tag attr" -> path
+    std::unordered_map<std::string, std::string> _image_prefixes;
     std::unordered_map<std::string, size_t> _labels;
     std::unordered_map<std::string, Value> _defaults;
     size_t _entry = 0;

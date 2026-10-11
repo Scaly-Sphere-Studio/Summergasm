@@ -1,8 +1,9 @@
 #pragma once
-// What the dialog knows of each character beyond the Ren'Py script: one
-// resources/characters/<id>.json per Character id (the sprite tag), e.g. l.json:
+// What the dialog knows of each character beyond the Ren'Py script:
+// resources/characters/<canonical-name>.json, with scene IDs mapped in aliases.json:
 //   {
 //     "name": "Léa",
+//     "color": "#ff7eb6",
 //     "expressions": {
 //       "neutral": { "mouth": [0.52, 0.18], "mouth_dir": [0.6, 0.8],
 //                    "tail": "straight", "intensity": 0.0 }
@@ -14,7 +15,7 @@
 // (right side) and tilting are applied by the sprite's model matrix.
 // tail & intensity: the speech bubble tail of that expression's lines, a say
 // line may override them (see renpy::Step::tail). Optional: "straight", 0.
-// "name" is only there for whoever reads the file.
+// "name" is for display/debugging; color is the character's dialog name color.
 #include "includes.hpp"
 
 #include <optional>
@@ -36,16 +37,29 @@ struct ExpressionInfo {
 
 class CharacterData {
 public:
-    // Loads g->characters_folder/<id>.json the first time an id is asked. A
-    // missing or bad file is warned about once, the character then has no data.
+    // Resolves an alias and loads its canonical JSON once. Missing or bad
+    // character files are warned about once; expression data is then absent.
     // expression: "" or unknown -> "neutral"; no data -> nullopt
     std::optional<ExpressionInfo> get(std::string const& id, std::string const& expression);
+    std::optional<uint32_t> color(std::string const& id);
+    std::string imagePrefix(std::string const& id);
     // Forgets what was loaded: the files are read again when next asked.
-    void reload() { _chars.clear(); }
+    void reload();
 
 private:
     using Expressions = std::unordered_map<std::string, ExpressionInfo>;
-    std::unordered_map<std::string, std::optional<Expressions>> _chars;
+    struct CharacterInfo {
+        Expressions expressions;
+        std::optional<uint32_t> color;
+    };
+    std::string canonicalId(std::string const& id);
+    std::optional<CharacterInfo> load(std::string const& id);
+    std::optional<CharacterInfo> const& info(std::string const& id);
+
+    bool _aliases_loaded = false;
+    std::unordered_map<std::string, std::string> _aliases;
+    std::unordered_map<std::string, std::string> _image_prefixes;
+    std::unordered_map<std::string, std::optional<CharacterInfo>> _chars;
 };
 
 } // namespace dialog

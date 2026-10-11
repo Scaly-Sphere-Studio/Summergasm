@@ -63,3 +63,4 @@ saves/
 settings.ini
 
 **/__pycache__
+**/.vscode/

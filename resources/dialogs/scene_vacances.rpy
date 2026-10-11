@@ -4,13 +4,13 @@
 #   - des sprites (show ... at left/center/right), plusieurs par côté possible
 #   - les effets SSS en ligne : **gras**, ~~vague~~, %%tremblement%%
 #   - les noms des personnages (Léa, Tom, Camille) sont colorés automatiquement
-#     dans le texte, avec la couleur de leur `define`
+#     dans le texte, avec leur couleur définie dans resources/characters/*.json
 #   - variables : `default`, `$ var = "..."` puis [var] dans le texte
 # ------------------------------------------------------------
 
-define l = Character("Léa", color="#ff7eb6")
-define t = Character("Tom", color="#4aa3ff")
-define c = Character("Camille", color="#f2b632")
+define l = Character("Léa")
+define t = Character("Tom")
+define c = Character("Camille")
 
 image l = "char/char4.png"
 image c = "char/char5.png"

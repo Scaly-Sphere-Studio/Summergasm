@@ -72,9 +72,10 @@
     <None Include="resources\lua\menu.lua" />
     <None Include="resources\lua\model_functions.lua" />
     <None Include="resources\dialogs\scene_vacances.rpy" />
-    <None Include="resources\characters\c.json" />
-    <None Include="resources\characters\l.json" />
-    <None Include="resources\characters\t.json" />
+    <None Include="resources\characters\aliases.json" />
+    <None Include="resources\characters\camille.json" />
+    <None Include="resources\characters\lea.json" />
+    <None Include="resources\characters\tom.json" />
     <None Include="resources\lua\train.lua" />
   </ItemGroup>
   <ItemGroup>

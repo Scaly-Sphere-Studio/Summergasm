@@ -178,9 +178,14 @@ void Dialog::Impl::start(std::string const& name)
 
     stop();
     ++generation;
-    script = std::move(new_script);
     // Characters' files may have been edited since
     ctx.characters.reload();
+    for (auto const& entry : new_script->characters()) {
+        if (auto const color = ctx.characters.color(entry.first))
+            new_script->setCharacterColor(entry.first, color);
+        new_script->setCharacterImagePrefix(entry.first, ctx.characters.imagePrefix(entry.first));
+    }
+    script = std::move(new_script);
     // Starts with the game's values, the script's `default`s set the missing ones
     synced_vars = renpy::Player::Vars(game_state::vars().begin(), game_state::vars().end());
     player = std::make_unique<renpy::Player>(*script, renpy::MarkupStyle{}, synced_vars);
