@@ -1,10 +1,11 @@
 """Interactively annotate mouth positions and speech-tail directions.
 
 Example:
-    python utils/annotate_character_mouths.py resources/characters/char1.json
+    python utils/annotate_character_mouths.py resources/characters/tom.json
 
-The image folder defaults to ``resources/assets/char``. Drag from the mouth
-position in the direction the speech-bubble tail should leave the mouth.
+The image folder defaults to ``resources/assets/char``. Character IDs and
+image prefixes come from ``resources/characters/aliases.json``. Drag from the
+mouth position in the direction the speech-bubble tail should leave the mouth.
 Coordinates saved to JSON are normalized to the original image dimensions.
 """
 
@@ -17,18 +18,25 @@ from pathlib import Path
 from tkinter import messagebox
 from typing import Any, List, Optional, Tuple
 
+from character_aliases import DEFAULT_ALIAS_FILE, canonical_id, load_aliases
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IMAGE_DIR = PROJECT_ROOT / "resources" / "assets" / "char"
 
 
-def load_character(json_path: Path, image_dir: Path) -> Tuple[dict, List[Tuple[str, Path]]]:
+def load_character(
+    json_path: Path,
+    image_dir: Path,
+    alias_file: Path = DEFAULT_ALIAS_FILE,
+) -> Tuple[dict, List[Tuple[str, Path]]]:
     with json_path.open(encoding="utf-8") as file:
         data = json.load(file)
     if not isinstance(data, dict) or not isinstance(data.get("expressions"), dict):
         raise ValueError("{} must contain an expressions object".format(json_path))
 
-    character_id = json_path.stem
+    aliases, image_prefixes = load_aliases(alias_file)
+    character_id = canonical_id(json_path.stem, aliases)
+    image_prefix = image_prefixes.get(character_id, json_path.stem)
     expressions = data["expressions"]
     ordered_names = sorted(expressions, key=lambda name: (name != "neutral", name.casefold()))
     images = {path.name.casefold(): path for path in image_dir.iterdir() if path.is_file()}
@@ -37,7 +45,7 @@ def load_character(json_path: Path, image_dir: Path) -> Tuple[dict, List[Tuple[s
     for name in ordered_names:
         if not isinstance(name, str) or not name:
             raise ValueError("{} contains an invalid expression name".format(json_path))
-        image_name = "{}.png".format(character_id) if name == "neutral" else "{}_{}.png".format(character_id, name)
+        image_name = "{}.png".format(image_prefix) if name == "neutral" else "{}_{}.png".format(image_prefix, name)
         image_path = images.get(image_name.casefold())
         if image_path is None:
             raise FileNotFoundError(
@@ -61,10 +69,10 @@ def normalized_pair(value: Any, field: str, expression: str) -> Tuple[float, flo
 
 
 class MouthAnnotator:
-    def __init__(self, root: tk.Tk, json_path: Path, image_dir: Path) -> None:
+    def __init__(self, root: tk.Tk, json_path: Path, image_dir: Path, alias_file: Path) -> None:
         self.root = root
         self.json_path = json_path
-        self.data, self.entries = load_character(json_path, image_dir)
+        self.data, self.entries = load_character(json_path, image_dir, alias_file)
         if not self.entries:
             raise ValueError("{} contains no expressions to annotate".format(json_path))
 
@@ -297,14 +305,25 @@ def main() -> int:
         default=DEFAULT_IMAGE_DIR,
         help="folder containing the matching character PNG files",
     )
+    parser.add_argument(
+        "--alias-file",
+        type=Path,
+        default=DEFAULT_ALIAS_FILE,
+        help="JSON file mapping scene aliases and canonical character IDs",
+    )
     args = parser.parse_args()
     if not args.image_dir.is_dir():
         parser.error("image directory does not exist: {}".format(args.image_dir))
     if not args.json_file.is_file():
         parser.error("character JSON file does not exist: {}".format(args.json_file))
+    aliases, _ = load_aliases(args.alias_file)
+    canonical = canonical_id(args.json_file.stem, aliases)
+    canonical_path = args.json_file.with_name(canonical + ".json")
+    if canonical_path.is_file():
+        args.json_file = canonical_path
 
     root = tk.Tk()
-    MouthAnnotator(root, args.json_file, args.image_dir)
+    MouthAnnotator(root, args.json_file, args.image_dir, args.alias_file)
     root.mainloop()
     return 0
 
