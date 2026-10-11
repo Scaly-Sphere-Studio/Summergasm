@@ -35,22 +35,7 @@ then
     scene_renderer:setLightingFactor(sky, 0)
     scene_renderer:setCastShadow(sky, false)
 
-    -- Sun disc: between the sky and the clouds, glowing through its emissive
-    -- map (unaffected by the lights). Position & size on screen, in pixels.
-    local sun_z = sky_z + 250
-    local sun_k = depth_scale(D, sun_z)
-    sun_disc = GL.Plane.new("train/sun.png")
-    sun_disc.translation = vec3.new(-win_w * 0.25 * sun_k, win_h * 0.25 * sun_k, sun_z)
-    scale_when_loaded(sun_disc, function(plane, w, h)
-        local s = 220 * sun_k
-        plane.scaling = vec3.new(s, s, 1)
-    end)
-    scene_renderer:addPlane(sun_disc)
-    scene_renderer:setLightingFactor(sun_disc, 0)
-    scene_renderer:setCastShadow(sun_disc, false)
-    scene_renderer:setEmissiveMap(sun_disc, "train/sun.png")
-    scene_renderer:setEmissiveColor(sun_disc, vec3.new(1, 0.9, 0.7))
-    scene_renderer:setEmissiveIntensity(sun_disc, 3.0)
+
 
     local nuage_z = sky_z + 500
     local nuage_scaling = 0.7
@@ -155,24 +140,42 @@ then
     -- into the gaps between the dunes behind and past the fence posts.
     -- The train, in front of the sun, is backlit: warm terminator rim.
     sun = PointLight.new()
-    sun.position = vec3.new(500, 200, 2500)
+    sun.position = vec3.new(0, 400, 2500)
     sun.color = vec3.new(1, 0.92, 0.8)
-    sun.intensity = 1.5
+    sun.intensity = 1.0
     sun.radius = 9000
     sun.falloff = 0.5
     sun.terminator_color = vec3.new(1, 0.45, 0.2)
     sun.terminator_width = 0
     -- Shadows toward the dunes behind, filled with a deep blue
     sun.cast_shadows = true
-    sun.shadow_direction = vec3.new(1400, -500, -1200)
+    -- sun.shadow_direction = vec3.new(1400, -500, -1200)
     sun.shadow_fov = 140
     sun.shadow_bias = 1
-    sun.shadow_softness = 1.5
+    sun.shadow_softness = 1.2
     -- Large source: shadows soften as they stretch away from their casters
     sun.size = 0
     sun.shadow_color = vec3.new(0.12, 0.1, 0.3)
     scene_renderer:addLight(sun)
     scene_renderer.shadow_map_size = 2048
+
+    -- Sun disc: between the sky and the clouds, glowing through its emissive
+    -- map (unaffected by the lights). Position & size on screen, in pixels.
+    local sun_z = sky_z + 250
+    local sun_k = depth_scale(D, sun_z)
+    sun_disc = GL.Plane.new("train/sun.png")
+    sun_disc.translation = sun.position
+    scale_when_loaded(sun_disc, function(plane, w, h)
+        local s = 220 * sun_k
+        plane.scaling = vec3.new(s, s, 1)
+    end)
+    scene_renderer:addPlane(sun_disc)
+    scene_renderer:setLightingFactor(sun_disc, 0)
+    scene_renderer:setCastShadow(sun_disc, false)
+    scene_renderer:setEmissiveMap(sun_disc, "train/sun.png")
+    scene_renderer:setEmissiveColor(sun_disc, vec3.new(1, 0.9, 0.7))
+    scene_renderer:setEmissiveIntensity(sun_disc, 3.0)
+
 
     -- Close colored light by the train, with a wide terminator ramp
     lamp = PointLight.new()
@@ -232,19 +235,19 @@ then
           terminator = vec3.new(1, 0.25, 0.1), shadow = vec3.new(0.3, 0.05, 0.05) },
     }
     dune_lights = {}
-    for i, plane in ipairs(fg_tiles) do
-        local setup = dune_light_setups[(i - 1) % #dune_light_setups + 1]
-        local light = add_light(vec3.new(0, 0, fg_z + setup.dz), setup.color, 2, 500, 1.5)
-        -- Moved with the tile by the renderer, after scrolling (no lag)
-        light.follow = plane
-        if (setup.terminator)
-        then
-            light.terminator_color = setup.terminator
-            light.terminator_width = 0.5
-            light.shadow_color = setup.shadow
-        end
-        dune_lights[#dune_lights + 1] = { plane = plane, light = light, x = setup.x, y = setup.y, dz = setup.dz }
-    end
+    -- for i, plane in ipairs(fg_tiles) do
+    --     local setup = dune_light_setups[(i - 1) % #dune_light_setups + 1]
+    --     local light = add_light(vec3.new(0, 0, fg_z + setup.dz), setup.color, 2, 500, 1.5)
+    --     -- Moved with the tile by the renderer, after scrolling (no lag)
+    --     light.follow = plane
+    --     if (setup.terminator)
+    --     then
+    --         light.terminator_color = setup.terminator
+    --         light.terminator_width = 0.5
+    --         light.shadow_color = setup.shadow
+    --     end
+    --     dune_lights[#dune_lights + 1] = { plane = plane, light = light, x = setup.x, y = setup.y, dz = setup.dz }
+    -- end
 
     window:addRenderer(scene_renderer)
 

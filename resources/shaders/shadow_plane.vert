@@ -29,7 +29,10 @@ struct Instance {
     float lighting;
     float shadow_transmission;
     int cast_shadow;
-    int _padding;
+    int emissive_unit;
+    int _padding0;
+    int _padding1;
+    vec4 emissive;
 };
 layout(std430, binding = 1) readonly buffer Instances { Instance instances[]; };
 

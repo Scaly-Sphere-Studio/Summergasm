@@ -3,9 +3,6 @@
 // Hot reloaded when saved: compile errors are logged, the previous shader stays.
 
 #define _TWO_PI 6.28318530718
-// Shadows fade out over this part of the shadow map's sides (in uv), instead
-// of stopping hard at the edge of the light's cone
-#define SHADOW_EDGE_FADE 0.15
 // Soft shadows (PCSS): taps of the blocker search & of the filter, and the
 // largest radius of both, in shadow map texels
 #define BLOCKER_TAPS 20
@@ -42,9 +39,9 @@ struct Light {
     vec4 position_radius;
     vec4 color_falloff;
     vec4 terminator_width;
-    vec4 shadow;
+    vec4 shadow;            // w: shadows' fade along the map's sides (uv, 0: none)
     mat4 shadow_vp;         // light's view projection
-    vec4 shadow_params;     // layer (-1: none), bias, softness (texels)
+    vec4 shadow_params;     // layer (-1: none), bias, softness (texels), ambient hidden
     vec4 shadow_frustum;    // z_near, z_far, light size in uv * depth (x, y)
 };
 layout(std430, binding = 2) readonly buffer Lights { Light lights[]; };
@@ -183,12 +180,18 @@ vec3 shadowFilter(Light l, vec3 Ldir)
     }
     visibility /= float(PCF_TAPS);
     transmittance /= float(PCF_TAPS);
-    vec2 edge = min(uvz.xy, 1.0 - uvz.xy);
-    float fade = smoothstep(0.0, SHADOW_EDGE_FADE, min(edge.x, edge.y));
+    // Instead of stopping hard at the edge of the light's cone (none when the
+    // shadow map covers the whole view)
+    float fade = 1.0;
+    if (l.shadow.w > 0.0) {
+        vec2 edge = min(uvz.xy, 1.0 - uvz.xy);
+        fade = smoothstep(0.0, l.shadow.w, min(edge.x, edge.y));
+    }
     return mix(vec3(1), visibility * transmittance, fade);
 }
 
-vec3 pointLight(Light l, vec3 N)
+// Cast shadows also hide part of the ambient light, scaling ambient_vis down
+vec3 pointLight(Light l, vec3 N, inout float ambient_vis)
 {
     vec3 L = l.position_radius.xyz - WorldPos;
     float d = length(L);
@@ -205,6 +208,11 @@ vec3 pointLight(Light l, vec3 N)
     // No need for shadows where the light doesn't reach anyway
     vec3 filtered = diffuse > 0.0 ? shadowFilter(l, Ldir) : vec3(1);
     float visibility = max(filtered.r, max(filtered.g, filtered.b));
+    // The stronger the light reaching the fragment, the more ambient its
+    // shadows hide: dim lights barely darken, strong ones leave deep shadows
+    float strength = min(dot(att * l.color_falloff.rgb, vec3(0.2126, 0.7152, 0.0722)), 1.0)
+        * l.shadow_params.w;
+    ambient_vis *= 1.0 - strength * (1.0 - visibility);
     // Color lerp: terminator color at N.L <= 0 and in shadow penumbras,
     // light color from N.L >= w in full light
     vec3 hue = l.color_falloff.rgb;
@@ -266,9 +274,11 @@ void main()
     uvec2 range = tiles[tile.y * u_TileInfo.z + tile.x];
 
     // Texels are sRGB: light in linear space
-    vec3 light = u_Ambient;
+    float ambient_vis = 1.0;
+    vec3 direct = vec3(0);
     for (uint i = range.x; i < range.x + range.y; ++i)
-        light += pointLight(lights[light_indices[i]], N);
+        direct += pointLight(lights[light_indices[i]], N, ambient_vis);
+    vec3 light = u_Ambient * ambient_vis + direct;
     vec3 lit = pow(pow(albedo.rgb, vec3(2.2)) * light, vec3(1.0 / 2.2));
     vec3 color = mix(albedo.rgb, lit, inst.lighting);
     if (inst.emissive_unit >= 0)

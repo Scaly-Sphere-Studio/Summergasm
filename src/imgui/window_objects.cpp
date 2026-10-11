@@ -449,6 +449,7 @@ static void print_object(SceneRenderer& renderer)
                 ImGui::DragFloat("Shadow FOV", &light->shadow_fov, 0.5f, 1.f, 170.f);
                 ImGui::DragFloat("Shadow bias", &light->shadow_bias, 0.01f, 0.f, 50.f);
                 ImGui::DragFloat("Min shadow softness", &light->shadow_softness, 0.05f, 0.f, 20.f);
+                ImGui::DragFloat("Shadow ambient", &light->shadow_ambient, 0.01f, 0.f, 1.f);
                 ImGui::DragFloat("Light size", &light->size, 0.5f, 0.f, 1000.f);
             }
             if (ImGui::Button("Remove"))

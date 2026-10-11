@@ -46,6 +46,10 @@ struct PointLight
     float shadow_bias{ 0.5f };
     // Minimum penumbra size, in shadow map texels
     float shadow_softness{ 1.5f };
+    // Share of the ambient light hidden by the cast shadows, when the light
+    // reaching them is at full strength (1, linear); less for dimmer lights.
+    // 0: shadows only remove this light's own contribution
+    float shadow_ambient{ 1.f };
     // Radius of the light source, in world units (0: point light). Penumbras
     // widen with it and with the distance between casters and receivers:
     // sharp where a caster touches the receiver, softer farther away.
@@ -212,9 +216,9 @@ private:
         glm::vec4 position_radius;
         glm::vec4 color_falloff;        // linear, intensity applied
         glm::vec4 terminator_width;     // linear, intensity applied
-        glm::vec4 shadow;               // linear, intensity applied
+        glm::vec4 shadow;               // linear, intensity applied; w: edge fade (uv)
         glm::mat4 shadow_vp;            // light's view projection
-        glm::vec4 shadow_params;        // layer (-1: none), bias, softness
+        glm::vec4 shadow_params;        // layer (-1: none), bias, softness, ambient hidden
         // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
         glm::vec4 shadow_frustum;
     };
@@ -243,9 +247,10 @@ private:
     // shadow casting planes (with shadow_fit_margin), fitted by shadow maps.
     // Returns false without camera or planes.
     bool _computeViewSlab(std::array<glm::vec3, 8>& corners) const;
-    // Also returns the frustum's z_near, z_far & light size in uv * depth
+    // Also returns the frustum's z_near, z_far & light size in uv * depth, and
+    // the width of the shadows' fade along its sides (0: none, view covered)
     glm::mat4 _shadowViewProjection(PointLight const& light, bool has_slab,
-        std::array<glm::vec3, 8> const& slab, glm::vec4& frustum) const;
+        std::array<glm::vec3, 8> const& slab, glm::vec4& frustum, float& edge_fade) const;
 
     // Instances, lights, tile ranges, light indices
     std::array<GLuint, 4> _ssbos{};

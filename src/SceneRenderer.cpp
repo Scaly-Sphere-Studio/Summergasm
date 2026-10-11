@@ -334,8 +334,11 @@ bool SceneRenderer::_computeViewSlab(std::array<glm::vec3, 8>& corners) const
 // visible shadow is cut by the frustum's edges. Otherwise, it's the whole
 // cone toward shadow_direction.
 glm::mat4 SceneRenderer::_shadowViewProjection(PointLight const& light, bool has_slab,
-    std::array<glm::vec3, 8> const& slab, glm::vec4& frustum) const
+    std::array<glm::vec3, 8> const& slab, glm::vec4& frustum, float& edge_fade) const
 {
+    // Shadows fade out over this part of the shadow map's sides (in uv),
+    // instead of stopping hard at the edge of the light's cone
+    edge_fade = 0.15f;
     auto const look = [&](glm::vec3 dir) {
         if (glm::length(dir) < 1e-4f)
             dir = glm::vec3(0.f, 0.f, -1.f);
@@ -381,6 +384,11 @@ glm::mat4 SceneRenderer::_shadowViewProjection(PointLight const& light, bool has
             view = aimed_view;
             tan_min = glm::max(fit_min, glm::vec2(-max_tan));
             tan_max = glm::min(fit_max, glm::vec2(max_tan));
+            // The whole view is covered: no shadow is cut by the edges,
+            // unless shadow_fov narrowed the frustum
+            if (glm::all(glm::greaterThan(fit_min, glm::vec2(-max_tan)))
+                && glm::all(glm::lessThan(fit_max, glm::vec2(max_tan))))
+                edge_fade = 0.f;
             // Tighter depth range: better depth precision
             z_near = std::max(z_near, depth_min * 0.5f);
             z_far = std::min(z_far, depth_max * 1.05f);
@@ -460,9 +468,10 @@ void SceneRenderer::_cullLights(glm::ivec4 const& viewport)
         };
         if (shadows && light->cast_shadows && shadow_layers < max_shadow_lights) {
             gpu_light.shadow_vp = _shadowViewProjection(*light, has_slab, slab,
-                gpu_light.shadow_frustum);
+                gpu_light.shadow_frustum, gpu_light.shadow.w);
             gpu_light.shadow_params = glm::vec4(static_cast<float>(shadow_layers++),
-                std::max(light->shadow_bias, 0.f), std::max(light->shadow_softness, 0.f), 0.f);
+                std::max(light->shadow_bias, 0.f), std::max(light->shadow_softness, 0.f),
+                std::max(light->shadow_ambient, 0.f));
         }
         auto const index = static_cast<uint32_t>(_gpu_lights.size());
         _gpu_lights.push_back(gpu_light);
