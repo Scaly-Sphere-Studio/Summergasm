@@ -169,6 +169,46 @@ float SceneRenderer::getShadowTransmission(std::shared_ptr<SSS::GL::PlaneBase> c
     return it == _plane_lighting.cend() ? 0.f : it->second.shadow_transmission;
 }
 
+void SceneRenderer::setEmissiveMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    SSS::GL::Texture::Shared emissive_map)
+{
+    if (plane)
+        _plane_lighting[plane.get()].emissive_map = std::move(emissive_map);
+}
+
+SSS::GL::Texture::Shared SceneRenderer::getEmissiveMap(
+    std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? nullptr : it->second.emissive_map;
+}
+
+void SceneRenderer::setEmissiveColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    glm::vec3 const& color)
+{
+    if (plane)
+        _plane_lighting[plane.get()].emissive_color = color;
+}
+
+glm::vec3 SceneRenderer::getEmissiveColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? glm::vec3(1.f) : it->second.emissive_color;
+}
+
+void SceneRenderer::setEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    float intensity)
+{
+    if (plane)
+        _plane_lighting[plane.get()].emissive_intensity = std::max(intensity, 0.f);
+}
+
+float SceneRenderer::getEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? 1.f : it->second.emissive_intensity;
+}
+
 static std::string read_file(std::filesystem::path const& path)
 {
     std::ifstream ifs(path, std::ios::binary);
@@ -483,10 +523,19 @@ void SceneRenderer::_buildBatches()
         GPUInstance instance{};
         instance.texture_unit = -1;
         instance.normal_unit = -1;
+        instance.emissive_unit = -1;
         instance.lighting = 1.f;
         instance.cast_shadow = 1;
 
+        // Only once loaded
+        auto const loaded = [](Texture::Shared const& texture) -> Texture* {
+            int w = 0, h = 0;
+            if (texture)
+                texture->getCurrentDimensions(w, h);
+            return w != 0 && h != 0 ? texture.get() : nullptr;
+        };
         Texture* normal_map = nullptr;
+        Texture* emissive_map = nullptr;
         auto const it = _plane_lighting.find(plane.get());
         if (it != _plane_lighting.cend()) {
             instance.lighting = it->second.factor;
@@ -494,18 +543,23 @@ void SceneRenderer::_buildBatches()
             instance.shadow_transmission = it->second.shadow_transmission;
             _translucent_casters = _translucent_casters
                 || (it->second.cast_shadow && it->second.shadow_transmission > 0.f);
-            int w = 0, h = 0;
-            if (it->second.normal_map)
-                it->second.normal_map->getCurrentDimensions(w, h);
-            if (w != 0 && h != 0)
-                normal_map = it->second.normal_map.get();
+            normal_map = loaded(it->second.normal_map);
+            emissive_map = loaded(it->second.emissive_map);
+            instance.emissive = glm::vec4(to_linear(it->second.emissive_color,
+                it->second.emissive_intensity), 0.f);
         }
 
         // Planes without texture keep their instance (discarded by the shaders)
         if (auto const texture = plane->getTexture()) {
             Batch* batch = &_batches.back();
-            size_t const needed = (is_missing(*batch, texture.get()) ? 1 : 0)
-                + (is_missing(*batch, normal_map) ? 1 : 0);
+            // Distinct textures missing from the batch (maps can be shared)
+            std::array<Texture*, 3> const used{ texture.get(), normal_map, emissive_map };
+            size_t needed = 0;
+            for (size_t i = 0; i < used.size(); ++i) {
+                if (is_missing(*batch, used[i])
+                    && std::find(used.cbegin(), used.cbegin() + i, used[i]) == used.cbegin() + i)
+                    ++needed;
+            }
             if (batch->textures.size() + needed > max_units) {
                 _batches.push_back({ static_cast<uint32_t>(_gpu_instances.size()), 0, {} });
                 batch = &_batches.back();
@@ -513,6 +567,8 @@ void SceneRenderer::_buildBatches()
             instance.texture_unit = unit_of(*batch, texture.get());
             if (normal_map)
                 instance.normal_unit = unit_of(*batch, normal_map);
+            if (emissive_map)
+                instance.emissive_unit = unit_of(*batch, emissive_map);
             instance.uv_mode = static_cast<GLint>(texture->getUVMode());
             instance.grayscale = texture->getGrayscale() ? 1 : 0;
             instance.uv_offset = texture->getUVOffset();

@@ -30,7 +30,10 @@ struct Instance {
     float lighting;     // 0 = unlit, 1 = fully lit
     float shadow_transmission;  // 0 = opaque, 1 = colored glass
     int cast_shadow;
-    int _padding;
+    int emissive_unit;  // -1: none
+    int _padding0;
+    int _padding1;
+    vec4 emissive;      // linear, intensity applied
 };
 layout(std430, binding = 1) readonly buffer Instances { Instance instances[]; };
 
@@ -236,7 +239,16 @@ void main()
     if (albedo.a < 0.004)
         discard;
 
+    // Emission, linear: added after lighting, not shadowed
+    vec3 emission = vec3(0);
+    if (inst.emissive_unit >= 0) {
+        vec4 e = texture(u_Textures[inst.emissive_unit], vec3(uv, 0));
+        emission = pow(e.rgb, vec3(2.2)) * e.a * inst.emissive.rgb;
+    }
+
     if (inst.lighting <= 0.0) {
+        if (inst.emissive_unit >= 0)
+            albedo.rgb = pow(pow(albedo.rgb, vec3(2.2)) + emission, vec3(1.0 / 2.2));
         FragColor = albedo;
         return;
     }
@@ -258,5 +270,8 @@ void main()
     for (uint i = range.x; i < range.x + range.y; ++i)
         light += pointLight(lights[light_indices[i]], N);
     vec3 lit = pow(pow(albedo.rgb, vec3(2.2)) * light, vec3(1.0 / 2.2));
-    FragColor = vec4(mix(albedo.rgb, lit, inst.lighting), albedo.a);
+    vec3 color = mix(albedo.rgb, lit, inst.lighting);
+    if (inst.emissive_unit >= 0)
+        color = pow(pow(color, vec3(2.2)) + emission, vec3(1.0 / 2.2));
+    FragColor = vec4(color, albedo.a);
 }

@@ -59,7 +59,7 @@ struct PointLight
 // together, all at the same world speed: the visible parallax only comes
 // from their depth.
 // Planes are lit by any number of point lights (see PointLight), culled per
-// screen tile, with optional per-plane normal maps, through
+// screen tile, with optional per-plane normal & emissive maps, through
 // resources/shaders/lit_plane.vert & .frag (hot reloaded when edited).
 // Lights can cast colored shadows: opaque texels block the light, and
 // translucent ones (see setShadowTransmission) tint it with their color.
@@ -137,6 +137,17 @@ public:
     // 0 = opaque (default), 1 = colored glass
     void setShadowTransmission(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float transmission);
     float getShadowTransmission(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // Emissive maps: their texels are added after lighting (not shadowed),
+    // times emissive color & intensity, masked by the plane's own alpha
+    void setEmissiveMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+        SSS::GL::Texture::Shared emissive_map);
+    SSS::GL::Texture::Shared getEmissiveMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // sRGB, white by default
+    void setEmissiveColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane, glm::vec3 const& color);
+    glm::vec3 getEmissiveColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // 1 by default
+    void setEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float intensity);
+    float getEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
 
 private:
     struct ScrollLayer {
@@ -157,6 +168,9 @@ private:
         float factor{ 1.f };
         bool cast_shadow{ true };
         float shadow_transmission{ 0.f };
+        SSS::GL::Texture::Shared emissive_map;
+        glm::vec3 emissive_color{ 1.f };
+        float emissive_intensity{ 1.f };
     };
     std::unordered_map<SSS::GL::PlaneBase const*, PlaneLighting> _plane_lighting;
 
@@ -190,7 +204,9 @@ private:
         float lighting;
         float shadow_transmission;
         GLint cast_shadow;
-        GLint _padding;
+        GLint emissive_unit;    // -1: none
+        GLint _padding[2];
+        glm::vec4 emissive;     // linear, intensity applied
     };
     struct GPULight {
         glm::vec4 position_radius;
@@ -202,7 +218,7 @@ private:
         // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
         glm::vec4 shadow_frustum;
     };
-    static_assert(sizeof(GPUInstance) == 40 && sizeof(GPULight) == 160);
+    static_assert(sizeof(GPUInstance) == 64&& sizeof(GPULight) == 160);
 
     // Instanced draw: instances [first, first + count) and their textures,
     // bound to units [0, textures.size())

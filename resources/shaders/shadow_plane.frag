@@ -28,7 +28,10 @@ struct Instance {
     float lighting;     // 0 = unlit, 1 = fully lit
     float shadow_transmission;  // 0 = opaque, 1 = colored glass
     int cast_shadow;
-    int _padding;
+    int emissive_unit;  // -1: none
+    int _padding0;
+    int _padding1;
+    vec4 emissive;      // linear, intensity applied
 };
 layout(std430, binding = 1) readonly buffer Instances { Instance instances[]; };
 

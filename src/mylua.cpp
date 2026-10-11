@@ -768,6 +768,33 @@ bool setup_lua()
     scene_renderer["getShadowTransmission"] = [](SceneRenderer& ren, GL::Plane* plane) {
         return ren.getShadowTransmission(GL::Plane::get(plane));
     };
+    // setEmissiveMap(plane, texture | path in the assets folder | nil)
+    scene_renderer["setEmissiveMap"] = sol::overload(
+        [](SceneRenderer& ren, GL::Plane* plane, GL::Texture* texture) {
+            ren.setEmissiveMap(GL::Plane::get(plane), texture ? GL::Texture::get(texture) : nullptr);
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, std::string const& path) {
+            ren.setEmissiveMap(GL::Plane::get(plane), GL::Texture::create(std::filesystem::path{ path }));
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, sol::lua_nil_t) {
+            ren.setEmissiveMap(GL::Plane::get(plane), nullptr);
+        }
+    );
+    scene_renderer["getEmissiveMap"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getEmissiveMap(GL::Plane::get(plane));
+    };
+    scene_renderer["setEmissiveColor"] = [](SceneRenderer& ren, GL::Plane* plane, glm::vec3 const& color) {
+        ren.setEmissiveColor(GL::Plane::get(plane), color);
+    };
+    scene_renderer["getEmissiveColor"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getEmissiveColor(GL::Plane::get(plane));
+    };
+    scene_renderer["setEmissiveIntensity"] = [](SceneRenderer& ren, GL::Plane* plane, float intensity) {
+        ren.setEmissiveIntensity(GL::Plane::get(plane), intensity);
+    };
+    scene_renderer["getEmissiveIntensity"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getEmissiveIntensity(GL::Plane::get(plane));
+    };
 
     // See PointLight in SceneRenderer.hpp
     auto point_light = lua.new_usertype<PointLight>("PointLight",

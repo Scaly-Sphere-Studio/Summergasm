@@ -35,6 +35,23 @@ then
     scene_renderer:setLightingFactor(sky, 0)
     scene_renderer:setCastShadow(sky, false)
 
+    -- Sun disc: between the sky and the clouds, glowing through its emissive
+    -- map (unaffected by the lights). Position & size on screen, in pixels.
+    local sun_z = sky_z + 250
+    local sun_k = depth_scale(D, sun_z)
+    sun_disc = GL.Plane.new("train/sun.png")
+    sun_disc.translation = vec3.new(-win_w * 0.25 * sun_k, win_h * 0.25 * sun_k, sun_z)
+    scale_when_loaded(sun_disc, function(plane, w, h)
+        local s = 220 * sun_k
+        plane.scaling = vec3.new(s, s, 1)
+    end)
+    scene_renderer:addPlane(sun_disc)
+    scene_renderer:setLightingFactor(sun_disc, 0)
+    scene_renderer:setCastShadow(sun_disc, false)
+    scene_renderer:setEmissiveMap(sun_disc, "train/sun.png")
+    scene_renderer:setEmissiveColor(sun_disc, vec3.new(1, 0.9, 0.7))
+    scene_renderer:setEmissiveIntensity(sun_disc, 3.0)
+
     local nuage_z = sky_z + 500
     local nuage_scaling = 0.7
     nuage = GL.Plane.new("train/nuage.png")
@@ -161,7 +178,7 @@ then
     lamp = PointLight.new()
     lamp.position = vec3.new(250, 50, 120)
     lamp.color = vec3.new(1, 0.8, 0.5)
-    lamp.intensity = 1.5
+    lamp.intensity = 0.01
     lamp.radius = 900
     lamp.falloff = 2
     lamp.terminator_color = vec3.new(1, 0.3, 0.2)
