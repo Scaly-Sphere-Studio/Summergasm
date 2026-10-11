@@ -127,7 +127,7 @@ then
 
     window:addRenderer(scene_renderer)
 
-    -- Flicker clock, in frames (no wall clock in Lua)
+    -- Flicker clock, in seconds (advanced by the global dt each frame)
     fire_t = 0
 
     print(filename, "init end")
@@ -141,8 +141,9 @@ then
     apply_loaded_scalings()
 
     -- Flicker: a few unrelated sines, the light following the flames
-    fire_t = fire_t + 1
-    local t = fire_t
+    -- The rates below were tuned per frame at 60 fps: t counts 60ths of a second
+    fire_t = fire_t + dt
+    local t = fire_t * 60
     local flicker = 0.12 * math.sin(t * 0.21) + 0.07 * math.sin(t * 0.53 + 1) + 0.05 * math.sin(t * 1.37)
     fire_light.intensity = fire_light_intensity * (1 + flicker)
     fire_light.position = vec3.new(
