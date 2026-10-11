@@ -1,0 +1,15 @@
+{
+    "aliases": {
+        "t": "tom",
+        "char1": "tom",
+        "c": "camille",
+        "char5": "camille",
+        "l": "lea",
+        "char4": "lea"
+    },
+    "image_prefixes": {
+        "tom": "char1",
+        "camille": "char5",
+        "lea": "char4"
+    }
+}

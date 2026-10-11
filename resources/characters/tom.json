@@ -1,0 +1,90 @@
+{
+    "name": "Tom",
+    "color": "#4aa3ff",
+    "expressions": {
+        "neutral": {
+            "mouth": [
+                0.514205,
+                0.157887
+            ],
+            "mouth_dir": [
+                0.497512,
+                0.867457
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "cry": {
+            "mouth": [
+                0.491653,
+                0.156571
+            ],
+            "mouth_dir": [
+                0.636565,
+                0.771223
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "fear": {
+            "mouth": [
+                0.726202,
+                0.239461
+            ],
+            "mouth_dir": [
+                0.0,
+                1.0
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "happy": {
+            "mouth": [
+                0.500674,
+                0.155255
+            ],
+            "mouth_dir": [
+                0.230025,
+                0.973185
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "relief": {
+            "mouth": [
+                0.478121,
+                0.147361
+            ],
+            "mouth_dir": [
+                0.422885,
+                0.906183
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "sad": {
+            "mouth": [
+                0.509695,
+                0.160518
+            ],
+            "mouth_dir": [
+                0.547249,
+                0.83697
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        },
+        "stun": {
+            "mouth": [
+                0.496163,
+                0.157887
+            ],
+            "mouth_dir": [
+                0.508254,
+                0.861207
+            ],
+            "tail": "straight",
+            "intensity": 0.0
+        }
+    }
+}
