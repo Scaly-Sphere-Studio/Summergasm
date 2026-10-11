@@ -5,8 +5,8 @@ Examples:
     python utils/generate_character_data.py path/to/sprites --output-dir path/to/data
 
 Files named ``char1.png`` provide the ``neutral`` expression; files named
-``char1_happy.png`` provide the ``happy`` expression in ``char1.json``.
-Existing expression values are preserved when this script is run again.
+``char1_happy.png`` provide the ``happy`` expression. The optional aliases.json
+maps those prefixes to canonical JSON filenames, and existing values are kept.
 """
 
 import argparse
@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Dict
 
+from character_aliases import DEFAULT_ALIAS_FILE, canonical_id, load_aliases
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IMAGE_DIR = PROJECT_ROOT / "resources" / "assets" / "char"
@@ -23,7 +25,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "resources" / "characters"
 FILENAME_PATTERN = re.compile(r"^([^_]+)(?:_(.+))?$")
 
 
-def discover_expressions(image_dir: Path) -> Dict[str, Dict[str, Path]]:
+def discover_expressions(image_dir: Path, aliases: Dict[str, str]) -> Dict[str, Dict[str, Path]]:
     """Return character IDs mapped to their expression images."""
     characters: Dict[str, Dict[str, Path]] = {}
     for image_path in sorted(image_dir.iterdir(), key=lambda path: path.name.casefold()):
@@ -35,7 +37,8 @@ def discover_expressions(image_dir: Path) -> Dict[str, Dict[str, Path]]:
             print("Skipping PNG with unsupported filename: {}".format(image_path.name), file=sys.stderr)
             continue
 
-        character_id, expression = match.groups()
+        image_prefix, expression = match.groups()
+        character_id = canonical_id(image_prefix, aliases)
         expression = expression or "neutral"
         if not character_id or not expression:
             print("Skipping PNG with unsupported filename: {}".format(image_path.name), file=sys.stderr)
@@ -61,11 +64,12 @@ def default_expression() -> dict:
     }
 
 
-def generate_character_data(image_dir: Path, output_dir: Path) -> int:
+def generate_character_data(image_dir: Path, output_dir: Path, alias_file: Path = DEFAULT_ALIAS_FILE) -> int:
     if not image_dir.is_dir():
         raise NotADirectoryError("Image directory does not exist: {}".format(image_dir))
 
-    characters = discover_expressions(image_dir)
+    aliases, _ = load_aliases(alias_file)
+    characters = discover_expressions(image_dir, aliases)
     output_dir.mkdir(parents=True, exist_ok=True)
     for character_id in sorted(characters, key=str.casefold):
         json_path = output_dir / (character_id + ".json")
@@ -78,7 +82,7 @@ def generate_character_data(image_dir: Path, output_dir: Path) -> int:
             if not isinstance(expressions, dict):
                 raise ValueError("{} must contain an expressions object".format(json_path))
         else:
-            data = {"name": character_id, "expressions": {}}
+            data = {"name": character_id.capitalize(), "expressions": {}}
             expressions = data["expressions"]
 
         added = 0
@@ -113,8 +117,14 @@ def main() -> int:
         default=DEFAULT_OUTPUT_DIR,
         help="folder for the generated character JSON files",
     )
+    parser.add_argument(
+        "--alias-file",
+        type=Path,
+        default=DEFAULT_ALIAS_FILE,
+        help="JSON file mapping image prefixes to canonical character IDs",
+    )
     args = parser.parse_args()
-    generate_character_data(args.image_dir, args.output_dir)
+    generate_character_data(args.image_dir, args.output_dir, args.alias_file)
     return 0
 
 
