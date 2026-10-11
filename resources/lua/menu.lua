@@ -58,6 +58,7 @@ then
         { label = "Dialog",   scene = "dialog" },
         { label = "Beach",    scene = "beach" },
         { label = "Train",    scene = "train" },
+        { label = "Fire pit", scene = "firepit" },
         { label = "Hands" },
         { label = "Fountain" },
         { label = "Map" },
