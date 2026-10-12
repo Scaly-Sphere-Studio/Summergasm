@@ -748,6 +748,7 @@ bool setup_lua()
     scene_renderer["play"] = &SceneRenderer::play;
     scene_renderer["toggle"] = &SceneRenderer::toggle;
     scene_renderer["lighting"] = &SceneRenderer::lighting;
+    scene_renderer["opaque_cutoff"] = &SceneRenderer::opaque_cutoff;
     scene_renderer["ambient"] = &SceneRenderer::ambient;
     scene_renderer["lights"] = &SceneRenderer::lights;
     scene_renderer["addLight"] = &SceneRenderer::addLight;

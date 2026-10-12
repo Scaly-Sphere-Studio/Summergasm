@@ -420,6 +420,7 @@ static void print_object(SceneRenderer& renderer)
 
     ImGui::SeparatorText("Lighting");
     ImGui::Checkbox("Lighting", &renderer.lighting);
+    ImGui::SliderFloat("Opaque cutoff", &renderer.opaque_cutoff, 0.f, 1.f);
     ImGui::ColorEdit3("Ambient", &renderer.ambient.x, ImGuiColorEditFlags_Float);
     ImGui::Checkbox("Normal maps: green down (DirectX)", &renderer.normal_map_y_down);
     ImGui::Checkbox("Shadows", &renderer.shadows);

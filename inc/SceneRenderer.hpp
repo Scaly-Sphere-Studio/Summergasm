@@ -57,8 +57,10 @@ struct PointLight
 };
 
 // Renders a whole 3D scene of planes seen through a (perspective) camera.
-// Planes are drawn back to front from the camera, so transparent sprites
-// blend correctly within a single renderer and a single depth buffer.
+// Lit planes are drawn in two passes: their opaque texels first, in any
+// order, hidden by depth alone (planes of any size, tilted or not); then the
+// translucent ones (e.g. sprites' edges), back to front from the camera,
+// blended over them. Unlit, planes are only drawn back to front.
 // Scroll layers are sets of tiles lined up along x that scroll and wrap
 // together, all at the same world speed: the visible parallax only comes
 // from their depth.
@@ -112,6 +114,9 @@ public:
 
     // Off: unlit, drawn by the PlaneRenderer preset shader
     bool lighting{ true };
+    // Texels at least this opaque are drawn in the first, opaque pass, the
+    // others in the translucent pass (see above)
+    float opaque_cutoff{ 0.99f };
     // sRGB, white: planes look unlit when there is no light
     glm::vec3 ambient{ 1.f };
     std::vector<PointLight::Shared> lights;

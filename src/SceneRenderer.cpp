@@ -292,7 +292,8 @@ bool SceneRenderer::_computeViewSlab(std::array<glm::vec3, 8>& corners) const
     if (!camera)
         return false;
 
-    // View-space depth range of the planes that matter for shadows
+    // View-space depth range of the planes that matter for shadows, from
+    // their corners (PlaneRenderer's vertices): tilted planes span depths
     glm::mat4 const view = camera->getView();
     float d_min = FLT_MAX, d_max = -FLT_MAX;
     for (auto const& plane : _planes) {
@@ -301,9 +302,14 @@ bool SceneRenderer::_computeViewSlab(std::array<glm::vec3, 8>& corners) const
         auto const it = _plane_lighting.find(plane.get());
         if (it != _plane_lighting.cend() && it->second.factor <= 0.f && !it->second.cast_shadow)
             continue;
-        float const depth = -(view * plane->getModelMat4()[3]).z;
-        d_min = std::min(d_min, depth);
-        d_max = std::max(d_max, depth);
+        glm::mat4 const model_view = view * plane->getModelMat4();
+        for (float const y : { -0.5f, 0.5f }) {
+            for (float const x : { -0.5f, 0.5f }) {
+                float const depth = -(model_view * glm::vec4(x, y, 0.f, 1.f)).z;
+                d_min = std::min(d_min, depth);
+                d_max = std::max(d_max, depth);
+            }
+        }
     }
     float const z_near = camera->getZNear();
     d_min = std::max(d_min, z_near);
@@ -842,7 +848,19 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
 
     if (clear_depth_buffer)
         glClear(GL_DEPTH_BUFFER_BIT);
+    GLint const loc_pass = shader.getUniformLocation("u_Pass");
+    glUniform1f(shader.getUniformLocation("u_OpaqueCutoff"), std::clamp(opaque_cutoff, 0.005f, 1.f));
+    // Opaque texels, in any order: depth alone hides what's behind them
+    glDisable(GL_BLEND);
+    glUniform1i(loc_pass, 0);
     _drawBatches(shader);
+    // Translucent ones, back to front, blended over the opaque ones
+    glEnable(GL_BLEND);
+    glDepthMask(GL_FALSE);
+    glUniform1i(loc_pass, 1);
+    _drawBatches(shader);
+    // Window's default state (see SSS::GL::Window)
+    glDepthMask(GL_TRUE);
     glBindSampler(shadow_unit + 2, 0);
     _vao.unbind();
     glActiveTexture(GL_TEXTURE0);

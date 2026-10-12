@@ -11,49 +11,33 @@ then
     cam_fire.fov = 40
     cam_fire.z_near = 10
     cam_fire.z_far = 6000
-    cam_start = vec3.new(0, 380, 1450)
-    cam_pitch = -13
+    cam_start = vec3.new(0, 200, 1450)
+    cam_pitch = -0
     cam_fire.position = cam_start
     -- Positive x angles look up
     cam_fire.rotation = vec2.new(cam_pitch, 0)
 
     scene_renderer = SceneRenderer.new(cam_fire)
 
-    -- Ground: tiles laid flat (y = 0), the image's top toward the back.
-    -- Planes are sorted by their center's depth: rows meet at the fire's and
-    -- characters' depths (multiples of tile_depth), so the ground behind
-    -- each of them is drawn before them, the ground in front after them.
-    -- Every other tile is mirrored, so the photo's edges always match.
-    local tile_depth = 220
-    local cols, rows_back, rows_front = 14, 9, 5
-    ground_tiles = {}
-    for k = -rows_back, rows_front - 1 do
-        for j = -cols / 2, cols / 2 - 1 do
-            local tile = GL.Plane.new("firepit/ground.jpg")
-            tile.rotation = vec3.new(-90, 0, 0)
-            local z = (k + 0.5) * tile_depth
-            tile.translation = vec3.new(0, 0, z)
-            local mx = (j % 2 == 0) and 1 or -1
-            local my = (k % 2 == 0) and 1 or -1
-            scale_when_loaded(tile, function(plane, w, h)
-                plane.scaling = vec3.new(mx * tile_depth, my * tile_depth, 1)
-                plane.translation = vec3.new((j + 0.5) * tile_depth * w / h, 0, z)
-            end)
-            scene_renderer:addPlane(tile)
-            scene_renderer:setCastShadow(tile, false)
-            ground_tiles[#ground_tiles + 1] = tile
-        end
-    end
+    -- Ground: one plane laid flat (y = 0), the image's top toward the back,
+    -- from z = -1980 to 1100
+    local ground_depth = 3080
+    ground = GL.Plane.new("firepit/ground.jpg")
+    ground.rotation = vec3.new(-90, 0, 0)
+    ground.translation = vec3.new(0, 0, -440)
+    scale_when_loaded(ground, vec3.new(ground_depth, ground_depth, 1))
+    scene_renderer:addPlane(ground)
+    scene_renderer:setCastShadow(ground, false)
 
     -- Characters, standing on the ground (feet at y = 0). height: in world
     -- units, mirror: faces the other way
     local character_setups = {
         -- Behind the fire
-        { image = "char/char5.png",       x = -210, z = -tile_depth, height = 430 },
-        { image = "char/char1.png",       x = 200,  z = -tile_depth, height = 470 },
+        { image = "char/char5.png",       x = -210, z = -220, height = 430 },
+        { image = "char/char1.png",       x = 200,  z = -220, height = 470 },
         -- In front of the fire, apart so it stays visible between them
-        { image = "char/char4.png",       x = -370, z = tile_depth,  height = 300 },
-        { image = "char/char1_happy.png", x = 370,  z = tile_depth,  height = 470, mirror = true },
+        { image = "char/char4.png",       x = -370, z = 220,  height = 300 },
+        { image = "char/char1_happy.png", x = 370,  z = 220,  height = 470, mirror = true },
     }
     characters = {}
     for _, setup in ipairs(character_setups) do

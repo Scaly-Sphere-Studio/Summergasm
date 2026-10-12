@@ -62,6 +62,10 @@ uniform sampler2DArrayShadow u_ShadowDepth;
 uniform sampler2DArray u_ShadowColor;
 // Same as u_ShadowDepth, read without comparison
 uniform sampler2DArray u_ShadowDepthRaw;
+// 0: opaque texels (alpha >= u_OpaqueCutoff), with depth, in any order
+// 1: translucent ones, blended back to front over them
+uniform int u_Pass;
+uniform float u_OpaqueCutoff;
 
 // Depth slope of the receiving plane in the shadow map: its depth is affine
 // in the shadow map's uv (planes stay planes through a projection), which
@@ -243,8 +247,12 @@ void main()
     if (inst.grayscale == 1)
         albedo.rgb = vec3(dot(albedo.rgb, vec3(0.2126, 0.7152, 0.0722)));
     albedo.a *= Alpha;
-    // Fully transparent texels don't write depth
-    if (albedo.a < 0.004)
+    if (u_Pass == 0) {
+        if (albedo.a < u_OpaqueCutoff)
+            discard;
+        albedo.a = 1.0;
+    }
+    else if (albedo.a >= u_OpaqueCutoff || albedo.a < 0.004)
         discard;
 
     // Emission, linear: added after lighting, not shadowed
