@@ -15,7 +15,7 @@ then
     cam_pitch = -13
     cam_fire.position = cam_start
     -- Positive x angles look up
-    cam_fire:rotate(vec2.new(cam_pitch, 0))
+    cam_fire.rotation = vec2.new(cam_pitch, 0)
 
     scene_renderer = SceneRenderer.new(cam_fire)
 
