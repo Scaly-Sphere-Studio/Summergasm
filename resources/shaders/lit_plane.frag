@@ -75,6 +75,8 @@ uniform float u_OpaqueCutoff;
 uniform vec4 u_Focus;
 // Distance from the camera along its view axis: dot(u_ViewDepth, vec4(p, 1))
 uniform vec4 u_ViewDepth;
+// 0..1: from the focus band to everything blurred by u_Focus.z (dialogs)
+uniform float u_FullBlur;
 
 // Depth of field: the fragment's blur radius along the screen's x & y, in
 // world units on its plane (set by main, zero when sharp). Shadows are
@@ -235,6 +237,7 @@ float blurRadius()
         coc = u_Focus.x / d - 1.0;
     else if (d > u_Focus.y)
         coc = 1.0 - u_Focus.y / d;
+    coc = mix(coc, 1.0, u_FullBlur);
     return min(coc * u_Focus.z, u_Focus.w);
 }
 

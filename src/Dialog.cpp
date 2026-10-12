@@ -455,6 +455,12 @@ void Dialog::updateAll()
     }
 }
 
+bool Dialog::anyVisible() noexcept
+{
+    return std::any_of(Impl::running.cbegin(), Impl::running.cend(),
+        [](Impl const* d) { return d->player && !d->hidden; });
+}
+
 void Dialog::reloadCharacterData()
 {
     for (Impl* d : Impl::running) d->ctx.characters.reload();

@@ -1,4 +1,5 @@
 #include "SceneRenderer.hpp"
+#include "Dialog.hpp"
 #include <fstream>
 
 SceneRenderer::Shared SceneRenderer::create(SSS::GL::Camera::Shared camera)
@@ -143,6 +144,26 @@ void SceneRenderer::_setFocus(float near_dist, float far_dist)
     _focus_start = std::chrono::steady_clock::now();
     _focus_near = near_dist;
     _focus_far = far_dist;
+}
+
+float SceneRenderer::getDialogBlur() const
+{
+    float const target = _dialog_blur_on ? 1.f : 0.f;
+    std::chrono::duration<float> const elapsed = std::chrono::steady_clock::now() - _dialog_blur_start;
+    if (focus_transition <= 0.f || elapsed.count() >= focus_transition)
+        return target;
+    return glm::mix(_dialog_blur_from, target, std::max(elapsed.count() / focus_transition, 0.f));
+}
+
+void SceneRenderer::_updateDialogBlur()
+{
+    bool const on = dialog_blur && Dialog::anyVisible();
+    if (on == _dialog_blur_on)
+        return;
+    // Fades from the amount shown, unless nothing was shown yet
+    _dialog_blur_from = _rendered ? getDialogBlur() : (on ? 1.f : 0.f);
+    _dialog_blur_start = std::chrono::steady_clock::now();
+    _dialog_blur_on = on;
 }
 
 void SceneRenderer::setFocus(float distance, float band_width)
@@ -919,10 +940,14 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
     glm::mat4 const view = camera ? camera->getView() : glm::mat4(1);
     glm::vec4 const view_depth = -glm::vec4(view[0][2], view[1][2], view[2][2], view[3][2]);
     glUniform4fv(shader.getUniformLocation("u_ViewDepth"), 1, &view_depth.x);
-    glm::vec2 const current_focus = getCurrentFocus();
+    // Off: everything sharp, but for the dialog blur
+    float const dialog_blur_amount = getDialogBlur();
+    glm::vec2 const current_focus = depth_of_field ? getCurrentFocus() : glm::vec2(0.f, FLT_MAX);
     glm::vec4 const focus(current_focus.x, current_focus.y,
-        depth_of_field ? std::max(focus_blur, 0.f) : 0.f, std::max(focus_max_blur, 0.f));
+        depth_of_field || dialog_blur_amount > 0.f ? std::max(focus_blur, 0.f) : 0.f,
+        std::max(focus_max_blur, 0.f));
     glUniform4fv(shader.getUniformLocation("u_Focus"), 1, &focus.x);
+    glUniform1f(shader.getUniformLocation("u_FullBlur"), dialog_blur_amount);
     // World size of a pixel: x, times the distance if y = 1 (perspective)
     glm::mat4 const proj = camera ? camera->getProjection() : glm::mat4(1);
     glUniform2f(shader.getUniformLocation("u_PixelSize"),
@@ -967,6 +992,7 @@ void SceneRenderer::render()
 {
     if (!isActive())
         return;
+    _updateDialogBlur();
     _rendered = true;
     for (auto& layer : _scroll_layers) {
         if (!layer.is_setup)

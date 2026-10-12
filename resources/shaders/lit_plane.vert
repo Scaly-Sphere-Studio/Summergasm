@@ -42,6 +42,7 @@ uniform vec4 u_Focus;
 uniform vec4 u_ViewDepth;
 // World size of a pixel: x, times the distance if y = 1 (perspective)
 uniform vec2 u_PixelSize;
+uniform float u_FullBlur;
 
 // Same as lit_plane.frag's
 float blurRadius(vec3 p)
@@ -54,6 +55,7 @@ float blurRadius(vec3 p)
         coc = u_Focus.x / d - 1.0;
     else if (d > u_Focus.y)
         coc = 1.0 - u_Focus.y / d;
+    coc = mix(coc, 1.0, u_FullBlur);
     return min(coc * u_Focus.z, u_Focus.w);
 }
 

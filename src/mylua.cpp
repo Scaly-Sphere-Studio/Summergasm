@@ -810,6 +810,7 @@ bool setup_lua()
     scene_renderer["setFocus"] = &SceneRenderer::setFocus;
     scene_renderer["moveFocus"] = &SceneRenderer::moveFocus;
     scene_renderer["focus_transition"] = &SceneRenderer::focus_transition;
+    scene_renderer["dialog_blur"] = &SceneRenderer::dialog_blur;
     scene_renderer["setBlurClamp"] = [](SceneRenderer& ren, GL::Plane* plane, bool clamp) {
         ren.setBlurClamp(GL::Plane::get(plane), clamp);
     };

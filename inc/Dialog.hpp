@@ -58,6 +58,8 @@ public:
     // loop once the scenes ran. When a story is over, its dialog stops and
     // calls its finished callback.
     static void updateAll();
+    // A conversation is playing and shown, in any dialog
+    static bool anyVisible() noexcept;
     // Reads resources/characters/*.json again (mouths & speech bubble tails),
     // for every started dialog
     static void reloadCharacterData();

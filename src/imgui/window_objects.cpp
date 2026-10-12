@@ -441,6 +441,7 @@ static void print_object(SceneRenderer& renderer)
     ImGui::DragFloat("Focus transition (s)", &renderer.focus_transition, 0.01f, 0.f, 10.f);
     ImGui::DragFloat("Blur at infinity (px)", &renderer.focus_blur, 0.1f, 0.f, 100.f);
     ImGui::DragFloat("Max blur (px)", &renderer.focus_max_blur, 0.1f, 0.f, 100.f);
+    ImGui::Checkbox("Blur while a dialog is shown", &renderer.dialog_blur);
 
     ImGui::SeparatorText("Lights");
     if (ImGui::Button("Add light"))

@@ -168,6 +168,12 @@ public:
     // edges or tiled side by side. Default: clamped for scroll layer tiles
     void setBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane, bool clamp);
     bool getBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // While a dialog is shown (see Dialog::anyVisible), everything is blurred
+    // by focus_blur, even with depth_of_field off: fades in and back out to
+    // the settings above in focus_transition, which it leaves untouched
+    bool dialog_blur{ true };
+    // 0: the settings above, 1: everything blurred
+    float getDialogBlur() const;
 
     // Normal maps: OpenGL convention (green up) unless set
     bool normal_map_y_down{ false };
@@ -217,6 +223,11 @@ private:
     std::chrono::steady_clock::time_point _focus_start;
     bool _rendered{ false };
     void _setFocus(float near_dist, float far_dist);
+    // Dialog blur: on or fading in, and the amount at the start of its fade
+    bool _dialog_blur_on{ false };
+    float _dialog_blur_from{ 0.f };
+    std::chrono::steady_clock::time_point _dialog_blur_start;
+    void _updateDialogBlur();
 
     struct PlaneLighting {
         SSS::GL::Texture::Shared normal_map;
