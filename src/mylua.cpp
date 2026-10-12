@@ -563,7 +563,37 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "game.reset",         { "",             "Erase every game value (game.vars)" } },
     { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
     { "console_reset_env",  { "",           "Run console commands in the global env" } },
+    // Depth of field of every SceneRenderer of the window, distances from the camera
+    { "dof",                { "[on]",                   "Depth of field, toggles without argument" } },
+    { "focus",              { "[distance, band_width]", "Sharp band centered on distance (width kept if omitted), prints it without argument. focus(0, 0): all blurred" } },
+    { "focus_near",         { "distance",               "Near end of the sharp band (pushes the far one if needed)" } },
+    { "focus_far",          { "distance",               "Far end of the sharp band (pushes the near one if needed). focus_near(0) focus_far(math.huge): all sharp" } },
+    { "focus_move",         { "delta",                  "Move the sharp band, away from the camera if positive" } },
 };
+
+// Applies func to every SceneRenderer of the window, then prints their focus band
+template <typename Func>
+static void mylua_focus(Func&& func)
+{
+    sol::function const print = g->lua()["print"];
+    std::vector<std::shared_ptr<SceneRenderer>> renderers;
+    if (g->window) {
+        for (auto const& renderer : g->window->getRenderers()) {
+            if (auto scene = std::dynamic_pointer_cast<SceneRenderer>(renderer))
+                renderers.emplace_back(std::move(scene));
+        }
+    }
+    if (renderers.empty()) {
+        print("No SceneRenderer in the window");
+        return;
+    }
+    for (auto const& renderer : renderers) {
+        func(*renderer);
+        print(std::format("Depth of field {}, sharp from {:.0f} to {:.0f} (distance {:.0f}, band width {:.0f})",
+            renderer->depth_of_field ? "on" : "off", renderer->getFocusNear(), renderer->getFocusFar(),
+            renderer->getFocusDistance(), renderer->getFocusBandWidth()));
+    }
+}
 
 // Returns "name(arg1, arg2, ...)" for Lua functions, or an empty string otherwise
 static std::string lua_function_signature(std::string const& name, sol::function const& f)
@@ -687,6 +717,26 @@ bool setup_lua()
     };
     lua["dialog"] = mylua_dialog;
     lua["help"] = mylua_help;
+    lua["dof"] = [](sol::optional<bool> on) {
+        mylua_focus([&](SceneRenderer& ren) {
+            ren.depth_of_field = on.value_or(!ren.depth_of_field);
+        });
+    };
+    lua["focus"] = [](sol::optional<float> distance, sol::optional<float> band_width) {
+        mylua_focus([&](SceneRenderer& ren) {
+            if (distance)
+                ren.setFocus(*distance, band_width.value_or(ren.getFocusBandWidth()));
+        });
+    };
+    lua["focus_near"] = [](float distance) {
+        mylua_focus([&](SceneRenderer& ren) { ren.setFocusNear(distance); });
+    };
+    lua["focus_far"] = [](float distance) {
+        mylua_focus([&](SceneRenderer& ren) { ren.setFocusFar(distance); });
+    };
+    lua["focus_move"] = [](float delta) {
+        mylua_focus([&](SceneRenderer& ren) { ren.moveFocus(delta); });
+    };
     lua["debug_mouths"] = [](sol::optional<bool> on) {
         Dialog::setDebugMouths(on.value_or(!Dialog::debugMouths()));
         return Dialog::debugMouths();
@@ -753,6 +803,25 @@ bool setup_lua()
     scene_renderer["lights"] = &SceneRenderer::lights;
     scene_renderer["addLight"] = &SceneRenderer::addLight;
     scene_renderer["removeLight"] = &SceneRenderer::removeLight;
+    // Depth of field: focus band from near to far, distances from the camera
+    scene_renderer["depth_of_field"] = &SceneRenderer::depth_of_field;
+    scene_renderer["focus_blur"] = &SceneRenderer::focus_blur;
+    scene_renderer["focus_max_blur"] = &SceneRenderer::focus_max_blur;
+    scene_renderer["setFocus"] = &SceneRenderer::setFocus;
+    scene_renderer["moveFocus"] = &SceneRenderer::moveFocus;
+    scene_renderer["focus_transition"] = &SceneRenderer::focus_transition;
+    scene_renderer["setBlurClamp"] = [](SceneRenderer& ren, GL::Plane* plane, bool clamp) {
+        ren.setBlurClamp(GL::Plane::get(plane), clamp);
+    };
+    scene_renderer["getBlurClamp"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getBlurClamp(GL::Plane::get(plane));
+    };
+    scene_renderer["setFocusNear"] = &SceneRenderer::setFocusNear;
+    scene_renderer["setFocusFar"] = &SceneRenderer::setFocusFar;
+    scene_renderer["focus_near"] = sol::property(&SceneRenderer::getFocusNear);
+    scene_renderer["focus_far"] = sol::property(&SceneRenderer::getFocusFar);
+    scene_renderer["focus_distance"] = sol::property(&SceneRenderer::getFocusDistance);
+    scene_renderer["focus_band_width"] = sol::property(&SceneRenderer::getFocusBandWidth);
     scene_renderer["normal_map_y_down"] = &SceneRenderer::normal_map_y_down;
     // setNormalMap(plane, texture | path in the assets folder | nil)
     scene_renderer["setNormalMap"] = sol::overload(

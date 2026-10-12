@@ -34,6 +34,8 @@ then
     -- The sky is its own light
     scene_renderer:setLightingFactor(sky, 0)
     scene_renderer:setCastShadow(sky, false)
+    -- Fills the window: blurred, its edges must stay opaque
+    scene_renderer:setBlurClamp(sky, true)
 
 
 
@@ -249,6 +251,16 @@ then
     --     dune_lights[#dune_lights + 1] = { plane = plane, light = light, x = setup.x, y = setup.y, dz = setup.dz }
     -- end
 
+    -- Depth of field (tune it in the inspector: Scene > scene_renderer).
+    -- Distances from the camera: a plane at z is D - z away. Sharp around
+    -- the train (z = 0 to 60), blurred the farther from it.
+    -- Everything sharp: setFocusNear(0) & setFocusFar(math.huge)
+    -- Everything blurred: setFocus(0, 0)
+    scene_renderer.depth_of_field = true
+    scene_renderer.focus_blur = 12
+    scene_renderer.focus_max_blur = 24
+    scene_renderer:setFocus(D - 30, 100)
+
     window:addRenderer(scene_renderer)
 
     print(filename, "init end")
@@ -264,6 +276,11 @@ then
     then
         cam_train:move(vec3.new(0, 0, D - cam_distance), false)
         cam_train.z_far = D + 6000
+        -- Same planes in focus, right away like the camera
+        local transition = scene_renderer.focus_transition
+        scene_renderer.focus_transition = 0
+        scene_renderer:moveFocus(D - cam_distance)
+        scene_renderer.focus_transition = transition
         cam_distance = D
     end
 

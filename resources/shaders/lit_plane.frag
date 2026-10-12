@@ -8,6 +8,10 @@
 #define BLOCKER_TAPS 20
 #define PCF_TAPS 24
 #define PCSS_MAX_RADIUS 32.0
+// Depth of field: most taps of a blurred texel, and filter taps of the
+// shadows on blurred fragments (wider filter, more taps against grain)
+#define BLUR_MAX_TAPS 64
+#define BLUR_PCF_TAPS 48
 
 out vec4 FragColor;
 
@@ -28,8 +32,8 @@ struct Instance {
     float shadow_transmission;  // 0 = opaque, 1 = colored glass
     int cast_shadow;
     int emissive_unit;  // -1: none
-    int _padding0;
-    int _padding1;
+    int blur_clamp;     // 1: the blur stays inside the plane
+    int _padding;
     vec4 emissive;      // linear, intensity applied
 };
 layout(std430, binding = 1) readonly buffer Instances { Instance instances[]; };
@@ -66,6 +70,17 @@ uniform sampler2DArray u_ShadowDepthRaw;
 // 1: translucent ones, blended back to front over them
 uniform int u_Pass;
 uniform float u_OpaqueCutoff;
+// Depth of field: x, y = focus band (near, far), z = blur at infinity,
+// w = largest blur, in pixels (z = 0: off)
+uniform vec4 u_Focus;
+// Distance from the camera along its view axis: dot(u_ViewDepth, vec4(p, 1))
+uniform vec4 u_ViewDepth;
+
+// Depth of field: the fragment's blur radius along the screen's x & y, in
+// world units on its plane (set by main, zero when sharp). Shadows are
+// filtered over that disk too.
+vec3 blur_world_x = vec3(0);
+vec3 blur_world_y = vec3(0);
 
 // Depth slope of the receiving plane in the shadow map: its depth is affine
 // in the shadow map's uv (planes stay planes through a projection), which
@@ -138,6 +153,18 @@ vec3 shadowFilter(Light l, vec3 Ldir)
     vec2 light_uv = l.shadow_frustum.zw;
     float d_r = clip.w;
 
+    // Depth of field: the fragment's blur disk in the shadow map (columns:
+    // uv offsets of its x & y radii), added to every tap's offset
+    mat2 blur_uv = mat2(0);
+    bool blurred = blur_world_x != vec3(0) || blur_world_y != vec3(0);
+    if (blurred) {
+        vec4 cx = l.shadow_vp * vec4(p + blur_world_x, 1);
+        vec4 cy = l.shadow_vp * vec4(p + blur_world_y, 1);
+        if (cx.w > 0.0 && cy.w > 0.0)
+            blur_uv = mat2(cx.xy / cx.w * 0.5 + 0.5 - uvz.xy, cy.xy / cy.w * 0.5 + 0.5 - uvz.xy);
+    }
+    int pcf_taps = blurred ? BLUR_PCF_TAPS : PCF_TAPS;
+
     vec2 radius = l.shadow_params.z * texel;
     if (light_uv.x > 0.0 && light_uv.y > 0.0) {
         // Blocker search, over the light seen from the fragment: the
@@ -146,7 +173,8 @@ vec3 shadowFilter(Light l, vec3 Ldir)
         float blockers = 0.0;
         float depth_sum = 0.0;
         for (int i = 0; i < BLOCKER_TAPS; ++i) {
-            vec2 offset = vogelDisk(i, BLOCKER_TAPS, angle) * search;
+            vec2 disk = vogelDisk(i, BLOCKER_TAPS, angle);
+            vec2 offset = disk * search + blur_uv * disk;
             vec3 uvl = vec3(uvz.xy + offset, layer);
             float d = texture(u_ShadowDepthRaw, uvl).r;
             if (d < uvz.z + dot(slope, offset) - slope_bias) {
@@ -175,15 +203,16 @@ vec3 shadowFilter(Light l, vec3 Ldir)
     // to the light than the fragment.
     float visibility = 0.0;
     vec3 transmittance = vec3(0);
-    for (int i = 0; i < PCF_TAPS; ++i) {
-        vec2 offset = vogelDisk(i, PCF_TAPS, angle) * radius;
+    for (int i = 0; i < pcf_taps; ++i) {
+        vec2 disk = vogelDisk(i, pcf_taps, angle);
+        vec2 offset = disk * radius + blur_uv * disk;
         float ref = uvz.z + dot(slope, offset) - slope_bias;
         visibility += texture(u_ShadowDepth, vec4(uvz.xy + offset, layer, ref));
         vec4 t = texture(u_ShadowColor, vec3(uvz.xy + offset, layer));
         transmittance += dist > t.a ? t.rgb : vec3(1);
     }
-    visibility /= float(PCF_TAPS);
-    transmittance /= float(PCF_TAPS);
+    visibility /= float(pcf_taps);
+    transmittance /= float(pcf_taps);
     // Instead of stopping hard at the edge of the light's cone (none when the
     // shadow map covers the whole view)
     float fade = 1.0;
@@ -192,6 +221,60 @@ vec3 shadowFilter(Light l, vec3 Ldir)
         fade = smoothstep(0.0, l.shadow.w, min(edge.x, edge.y));
     }
     return mix(vec3(1), visibility * transmittance, fade);
+}
+
+// Blur radius of the fragment, in pixels, from its distance to the focus band
+// (thin lens circle of confusion)
+float blurRadius()
+{
+    if (u_Focus.z <= 0.0)
+        return 0.0;
+    float d = max(dot(u_ViewDepth, vec4(WorldPos, 1)), 1e-4);
+    float coc = 0.0;
+    if (d < u_Focus.x)
+        coc = u_Focus.x / d - 1.0;
+    else if (d > u_Focus.y)
+        coc = 1.0 - u_Focus.y / d;
+    return min(coc * u_Focus.z, u_Focus.w);
+}
+
+// Plane uv to texture uv
+vec2 mapUV(Instance inst, vec2 uv)
+{
+    if (inst.uv_mode == 1) {
+        vec2 c = uv - vec2(0.5);
+        float angle = atan(c.y, c.x) / _TWO_PI + 0.5 + inst.uv_offset.x;
+        float radius = length(c) * 2.0 + inst.uv_offset.y;
+        return vec2(angle, radius);
+    }
+    return uv + inst.uv_offset;
+}
+
+// Blurred texel of one of the plane's textures: average over a disk of
+// radius pixels around the fragment, weighted by alpha. px_to_uv: screen
+// pixels to plane uv; grad_x & grad_y: texture uv per pixel. Taps off the
+// plane are transparent (the plane grew to fit the blur, see lit_plane.vert),
+// or clamped on it with blur_clamp. They sample a mip level fitting their
+// spacing.
+vec4 blurredTexel(Instance inst, int unit, float layer, float radius, mat2 px_to_uv,
+    vec2 grad_x, vec2 grad_y, float angle)
+{
+    // Roughly one tap per 1.5 pixel², the spacing between taps prefiltered
+    int taps = clamp(int(radius * radius * 0.75), 8, BLUR_MAX_TAPS);
+    float spacing = max(radius * 1.77 / sqrt(float(taps)), 1.0);
+    vec4 sum = vec4(0);
+    for (int i = 0; i < taps; ++i) {
+        vec2 uv = UVW.xy + px_to_uv * (vogelDisk(i, taps, angle) * radius);
+        if (inst.blur_clamp != 0)
+            uv = clamp(uv, 0.0, 1.0);
+        else if (any(lessThan(uv, vec2(0))) || any(greaterThan(uv, vec2(1))))
+            continue;
+        vec4 t = textureGrad(u_Textures[unit], vec3(mapUV(inst, uv), layer),
+            grad_x * spacing, grad_y * spacing);
+        sum += vec4(t.rgb * t.a, t.a);
+    }
+    sum /= float(taps);
+    return vec4(sum.a > 0.0 ? sum.rgb / sum.a : vec3(0), sum.a);
 }
 
 // Cast shadows also hide part of the ambient light, scaling ambient_vis down
@@ -231,19 +314,31 @@ vec3 pointLight(Light l, vec3 N, inout float ambient_vis)
 void main()
 {
     Instance inst = instances[instanceIndex];
+    vec2 uv = mapUV(inst, UVW.xy);
+    // Derivatives before any discard (blurred taps sample explicit gradients)
+    mat2 px_to_uv = mat2(dFdx(UVW.xy), dFdy(UVW.xy));
+    vec2 grad_x = dFdx(uv);
+    vec2 grad_y = dFdy(uv);
+    vec3 world_x = dFdx(WorldPos);
+    vec3 world_y = dFdy(WorldPos);
     if (inst.texture_unit < 0)
         discard;
 
-    vec2 uv = UVW.xy;
-    if (inst.uv_mode == 1) {
-        vec2 c = uv - vec2(0.5);
-        float angle = atan(c.y, c.x) / _TWO_PI + 0.5 + inst.uv_offset.x;
-        float radius = length(c) * 2.0 + inst.uv_offset.y;
-        uv = vec2(angle, radius);
-    } else {
-        uv += inst.uv_offset;
+    float blur = blurRadius();
+    // Below half a pixel, the blur wouldn't show
+    bool blurred = blur >= 0.5;
+    // Off the plane, where it grew for a blur this fragment doesn't have
+    // (e.g. tilted planes)
+    if (!blurred && (any(lessThan(UVW.xy, vec2(-1e-3))) || any(greaterThan(UVW.xy, vec2(1.001)))))
+        discard;
+    if (blurred) {
+        blur_world_x = world_x * blur;
+        blur_world_y = world_y * blur;
     }
-    vec4 albedo = texture(u_Textures[inst.texture_unit], vec3(uv, UVW.z));
+    float blur_angle = interleavedGradientNoise(gl_FragCoord.xy) * _TWO_PI;
+    vec4 albedo = blurred
+        ? blurredTexel(inst, inst.texture_unit, UVW.z, blur, px_to_uv, grad_x, grad_y, blur_angle)
+        : texture(u_Textures[inst.texture_unit], vec3(uv, UVW.z));
     if (inst.grayscale == 1)
         albedo.rgb = vec3(dot(albedo.rgb, vec3(0.2126, 0.7152, 0.0722)));
     albedo.a *= Alpha;
@@ -258,7 +353,9 @@ void main()
     // Emission, linear: added after lighting, not shadowed
     vec3 emission = vec3(0);
     if (inst.emissive_unit >= 0) {
-        vec4 e = texture(u_Textures[inst.emissive_unit], vec3(uv, 0));
+        vec4 e = blurred
+            ? blurredTexel(inst, inst.emissive_unit, 0.0, blur, px_to_uv, grad_x, grad_y, blur_angle)
+            : texture(u_Textures[inst.emissive_unit], vec3(uv, 0));
         emission = pow(e.rgb, vec3(2.2)) * e.a * inst.emissive.rgb;
     }
 
@@ -271,7 +368,9 @@ void main()
 
     vec3 N = TBN[2];
     if (inst.normal_unit >= 0) {
-        vec3 n = texture(u_Textures[inst.normal_unit], vec3(uv, 0)).xyz * 2.0 - 1.0;
+        vec3 n = (blurred
+            ? blurredTexel(inst, inst.normal_unit, 0.0, blur, px_to_uv, grad_x, grad_y, blur_angle)
+            : texture(u_Textures[inst.normal_unit], vec3(uv, 0))).xyz * 2.0 - 1.0;
         if (u_NormalYDown == 1)
             n.y = -n.y;
         N = normalize(TBN * n);

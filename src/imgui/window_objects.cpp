@@ -426,6 +426,23 @@ static void print_object(SceneRenderer& renderer)
     ImGui::Checkbox("Shadows", &renderer.shadows);
     ImGui::InputInt("Shadow map size", &renderer.shadow_map_size, 256, 1024);
     ImGui::DragFloat("Shadow fit margin", &renderer.shadow_fit_margin, 0.01f, 0.f, 2.f);
+
+    ImGui::SeparatorText("Depth of field");
+    ImGui::Checkbox("Depth of field", &renderer.depth_of_field);
+    float focus[2] = { renderer.getFocusDistance(), renderer.getFocusBandWidth() };
+    if (ImGui::DragFloat2("Focus distance, band width", focus, 5.f, 0.f, FLT_MAX))
+        renderer.setFocus(focus[0], focus[1]);
+    float near_dist = renderer.getFocusNear();
+    if (ImGui::DragFloat("Focus near", &near_dist, 5.f, 0.f, FLT_MAX))
+        renderer.setFocusNear(near_dist);
+    float far_dist = renderer.getFocusFar();
+    if (ImGui::DragFloat("Focus far", &far_dist, 5.f, 0.f, FLT_MAX))
+        renderer.setFocusFar(far_dist);
+    ImGui::DragFloat("Focus transition (s)", &renderer.focus_transition, 0.01f, 0.f, 10.f);
+    ImGui::DragFloat("Blur at infinity (px)", &renderer.focus_blur, 0.1f, 0.f, 100.f);
+    ImGui::DragFloat("Max blur (px)", &renderer.focus_max_blur, 0.1f, 0.f, 100.f);
+
+    ImGui::SeparatorText("Lights");
     if (ImGui::Button("Add light"))
         renderer.addLight(PointLight::create());
     PointLight::Shared to_remove;

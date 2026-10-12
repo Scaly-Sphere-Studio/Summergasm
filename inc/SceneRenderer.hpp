@@ -131,6 +131,44 @@ public:
     // shadows of casters just outside of it
     float shadow_fit_margin{ 0.25f };
 
+    // Depth of field (lit planes only, see lighting). Planes are sharp inside
+    // the focus band [near, far], distances from the camera along its view
+    // axis, and blurred outside of it, the more the farther from it (thin
+    // lens): by focus_blur * (1 - far / d) pixels behind it, reaching
+    // focus_blur at infinity, and by focus_blur * (near / d - 1) in front of
+    // it, up to focus_max_blur. Each plane blurs its own texture: the blur
+    // doesn't spread past the plane's edges.
+    // Everything sharp: a band from 0 to FLT_MAX. Everything blurred: a band
+    // in front of every plane, e.g. setFocus(0, 0).
+    bool depth_of_field{ false };
+    // In pixels
+    float focus_blur{ 12.f };
+    float focus_max_blur{ 24.f };
+    // Band of band_width centered on distance
+    void setFocus(float distance, float band_width);
+    // Moves the whole band by delta, away from the camera if positive
+    void moveFocus(float delta);
+    // Each pushes the other bound if needed
+    void setFocusNear(float distance);
+    void setFocusFar(float distance);
+    // In seconds: the band lerps from where it is (even mid-transition) to
+    // the one set. Immediate before the first render. An infinite far bound
+    // lerps on 1 / far, as the blur behind the band does.
+    float focus_transition{ 0.5f };
+    // The band set, the one shown being mid-transition (see getCurrentFocus)
+    inline float getFocusNear() const noexcept { return _focus_near; };
+    inline float getFocusFar() const noexcept { return _focus_far; };
+    inline float getFocusDistance() const noexcept { return _focus_near / 2.f + _focus_far / 2.f; };
+    inline float getFocusBandWidth() const noexcept { return _focus_far - _focus_near; };
+    // The band shown: near & far
+    glm::vec2 getCurrentFocus() const;
+    // Blurred planes grow by their blur radius, the blur spreading past their
+    // edges and fading out. Clamped, the blur stays inside the plane, its
+    // edges sharp but never transparent: for planes reaching the screen's
+    // edges or tiled side by side. Default: clamped for scroll layer tiles
+    void setBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane, bool clamp);
+    bool getBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+
     // Normal maps: OpenGL convention (green up) unless set
     bool normal_map_y_down{ false };
     void setNormalMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
@@ -172,6 +210,14 @@ private:
     void _moveLayers();
     void _sortPlanes();
 
+    float _focus_near{ 0.f };
+    float _focus_far{ FLT_MAX };
+    // Band at the start of the transition (near & far)
+    glm::vec2 _focus_from{ 0.f, FLT_MAX };
+    std::chrono::steady_clock::time_point _focus_start;
+    bool _rendered{ false };
+    void _setFocus(float near_dist, float far_dist);
+
     struct PlaneLighting {
         SSS::GL::Texture::Shared normal_map;
         float factor{ 1.f };
@@ -180,7 +226,10 @@ private:
         SSS::GL::Texture::Shared emissive_map;
         glm::vec3 emissive_color{ 1.f };
         float emissive_intensity{ 1.f };
+        // Unset: whether the plane is a scroll layer tile
+        std::optional<bool> blur_clamp;
     };
+    bool _isScrollTile(SSS::GL::PlaneBase const* plane) const;
     std::unordered_map<SSS::GL::PlaneBase const*, PlaneLighting> _plane_lighting;
 
     // <name>.vert & <name>.frag of shaders_folder, reloaded when edited
@@ -214,7 +263,8 @@ private:
         float shadow_transmission;
         GLint cast_shadow;
         GLint emissive_unit;    // -1: none
-        GLint _padding[2];
+        GLint blur_clamp;       // 1: the blur stays inside the plane
+        GLint _padding;
         glm::vec4 emissive;     // linear, intensity applied
     };
     struct GPULight {

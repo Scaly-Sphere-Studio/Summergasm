@@ -117,6 +117,58 @@ void SceneRenderer::removeLight(PointLight::Shared const& light)
     std::erase(lights, light);
 }
 
+glm::vec2 SceneRenderer::getCurrentFocus() const
+{
+    std::chrono::duration<float> const elapsed = std::chrono::steady_clock::now() - _focus_start;
+    if (focus_transition <= 0.f || elapsed.count() >= focus_transition)
+        return glm::vec2(_focus_near, _focus_far);
+    float const t = std::max(elapsed.count() / focus_transition, 0.f);
+    float const near_dist = glm::mix(_focus_from.x, _focus_near, t);
+    float far_dist;
+    if (_focus_from.y == FLT_MAX || _focus_far == FLT_MAX) {
+        // Lerps on 1 / far: from or to infinity without a jump at the end
+        float const inv = glm::mix(1.f / std::max(_focus_from.y, 1e-3f),
+            1.f / std::max(_focus_far, 1e-3f), t);
+        far_dist = inv > 0.f ? std::min(1.f / inv, FLT_MAX) : FLT_MAX;
+    }
+    else
+        far_dist = glm::mix(_focus_from.y, _focus_far, t);
+    return glm::vec2(near_dist, std::max(far_dist, near_dist));
+}
+
+void SceneRenderer::_setFocus(float near_dist, float far_dist)
+{
+    // Lerp from the band shown, unless nothing was shown yet
+    _focus_from = _rendered ? getCurrentFocus() : glm::vec2(near_dist, far_dist);
+    _focus_start = std::chrono::steady_clock::now();
+    _focus_near = near_dist;
+    _focus_far = far_dist;
+}
+
+void SceneRenderer::setFocus(float distance, float band_width)
+{
+    float const half_width = std::max(band_width, 0.f) / 2.f;
+    float const near_dist = std::clamp(distance - half_width, 0.f, FLT_MAX);
+    _setFocus(near_dist, std::clamp(distance + half_width, near_dist, FLT_MAX));
+}
+
+void SceneRenderer::moveFocus(float delta)
+{
+    setFocus(getFocusDistance() + delta, getFocusBandWidth());
+}
+
+void SceneRenderer::setFocusNear(float distance)
+{
+    float const near_dist = std::clamp(distance, 0.f, FLT_MAX);
+    _setFocus(near_dist, std::max(_focus_far, near_dist));
+}
+
+void SceneRenderer::setFocusFar(float distance)
+{
+    float const far_dist = std::clamp(distance, 0.f, FLT_MAX);
+    _setFocus(std::min(_focus_near, far_dist), far_dist);
+}
+
 void SceneRenderer::setNormalMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
     SSS::GL::Texture::Shared normal_map)
 {
@@ -207,6 +259,31 @@ float SceneRenderer::getEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> co
 {
     auto const it = _plane_lighting.find(plane.get());
     return it == _plane_lighting.cend() ? 1.f : it->second.emissive_intensity;
+}
+
+bool SceneRenderer::_isScrollTile(SSS::GL::PlaneBase const* plane) const
+{
+    for (auto const& layer : _scroll_layers) {
+        for (auto const& tile : layer.planes) {
+            if (tile.get() == plane)
+                return true;
+        }
+    }
+    return false;
+}
+
+void SceneRenderer::setBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane, bool clamp)
+{
+    if (plane)
+        _plane_lighting[plane.get()].blur_clamp = clamp;
+}
+
+bool SceneRenderer::getBlurClamp(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    if (it != _plane_lighting.cend() && it->second.blur_clamp)
+        return *it->second.blur_clamp;
+    return _isScrollTile(plane.get());
 }
 
 static std::string read_file(std::filesystem::path const& path)
@@ -519,6 +596,11 @@ void SceneRenderer::_buildBatches()
     _translucent_casters = false;
     _batches.clear();
     _batches.emplace_back();
+    std::unordered_set<SSS::GL::PlaneBase const*> scroll_tiles;
+    for (auto const& layer : _scroll_layers) {
+        for (auto const& tile : layer.planes)
+            scroll_tiles.insert(tile.get());
+    }
 
     auto const is_missing = [](Batch const& batch, Texture const* texture) {
         return texture && std::find(batch.textures.cbegin(), batch.textures.cend(), texture)
@@ -541,6 +623,7 @@ void SceneRenderer::_buildBatches()
         instance.emissive_unit = -1;
         instance.lighting = 1.f;
         instance.cast_shadow = 1;
+        std::optional<bool> blur_clamp;
 
         // Only once loaded
         auto const loaded = [](Texture::Shared const& texture) -> Texture* {
@@ -562,7 +645,9 @@ void SceneRenderer::_buildBatches()
             emissive_map = loaded(it->second.emissive_map);
             instance.emissive = glm::vec4(to_linear(it->second.emissive_color,
                 it->second.emissive_intensity), 0.f);
+            blur_clamp = it->second.blur_clamp;
         }
+        instance.blur_clamp = blur_clamp.value_or(scroll_tiles.contains(plane.get())) ? 1 : 0;
 
         // Planes without texture keep their instance (discarded by the shaders)
         if (auto const texture = plane->getTexture()) {
@@ -830,6 +915,18 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
     glm::vec3 const ambient_lin = to_linear(ambient);
     glUniform3fv(shader.getUniformLocation("u_Ambient"), 1, &ambient_lin.x);
     glUniform4i(shader.getUniformLocation("u_TileInfo"), viewport.x, viewport.y, _tiles_x, tile_size);
+    // Distance along the view axis = -(view * p).z: the view's third row, negated
+    glm::mat4 const view = camera ? camera->getView() : glm::mat4(1);
+    glm::vec4 const view_depth = -glm::vec4(view[0][2], view[1][2], view[2][2], view[3][2]);
+    glUniform4fv(shader.getUniformLocation("u_ViewDepth"), 1, &view_depth.x);
+    glm::vec2 const current_focus = getCurrentFocus();
+    glm::vec4 const focus(current_focus.x, current_focus.y,
+        depth_of_field ? std::max(focus_blur, 0.f) : 0.f, std::max(focus_max_blur, 0.f));
+    glUniform4fv(shader.getUniformLocation("u_Focus"), 1, &focus.x);
+    // World size of a pixel: x, times the distance if y = 1 (perspective)
+    glm::mat4 const proj = camera ? camera->getProjection() : glm::mat4(1);
+    glUniform2f(shader.getUniformLocation("u_PixelSize"),
+        2.f / (proj[1][1] * static_cast<float>(std::max(viewport.w, 1))), proj[3][3] == 0.f ? 1.f : 0.f);
     _setTextureUnits(shader);
 
     // Shadow maps on the first reserved units
@@ -870,6 +967,7 @@ void SceneRenderer::render()
 {
     if (!isActive())
         return;
+    _rendered = true;
     for (auto& layer : _scroll_layers) {
         if (!layer.is_setup)
             _setupLayer(layer);
