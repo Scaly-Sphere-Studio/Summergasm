@@ -1,5 +1,6 @@
 #include "Summergasm.hpp"
 #include "Dialog.hpp"
+#include "MapOverlay.hpp"
 #include "SignalManager.hpp"
 #include "Settings.hpp"
 
@@ -21,6 +22,7 @@ void exitSummergasm(int status)
 {
     free_imgui_objects();
     mylua_free_dialog();
+    MapOverlay::free();
     // Lua handlers must go before the Lua state does
     signals::clear();
     g->lua_scenes.clear();
@@ -101,6 +103,8 @@ int main(void) try
         mylua_run_active_scenes();
         // Started by the scenes, before scroll_y is reset (scrolls their log)
         Dialog::updateAll();
+        // M opens it, unless a dialog is shown: after the dialogs updated
+        MapOverlay::update();
         // Music fades & audio events, after the scenes' play_music() requests
         SSS::Audio::update();
         g->scroll_y = 0.0;

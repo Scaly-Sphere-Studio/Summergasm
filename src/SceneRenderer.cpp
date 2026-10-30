@@ -1,5 +1,6 @@
 #include "SceneRenderer.hpp"
 #include "Dialog.hpp"
+#include "MapOverlay.hpp"
 #include <fstream>
 
 SceneRenderer::Shared SceneRenderer::create(SSS::GL::Camera::Shared camera)
@@ -7,6 +8,25 @@ SceneRenderer::Shared SceneRenderer::create(SSS::GL::Camera::Shared camera)
     Shared renderer(new SceneRenderer());
     renderer->camera = std::move(camera);
     return renderer;
+}
+
+void SceneRenderer::removePlane(std::shared_ptr<SSS::GL::PlaneBase> plane)
+{
+    if (!plane)
+        return;
+    _plane_lighting.erase(plane.get());
+    SSS::GL::PlaneRenderer::removePlane(std::move(plane));
+}
+
+void SceneRenderer::addMesh(FoldingMap::Shared mesh)
+{
+    if (mesh && std::find(_meshes.cbegin(), _meshes.cend(), mesh) == _meshes.cend())
+        _meshes.push_back(std::move(mesh));
+}
+
+void SceneRenderer::removeMesh(FoldingMap::Shared const& mesh)
+{
+    std::erase(_meshes, mesh);
 }
 
 void SceneRenderer::addScrollLayer(std::vector<SSS::GL::Plane::Shared> const& planes)
@@ -157,7 +177,7 @@ float SceneRenderer::getDialogBlur() const
 
 void SceneRenderer::_updateDialogBlur()
 {
-    bool const on = dialog_blur && Dialog::anyVisible();
+    bool const on = dialog_blur && (Dialog::anyVisible() || MapOverlay::isOpen());
     if (on == _dialog_blur_on)
         return;
     // Fades from the amount shown, unless nothing was shown yet
@@ -282,6 +302,135 @@ float SceneRenderer::getEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> co
     return it == _plane_lighting.cend() ? 1.f : it->second.emissive_intensity;
 }
 
+int SceneRenderer::addGradient(SSS::Math::Gradient<glm::vec4> gradient)
+{
+    if (static_cast<int>(_gradients.size()) >= max_gradients)
+        return -1;
+    _gradients.push_back(std::move(gradient));
+    _gradients_dirty = true;
+    return static_cast<int>(_gradients.size()) - 1;
+}
+
+void SceneRenderer::setGradientStops(int index, SSS::Math::Gradient<glm::vec4> gradient)
+{
+    if (index < 0 || index >= static_cast<int>(_gradients.size()))
+        return;
+    _gradients[index] = std::move(gradient);
+    _gradients_dirty = true;
+}
+
+void SceneRenderer::clearGradients()
+{
+    _gradients.clear();
+    _gradients_dirty = true;
+}
+
+void SceneRenderer::setGradient(std::shared_ptr<SSS::GL::PlaneBase> const& plane, int index)
+{
+    if (plane)
+        _plane_lighting[plane.get()].gradient = std::clamp(index, -1, max_gradients - 1);
+}
+
+int SceneRenderer::getGradient(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? -1 : it->second.gradient;
+}
+
+// One row per gradient, 256 samples each, unused rows transparent
+void SceneRenderer::_updateGradientAtlas()
+{
+    if (!_gradients_dirty && _gradient_atlas)
+        return;
+    constexpr int size = max_gradients;
+    std::vector<uint32_t> pixels(size * size, 0);
+    for (size_t row = 0; row < _gradients.size(); ++row) {
+        for (int x = 0; x < size; ++x) {
+            glm::vec4 const color = glm::clamp(
+                _gradients[row].evaluate(static_cast<float>(x) / (size - 1)), 0.f, 1.f);
+            glm::uvec4 const c(glm::round(color * 255.f));
+            // RGBA bytes, in memory order
+            pixels[row * size + x] = c.r | (c.g << 8) | (c.b << 16) | (c.a << 24);
+        }
+    }
+    if (!_gradient_atlas)
+        _gradient_atlas = SSS::GL::Texture::create();
+    _gradient_atlas->editRawPixels(pixels.data(), size, size);
+    _gradients_dirty = false;
+}
+
+void SceneRenderer::setCausticsMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    SSS::GL::Texture::Shared caustics_map)
+{
+    if (!plane)
+        return;
+    if (caustics_map)
+        caustics_map->setRepeat(true);
+    _plane_lighting[plane.get()].caustics_map = std::move(caustics_map);
+}
+
+SSS::GL::Texture::Shared SceneRenderer::getCausticsMap(
+    std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? nullptr : it->second.caustics_map;
+}
+
+void SceneRenderer::setCausticsColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    glm::vec3 const& color)
+{
+    if (plane)
+        _plane_lighting[plane.get()].caustics_color = color;
+}
+
+glm::vec3 SceneRenderer::getCausticsColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? glm::vec3(1.f) : it->second.caustics_color;
+}
+
+void SceneRenderer::setCausticsIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    float intensity)
+{
+    if (plane)
+        _plane_lighting[plane.get()].caustics_intensity = std::max(intensity, 0.f);
+}
+
+float SceneRenderer::getCausticsIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? 1.f : it->second.caustics_intensity;
+}
+
+void SceneRenderer::setCausticsTile(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float tile)
+{
+    if (plane)
+        _plane_lighting[plane.get()].caustics_tile = std::max(tile, 0.001f);
+}
+
+float SceneRenderer::getCausticsTile(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? 100.f : it->second.caustics_tile;
+}
+
+void SceneRenderer::setCausticsWaterline(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+    float water_y, float fade)
+{
+    if (!plane)
+        return;
+    auto& lighting = _plane_lighting[plane.get()];
+    lighting.caustics_water_y = water_y;
+    lighting.caustics_fade = std::max(fade, 0.001f);
+}
+
+glm::vec2 SceneRenderer::getCausticsWaterline(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const
+{
+    auto const it = _plane_lighting.find(plane.get());
+    return it == _plane_lighting.cend() ? glm::vec2(0.f, 100.f)
+        : glm::vec2(it->second.caustics_water_y, it->second.caustics_fade);
+}
+
 bool SceneRenderer::_isScrollTile(SSS::GL::PlaneBase const* plane) const
 {
     for (auto const& layer : _scroll_layers) {
@@ -324,7 +473,7 @@ bool SceneRenderer::HotShaders::update()
     last_check = now;
 
     std::filesystem::path const vert = shaders_folder + name + ".vert";
-    std::filesystem::path const frag = shaders_folder + name + ".frag";
+    std::filesystem::path const frag = shaders_folder + (frag_name.empty() ? name : frag_name) + ".frag";
     std::error_code ec_v, ec_f;
     auto const new_vert_time = std::filesystem::last_write_time(vert, ec_v);
     auto const new_frag_time = std::filesystem::last_write_time(frag, ec_f);
@@ -407,6 +556,18 @@ bool SceneRenderer::_computeViewSlab(std::array<glm::vec3, 8>& corners) const
                 d_min = std::min(d_min, depth);
                 d_max = std::max(d_max, depth);
             }
+        }
+    }
+    // Meshes: the corners of their bounding box
+    for (auto const& draw : _mesh_draws) {
+        glm::mat4 const model_view = view * draw.mesh->getModelMat4();
+        glm::vec3 const lo = draw.mesh->getBoundsMin();
+        glm::vec3 const hi = draw.mesh->getBoundsMax();
+        for (int i = 0; i < 8; ++i) {
+            glm::vec3 const corner((i & 1) ? hi.x : lo.x, (i & 2) ? hi.y : lo.y, (i & 4) ? hi.z : lo.z);
+            float const depth = -(model_view * glm::vec4(corner, 1.f)).z;
+            d_min = std::min(d_min, depth);
+            d_max = std::max(d_max, depth);
         }
     }
     float const z_near = camera->getZNear();
@@ -642,6 +803,8 @@ void SceneRenderer::_buildBatches()
         instance.texture_unit = -1;
         instance.normal_unit = -1;
         instance.emissive_unit = -1;
+        instance.caustics_unit = -1;
+        instance.gradient = -1;
         instance.lighting = 1.f;
         instance.cast_shadow = 1;
         std::optional<bool> blur_clamp;
@@ -655,6 +818,7 @@ void SceneRenderer::_buildBatches()
         };
         Texture* normal_map = nullptr;
         Texture* emissive_map = nullptr;
+        Texture* caustics_map = nullptr;
         auto const it = _plane_lighting.find(plane.get());
         if (it != _plane_lighting.cend()) {
             instance.lighting = it->second.factor;
@@ -667,6 +831,20 @@ void SceneRenderer::_buildBatches()
             instance.emissive = glm::vec4(to_linear(it->second.emissive_color,
                 it->second.emissive_intensity), 0.f);
             blur_clamp = it->second.blur_clamp;
+            if (it->second.gradient < static_cast<int>(_gradients.size()))
+                instance.gradient = it->second.gradient;
+            caustics_map = loaded(it->second.caustics_map);
+            if (caustics_map) {
+                instance.caustics = glm::vec4(to_linear(it->second.caustics_color,
+                    it->second.caustics_intensity), 0.f);
+                // Square tiles of caustics_tile world units, whatever the
+                // plane's size or mirroring: its world size along x & y
+                glm::mat4 const& model = plane->getModelMat4();
+                glm::vec2 const size(glm::length(glm::vec3(model[0])), glm::length(glm::vec3(model[1])));
+                instance.caustics_params = glm::vec4(
+                    size / it->second.caustics_tile,
+                    it->second.caustics_water_y, it->second.caustics_fade);
+            }
         }
         instance.blur_clamp = blur_clamp.value_or(scroll_tiles.contains(plane.get())) ? 1 : 0;
 
@@ -674,7 +852,7 @@ void SceneRenderer::_buildBatches()
         if (auto const texture = plane->getTexture()) {
             Batch* batch = &_batches.back();
             // Distinct textures missing from the batch (maps can be shared)
-            std::array<Texture*, 3> const used{ texture.get(), normal_map, emissive_map };
+            std::array<Texture*, 4> const used{ texture.get(), normal_map, emissive_map, caustics_map };
             size_t needed = 0;
             for (size_t i = 0; i < used.size(); ++i) {
                 if (is_missing(*batch, used[i])
@@ -690,6 +868,8 @@ void SceneRenderer::_buildBatches()
                 instance.normal_unit = unit_of(*batch, normal_map);
             if (emissive_map)
                 instance.emissive_unit = unit_of(*batch, emissive_map);
+            if (caustics_map)
+                instance.caustics_unit = unit_of(*batch, caustics_map);
             instance.uv_mode = static_cast<GLint>(texture->getUVMode());
             instance.grayscale = texture->getGrayscale() ? 1 : 0;
             instance.uv_offset = texture->getUVOffset();
@@ -697,6 +877,114 @@ void SceneRenderer::_buildBatches()
         _gpu_instances.push_back(instance);
         ++_batches.back().count;
     }
+
+    // Meshes: their own draws, after the planes' instances. Front texture on
+    // unit 0, back texture on unit 1 (the front one without back texture).
+    _mesh_draws.clear();
+    for (auto const& mesh : _meshes) {
+        if (mesh->hidden)
+            continue;
+        mesh->update();
+        Texture* const front = [&]() -> Texture* {
+            int w = 0, h = 0;
+            if (mesh->front)
+                mesh->front->getCurrentDimensions(w, h);
+            return w != 0 && h != 0 ? mesh->front.get() : nullptr;
+        }();
+        Texture* back = front;
+        if (mesh->back) {
+            int w = 0, h = 0;
+            mesh->back->getCurrentDimensions(w, h);
+            back = w != 0 && h != 0 ? mesh->back.get() : nullptr;
+        }
+        auto const face_instance = [&](Texture* texture, GLint unit) {
+            GPUInstance instance{};
+            instance.texture_unit = texture ? unit : -1;
+            instance.normal_unit = -1;
+            instance.emissive_unit = -1;
+            instance.caustics_unit = -1;
+            instance.gradient = -1;
+            instance.lighting = 1.f;
+            instance.cast_shadow = mesh->cast_shadow ? 1 : 0;
+            instance.blur_clamp = 1;
+            if (texture) {
+                instance.uv_mode = static_cast<GLint>(texture->getUVMode());
+                instance.grayscale = texture->getGrayscale() ? 1 : 0;
+                instance.uv_offset = texture->getUVOffset();
+            }
+            _gpu_instances.push_back(instance);
+            return static_cast<GLint>(_gpu_instances.size() - 1);
+        };
+        MeshDraw draw{ mesh.get(), -1, -1 };
+        draw.front_instance = face_instance(front, 0);
+        draw.back_instance = face_instance(back, back == front ? 0 : 1);
+        // Front layers on units 2 to 4, once loaded
+        for (size_t i = 0; i < mesh->layers.size(); ++i) {
+            int w = 0, h = 0;
+            if (mesh->layers[i])
+                mesh->layers[i]->getCurrentDimensions(w, h);
+            if (w != 0 && h != 0)
+                _gpu_instances[draw.front_instance].layer_units[i] = static_cast<GLint>(2 + i);
+        }
+        _mesh_draws.push_back(draw);
+    }
+}
+
+void SceneRenderer::_drawMeshes(SSS::GL::Shaders& shader, bool shadow) const
+{
+    if (_mesh_draws.empty())
+        return;
+    GLint const loc_model = shader.getUniformLocation("u_Model");
+    GLint const loc_base_instance = shader.getUniformLocation("u_BaseInstance");
+    GLint const loc_back = shader.getUniformLocation("u_Back");
+    GLint const loc_pinch = shader.getUniformLocation("u_Pinch");
+    GLboolean const cull = glIsEnabled(GL_CULL_FACE);
+    GLint cull_mode = GL_BACK;
+    glGetIntegerv(GL_CULL_FACE_MODE, &cull_mode);
+
+    for (auto const& draw : _mesh_draws) {
+        FoldingMap& mesh = *draw.mesh;
+        glm::mat4 const model = mesh.getModelMat4();
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, &model[0][0]);
+        glUniform4fv(loc_pinch, 1, &mesh.pinch.x);
+        if (mesh.front) {
+            glActiveTexture(GL_TEXTURE0);
+            mesh.front->bind();
+        }
+        if (mesh.back) {
+            glActiveTexture(GL_TEXTURE1);
+            mesh.back->bind();
+        }
+        if (!shadow) {
+            for (size_t i = 0; i < mesh.layers.size(); ++i) {
+                if (!mesh.layers[i])
+                    continue;
+                glActiveTexture(GL_TEXTURE2 + static_cast<GLenum>(i));
+                mesh.layers[i]->bind();
+            }
+        }
+        if (shadow) {
+            glDisable(GL_CULL_FACE);
+            glUniform1i(loc_base_instance, draw.front_instance);
+            mesh.draw();
+            continue;
+        }
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glUniform1i(loc_back, 0);
+        glUniform1i(loc_base_instance, draw.front_instance);
+        mesh.draw();
+        glCullFace(GL_FRONT);
+        glUniform1i(loc_back, 1);
+        glUniform1i(loc_base_instance, draw.back_instance);
+        mesh.draw();
+    }
+
+    if (cull)
+        glEnable(GL_CULL_FACE);
+    else
+        glDisable(GL_CULL_FACE);
+    glCullFace(static_cast<GLenum>(cull_mode));
 }
 
 static void upload_ssbo(GLuint ssbo, GLuint binding, GLsizeiptr size, void const* data)
@@ -849,6 +1137,15 @@ void SceneRenderer::_renderShadowMaps()
     glm::ivec4 prev_viewport;
     glGetIntegerv(GL_VIEWPORT, &prev_viewport.x);
 
+    // Meshes' opaque depth, with their own vertex shader
+    SSS::GL::Shaders* const mesh_shader = !_mesh_draws.empty() && _shadow_mesh_shaders.update()
+        ? _shadow_mesh_shaders.shaders.get() : nullptr;
+    if (mesh_shader) {
+        mesh_shader->use();
+        _setTextureUnits(*mesh_shader);
+        glUniform1i(mesh_shader->getUniformLocation("u_Pass"), 0);
+    }
+
     auto& shader = *_shadow_shaders.shaders;
     shader.use();
     _setTextureUnits(shader);
@@ -882,6 +1179,14 @@ void SceneRenderer::_renderShadowMaps()
         glDisable(GL_BLEND);
         glUniform1i(loc_pass, 0);
         _drawBatches(shader);
+        if (mesh_shader) {
+            mesh_shader->use();
+            glUniformMatrix4fv(mesh_shader->getUniformLocation("u_VP"), 1, GL_FALSE, &light.shadow_vp[0][0]);
+            glUniform4fv(mesh_shader->getUniformLocation("u_LightPosRadius"), 1, &light.position_radius.x);
+            _drawMeshes(*mesh_shader, true);
+            shader.use();
+            _vao.bind();
+        }
         if (!_translucent_casters)
             continue;
 
@@ -917,8 +1222,10 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
 
     glm::ivec4 viewport;
     glGetIntegerv(GL_VIEWPORT, &viewport.x);
-    _cullLights(viewport);
+    _updateGradientAtlas();
+    // Before the lights: the meshes' bounds fit the shadow maps
     _buildBatches();
+    _cullLights(viewport);
     upload_ssbo(_ssbos[0], 1, _gpu_instances);
     upload_ssbo(_ssbos[1], 2, _gpu_lights);
     upload_ssbo(_ssbos[2], 3, _tile_ranges);
@@ -929,53 +1236,72 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
     _updateVBOs();
     _renderShadowMaps();
 
-    shader.use();
     glm::mat4 const vp = camera ? camera->getVP() : glm::mat4(1);
-    glUniformMatrix4fv(shader.getUniformLocation("u_VP"), 1, GL_FALSE, &vp[0][0]);
-    glUniform1i(shader.getUniformLocation("u_NormalYDown"), normal_map_y_down ? 1 : 0);
     glm::vec3 const ambient_lin = to_linear(ambient);
-    glUniform3fv(shader.getUniformLocation("u_Ambient"), 1, &ambient_lin.x);
-    glUniform4i(shader.getUniformLocation("u_TileInfo"), viewport.x, viewport.y, _tiles_x, tile_size);
     // Distance along the view axis = -(view * p).z: the view's third row, negated
     glm::mat4 const view = camera ? camera->getView() : glm::mat4(1);
     glm::vec4 const view_depth = -glm::vec4(view[0][2], view[1][2], view[2][2], view[3][2]);
-    glUniform4fv(shader.getUniformLocation("u_ViewDepth"), 1, &view_depth.x);
     // Off: everything sharp, but for the dialog blur
     float const dialog_blur_amount = getDialogBlur();
     glm::vec2 const current_focus = depth_of_field ? getCurrentFocus() : glm::vec2(0.f, FLT_MAX);
     glm::vec4 const focus(current_focus.x, current_focus.y,
         depth_of_field || dialog_blur_amount > 0.f ? std::max(focus_blur, 0.f) : 0.f,
         std::max(focus_max_blur, 0.f));
-    glUniform4fv(shader.getUniformLocation("u_Focus"), 1, &focus.x);
-    glUniform1f(shader.getUniformLocation("u_FullBlur"), dialog_blur_amount);
-    // World size of a pixel: x, times the distance if y = 1 (perspective)
     glm::mat4 const proj = camera ? camera->getProjection() : glm::mat4(1);
-    glUniform2f(shader.getUniformLocation("u_PixelSize"),
-        2.f / (proj[1][1] * static_cast<float>(std::max(viewport.w, 1))), proj[3][3] == 0.f ? 1.f : 0.f);
-    _setTextureUnits(shader);
-
-    // Shadow maps on the first reserved units
+    // Shadow maps on the first reserved units, gradient atlas on the last one
     GLint const shadow_unit = static_cast<GLint>(
         SSS::GL::Window::maxGLSLTextureUnits() - reserved_texture_units);
+    float const time = std::chrono::duration<float>(
+        std::chrono::steady_clock::now() - _start_time).count();
+
+    // Same uniforms for the planes' and the meshes' shaders (lit_plane.frag)
+    auto const set_uniforms = [&](SSS::GL::Shaders& s) {
+        s.use();
+        glUniformMatrix4fv(s.getUniformLocation("u_VP"), 1, GL_FALSE, &vp[0][0]);
+        glUniform1i(s.getUniformLocation("u_NormalYDown"), normal_map_y_down ? 1 : 0);
+        glUniform3fv(s.getUniformLocation("u_Ambient"), 1, &ambient_lin.x);
+        glUniform4i(s.getUniformLocation("u_TileInfo"), viewport.x, viewport.y, _tiles_x, tile_size);
+        glUniform4fv(s.getUniformLocation("u_ViewDepth"), 1, &view_depth.x);
+        glUniform4fv(s.getUniformLocation("u_Focus"), 1, &focus.x);
+        glUniform1f(s.getUniformLocation("u_FullBlur"), dialog_blur_amount);
+        // World size of a pixel: x, times the distance if y = 1 (perspective)
+        glUniform2f(s.getUniformLocation("u_PixelSize"),
+            2.f / (proj[1][1] * static_cast<float>(std::max(viewport.w, 1))), proj[3][3] == 0.f ? 1.f : 0.f);
+        _setTextureUnits(s);
+        glUniform1i(s.getUniformLocation("u_ShadowDepth"), shadow_unit);
+        glUniform1i(s.getUniformLocation("u_ShadowColor"), shadow_unit + 1);
+        glUniform1i(s.getUniformLocation("u_ShadowDepthRaw"), shadow_unit + 2);
+        glUniform1i(s.getUniformLocation("u_Gradients"), shadow_unit + 3);
+        glUniform1f(s.getUniformLocation("u_Time"), time);
+        glUniform1f(s.getUniformLocation("u_CausticsSpeed"), caustics_speed);
+        glUniform1f(s.getUniformLocation("u_OpaqueCutoff"), std::clamp(opaque_cutoff, 0.005f, 1.f));
+        glUniform1i(s.getUniformLocation("u_Pass"), 0);
+    };
+
     glActiveTexture(GL_TEXTURE0 + shadow_unit);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _shadow_depth);
     glActiveTexture(GL_TEXTURE0 + shadow_unit + 1);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _translucent_casters ? _shadow_color : _shadow_white);
-    glUniform1i(shader.getUniformLocation("u_ShadowDepth"), shadow_unit);
-    glUniform1i(shader.getUniformLocation("u_ShadowColor"), shadow_unit + 1);
     glActiveTexture(GL_TEXTURE0 + shadow_unit + 2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _shadow_depth);
     glBindSampler(shadow_unit + 2, _shadow_depth_sampler);
-    glUniform1i(shader.getUniformLocation("u_ShadowDepthRaw"), shadow_unit + 2);
+    glActiveTexture(GL_TEXTURE0 + shadow_unit + 3);
+    _gradient_atlas->bind();
 
     if (clear_depth_buffer)
         glClear(GL_DEPTH_BUFFER_BIT);
+    set_uniforms(shader);
     GLint const loc_pass = shader.getUniformLocation("u_Pass");
-    glUniform1f(shader.getUniformLocation("u_OpaqueCutoff"), std::clamp(opaque_cutoff, 0.005f, 1.f));
     // Opaque texels, in any order: depth alone hides what's behind them
     glDisable(GL_BLEND);
-    glUniform1i(loc_pass, 0);
     _drawBatches(shader);
+    // Opaque meshes, then back to the planes
+    if (!_mesh_draws.empty() && _lit_mesh_shaders.update()) {
+        set_uniforms(*_lit_mesh_shaders.shaders);
+        _drawMeshes(*_lit_mesh_shaders.shaders, false);
+        shader.use();
+        _vao.bind();
+    }
     // Translucent ones, back to front, blended over the opaque ones
     glEnable(GL_BLEND);
     glDepthMask(GL_FALSE);

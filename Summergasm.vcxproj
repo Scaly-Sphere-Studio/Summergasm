@@ -44,6 +44,8 @@
     <ClCompile Include="src\mylua.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\SceneRenderer.cpp" />
+    <ClCompile Include="src\FoldingMap.cpp" />
+    <ClCompile Include="src\MapOverlay.cpp" />
     <ClCompile Include="src\renpy\RenpyParser.cpp" />
     <ClCompile Include="src\setup_lua.cpp" />
   </ItemGroup>
@@ -62,6 +64,8 @@
     <ClInclude Include="inc\Summergasm.hpp" />
     <ClInclude Include="inc\mylua.hpp" />
     <ClInclude Include="inc\SceneRenderer.hpp" />
+    <ClInclude Include="inc\FoldingMap.hpp" />
+    <ClInclude Include="inc\MapOverlay.hpp" />
     <ClInclude Include="src\renpy\RenpyParser.h" />
   </ItemGroup>
   <ItemGroup>

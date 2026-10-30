@@ -1,6 +1,7 @@
 #pragma once
 
 #include "includes.hpp"
+#include "FoldingMap.hpp"
 
 // Point light of a SceneRenderer. Colors are sRGB, as picked; the lighting
 // itself is computed in linear space.
@@ -83,6 +84,18 @@ public:
     ~SceneRenderer();
 
     void render() override;
+
+    // Also forgets the plane's settings below (lighting, maps, gradient...)
+    void removePlane(std::shared_ptr<SSS::GL::PlaneBase> plane);
+
+    // Meshes (see FoldingMap): opaque, lit only (not drawn with lighting
+    // off), drawn after the planes' opaque texels through
+    // resources/shaders/lit_mesh.vert & lit_plane.frag, and casting shadows
+    // through shadow_mesh.vert & shadow_plane.frag. Depth of field blurs them
+    // inside their own uv (as blur clamped planes).
+    void addMesh(FoldingMap::Shared mesh);
+    void removeMesh(FoldingMap::Shared const& mesh);
+    inline std::vector<FoldingMap::Shared> const& getMeshes() const noexcept { return _meshes; };
 
     // Adds the planes to the renderer, as a new scroll layer. The tiles are
     // lined up along x, from x = 0, once all their textures are loaded.
@@ -202,6 +215,44 @@ public:
     void setEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float intensity);
     float getEmissiveIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
 
+    // Gradient maps: rows of a 256x256 atlas, one gradient (sRGB RGBA) per row,
+    // evaluated at 256 points. A plane with a gradient has its texture's
+    // luminance mapped to the row's colors, alpha multiplied (e.g. greyscale
+    // assets tinted in many color schemes, sharing one texture).
+    // Returns the gradient's index, -1 when the atlas is full
+    static constexpr int max_gradients = 256;
+    int addGradient(SSS::Math::Gradient<glm::vec4> gradient);
+    void setGradientStops(int index, SSS::Math::Gradient<glm::vec4> gradient);
+    void clearGradients();
+    inline int getGradientCount() const noexcept { return static_cast<int>(_gradients.size()); };
+    // -1: none (default)
+    void setGradient(std::shared_ptr<SSS::GL::PlaneBase> const& plane, int index);
+    int getGradient(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+
+    // Caustics maps: tiled over the plane by tiles of caustics_tile world
+    // units, two scrolling copies combined (min) for a moving light pattern.
+    // Added after lighting like the emissive maps, times color & intensity,
+    // full at the waterline (world y) and fading out over fade world units
+    // above it, none below it. The map is set to repeat.
+    void setCausticsMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+        SSS::GL::Texture::Shared caustics_map);
+    SSS::GL::Texture::Shared getCausticsMap(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // sRGB, white by default
+    void setCausticsColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane, glm::vec3 const& color);
+    glm::vec3 getCausticsColor(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // 1 by default
+    void setCausticsIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float intensity);
+    float getCausticsIntensity(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // World size of a tile, 100 by default
+    void setCausticsTile(std::shared_ptr<SSS::GL::PlaneBase> const& plane, float tile);
+    float getCausticsTile(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // Waterline's world y (0) and fade height (100)
+    void setCausticsWaterline(std::shared_ptr<SSS::GL::PlaneBase> const& plane,
+        float water_y, float fade);
+    glm::vec2 getCausticsWaterline(std::shared_ptr<SSS::GL::PlaneBase> const& plane) const;
+    // In tiles per second, the same for every plane
+    float caustics_speed{ 0.05f };
+
 private:
     struct ScrollLayer {
         std::vector<std::shared_ptr<SSS::GL::PlaneBase>> planes;
@@ -239,13 +290,22 @@ private:
         float emissive_intensity{ 1.f };
         // Unset: whether the plane is a scroll layer tile
         std::optional<bool> blur_clamp;
+        int gradient{ -1 };
+        SSS::GL::Texture::Shared caustics_map;
+        glm::vec3 caustics_color{ 1.f };
+        float caustics_intensity{ 1.f };
+        float caustics_tile{ 100.f };
+        float caustics_water_y{ 0.f };
+        float caustics_fade{ 100.f };
     };
     bool _isScrollTile(SSS::GL::PlaneBase const* plane) const;
     std::unordered_map<SSS::GL::PlaneBase const*, PlaneLighting> _plane_lighting;
 
-    // <name>.vert & <name>.frag of shaders_folder, reloaded when edited
+    // <name>.vert & <frag_name>.frag (<name>.frag if empty) of
+    // shaders_folder, reloaded when edited
     struct HotShaders {
         std::string name;
+        std::string frag_name;
         SSS::GL::Shaders::Shared shaders;
         std::filesystem::file_time_type vert_time, frag_time;
         std::chrono::steady_clock::time_point last_check;
@@ -254,6 +314,31 @@ private:
     };
     HotShaders _lit_shaders{ "lit_plane" };
     HotShaders _shadow_shaders{ "shadow_plane" };
+    HotShaders _lit_mesh_shaders{ "lit_mesh", "lit_plane" };
+    HotShaders _shadow_mesh_shaders{ "shadow_mesh", "shadow_plane" };
+
+    std::vector<FoldingMap::Shared> _meshes;
+    // Instances of the drawn meshes, after the planes' (-1: none). Their
+    // front texture is bound to unit 0, their back one to unit 1, their
+    // front layers to units 2 to 4.
+    struct MeshDraw {
+        FoldingMap* mesh;
+        GLint front_instance;
+        GLint back_instance;
+    };
+    std::vector<MeshDraw> _mesh_draws;
+    // Lit: front & back faces culled apart, each with its instance. Shadows:
+    // both at once, with the front instance. Binds the mesh's VAOs, leaving
+    // none bound.
+    void _drawMeshes(SSS::GL::Shaders& shader, bool shadow) const;
+
+    std::vector<SSS::Math::Gradient<glm::vec4>> _gradients;
+    SSS::GL::Texture::Shared _gradient_atlas;
+    bool _gradients_dirty{ false };
+    // Rebuilds the atlas if a gradient changed (needs the GL context)
+    void _updateGradientAtlas();
+    // Caustics clock
+    std::chrono::steady_clock::time_point const _start_time{ std::chrono::steady_clock::now() };
 
     void _renderLit(SSS::GL::Shaders& shader);
     static bool _isDrawn(std::shared_ptr<SSS::GL::PlaneBase> const& plane);
@@ -275,8 +360,14 @@ private:
         GLint cast_shadow;
         GLint emissive_unit;    // -1: none
         GLint blur_clamp;       // 1: the blur stays inside the plane
-        GLint _padding;
+        GLint caustics_unit;    // -1: none
         glm::vec4 emissive;     // linear, intensity applied
+        glm::vec4 caustics;     // linear, intensity applied
+        glm::vec4 caustics_params;  // tiles along x & y, waterline y, fade height
+        GLint gradient;         // atlas row, -1: none
+        // Meshes' front layers (see FoldingMap::layers), composited over the
+        // texture in order, -1: none
+        GLint layer_units[3]{ -1, -1, -1 };
     };
     struct GPULight {
         glm::vec4 position_radius;
@@ -288,7 +379,7 @@ private:
         // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
         glm::vec4 shadow_frustum;
     };
-    static_assert(sizeof(GPUInstance) == 64&& sizeof(GPULight) == 160);
+    static_assert(sizeof(GPUInstance) == 112 && sizeof(GPULight) == 160);
 
     // Instanced draw: instances [first, first + count) and their textures,
     // bound to units [0, textures.size())

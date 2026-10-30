@@ -8,7 +8,7 @@ Scenes are Lua scripts (`resources/lua/*.lua`) driving the SSS libraries
 | What | Where | How to add / edit |
 |---|---|---|
 | Global functions bound from C++ (`load_scene`, `dialog`, `focus`, `play_sound`…) | [src/mylua.cpp](src/mylua.cpp), `setup_lua()` | `lua["name"] = [](...) { ... };` then add a line to `lua_commands_help` (same file, above `mylua_focus`) so `help()` shows its arguments |
-| Usertypes & tables bound from C++ (`SceneRenderer`, `PointLight`, `Dialog`, `vec2`, `signals`, `game`) | [src/mylua.cpp](src/mylua.cpp), `setup_lua()` | `usertype["member"] = &Class::member;` |
+| Usertypes & tables bound from C++ (`SceneRenderer`, `PointLight`, `FoldingMap`, `Dialog`, `vec2`, `signals`, `game`) | [src/mylua.cpp](src/mylua.cpp), `setup_lua()` | `usertype["member"] = &Class::member;` |
 | Console aliases (`h`, `?`, `ls`, `us`, `rs`, `m`) | [src/imgui/console.cpp](src/imgui/console.cpp), `ConsoleMemory::pushCmd()` | Add the alias to `alias_regex` **and** to the `if / else` chain below it |
 | SSS libraries (`GL`, `TR`, `Audio`, `vec3`, `RGBA`…) | [src/setup_lua.cpp](src/setup_lua.cpp) → `SSS::*::lua_setup_*()` | Bound in the SSS repositories (installed through vcpkg) |
 | Global Lua helpers | [resources/lua/model_functions.lua](resources/lua/model_functions.lua) | Plain `function name (args)` |
@@ -60,6 +60,7 @@ Typed in the in-game console. Quotes around the argument are optional.
 | `reload_scene` | `[scene_name]` | Reload a scene if its script compiles, default: the current one |
 | `auto_reload` | `[on]` | Reload the current scene when its file changes (if it compiles). On by default |
 | `list_scenes` | | List scenes & which are running |
+| `list_assets` | `folder` | Sorted file names in `resources/assets/<folder>`, empty if missing |
 | `menu` | | Unload every scene & return to the menu |
 | `console_set_env` | `scene_name` | Run console commands in a running scene's environment |
 | `console_reset_env` | | Run console commands in the global environment |
@@ -150,6 +151,7 @@ Colors are sRGB `vec3`.
 |---|---|---|
 | `SceneRenderer.new` | `[camera]` | New renderer |
 | `:addPlane` | `plane` | Add a plane |
+| `:removePlane` | `plane` | Remove a plane, and forget its settings below |
 | `:addScrollLayer` | `{ planes }` | Add the planes as a scroll layer: tiles lined up along x from x = 0, scrolling & wrapping together |
 | `:clearScrollLayers` | | Stop scrolling all layers (their planes stay) |
 | `.scroll_layer_count` | *read-only* | Number of scroll layers |
@@ -182,6 +184,58 @@ Colors are sRGB `vec3`.
 | `:setEmissiveMap` / `:getEmissiveMap` | `plane, [texture \| path \| nil]` | Added after lighting, not shadowed |
 | `:setEmissiveColor` / `:getEmissiveColor` | `plane, [color]` | White by default |
 | `:setEmissiveIntensity` / `:getEmissiveIntensity` | `plane, [intensity]` | 1 by default |
+| `:addGradient` | `{ { t, 0xRRGGBB \| vec3, [alpha], [ease] }, ... }` | New gradient map (a row of the 256x256 atlas, sRGB), returns its index (-1: full). `ease`: `"Linear"`, `"SineEaseIn"`, `"QuadEaseInOut"`... from that stop to the next |
+| `:setGradientStops` | `index, stops` | Replace a gradient |
+| `:clearGradients` | | Remove every gradient |
+| `.gradient_count` | *read-only* | Number of gradients |
+| `:setGradient` / `:getGradient` | `plane, [index \| nil]` | The texture's luminance (0 black .. 1 white) picks the gradient's color, alpha multiplied. -1: none (default) |
+| `:setCausticsMap` / `:getCausticsMap` | `plane, [texture \| path \| nil]` | Tiled caustics added after lighting, two scrolling copies combined. Set to repeat |
+| `:setCausticsColor` / `:getCausticsColor` | `plane, [color]` | White by default |
+| `:setCausticsIntensity` / `:getCausticsIntensity` | `plane, [intensity]` | 1 by default |
+| `:setCausticsTile` / `:getCausticsTile` | `plane, [tile]` | World size of a tile, 100 by default |
+| `:setCausticsWaterline` / `:getCausticsWaterline` | `plane, [water_y, fade]` | Full at the waterline (world y, 0), fading out over `fade` world units above it (100), none below |
+| `.caustics_speed` | number | Tiles per second, for every plane |
+| `:addMesh` / `:removeMesh` | `mesh` | Add / remove a `FoldingMap`: opaque, lit only, casts shadows |
+
+### `FoldingMap`
+
+Paper map mesh, 4 columns by 2 rows, folded like a city map: accordion folded
+along its vertical lines, then in half along the center line (top half behind,
+around a rounded crease). Column 0 stays in place: folded, the bottom left
+panel's front is on top. Lies in its local xy plane, centered on the origin,
+front toward +z. See [inc/FoldingMap.hpp](inc/FoldingMap.hpp). Also has
+`.translation`, `.rotation`, `.scaling` (as planes).
+
+| Member | Arguments | Description |
+|---|---|---|
+| `FoldingMap.new` | `front, back, width, height` | Textures (`back` can be `nil`: the front one, mirrored) or image paths in the assets folder |
+| `.half_fold` | number | 0 flat .. 1 folded in half. Fold it only with the accordion closed |
+| `.accordion` | number | 0 flat .. 1 closed |
+| `.thickness` | number | Distance between the folded layers (1.5) |
+| `.crease_radius` | number | Innermost layer's radius around the crease (3) |
+| `.width`, `.height` | *read-only* | Local size |
+| `.front`, `.back` | `GL.Texture` | Back faces show the back texture mirrored along x (the sheet turned over) |
+| `.hidden`, `.cast_shadow` | bool | |
+| `:getBounds` | | `min, max` (`vec3`): local bounding box of the current shape |
+
+### `map_overlay`
+
+City map shown over the current scene, like the dialog (see
+[inc/MapOverlay.hpp](inc/MapOverlay.hpp)): a `FoldingMap` of
+`assets/map/map_front.png` & `map_back.png`, 2D (orthographic, unlit, with a
+faux perspective pinching the panels folding away). The map is turned 180
+degrees in its plane: the folded map shows its blue cover centered on screen,
+then unfolds from behind it, away from the viewer, until the map's front fills
+the screen (edges cropped), the cover at the top right; the scenes are
+blurred behind it. **M** opens it (not while a dialog is shown) or
+closes it, **Escape** closes it, and a dialog showing up closes it.
+
+| Function | Description |
+|---|---|
+| `map_overlay.open()` / `.close()` / `.toggle()` | Open (ignored while a dialog is shown) / fold back & close |
+| `map_overlay.hide()` | Remove at once, without folding back |
+| `map_overlay.is_open()` | Opening or open |
+| `map_overlay.is_shown()` | Drawn: opening, open or closing |
 
 ### `PointLight`
 
@@ -228,6 +282,23 @@ Created with `PointLight.new()`, added with `SceneRenderer:addLight()`. Distance
 | `depth_scale` | `D, z` | Scale keeping a plane at depth `z` the same pixel size, from distance `D` |
 | `move_camera` | `camera, speed` | Move the camera with the arrow keys |
 | `zoom_camera` | `camera, zoom` | Zoom with keypad + / - |
+
+### Boats ([boat_factory.lua](resources/lua/boat_factory.lua))
+
+Sailboats assembled from greyscale parts in `resources/assets/boat/parts/`:
+`boat_<i>.png` (hull), `mat_<i>.png` (mast), `toile_<i>.png` (sail), all on the
+same canvas. Any index of each part combines with the others, tinted by the
+gradients of `boat_palettes`.
+
+| Function / value | Arguments | Description |
+|---|---|---|
+| `boat_parts` | `[refresh]` | Indices found per part (`{ boat = { 1, 2 }, ... }`), scanned once or again if `refresh` |
+| `boat_palettes` | | Gradient stops per part (`boat`, `mat`, `toile`), placed on the parts' grey levels |
+| `register_boat_palettes` | `renderer` | Add every palette to a `SceneRenderer` (done by `create_boat` if needed) |
+| `create_boat` | `renderer, [{ x, z, height, mirror, boat, mat, toile, palettes }]` | New random boat, waterline at y = 0. Returns `{ planes, hull, x, z, height... }` |
+| `update_boat` | `boat, t` | Bobbing & roll, `t` in seconds |
+| `remove_boat` | `renderer, boat` | Remove its planes |
+| `boat_waterline` | | Waterline, as a share of the canvas height from its bottom |
 
 ### Scene-local helpers & callbacks
 

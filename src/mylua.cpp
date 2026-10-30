@@ -1,5 +1,6 @@
 #include "mylua.hpp"
 #include "Dialog.hpp"
+#include "MapOverlay.hpp"
 #include "GameState.hpp"
 #include "Settings.hpp"
 #include "SignalManager.hpp"
@@ -455,6 +456,11 @@ bool mylua_return_to_menu()
 // menu is the current scene): the caller then closes the game.
 bool mylua_on_escape()
 {
+    // Closes the map first
+    if (MapOverlay::isOpen()) {
+        MapOverlay::close();
+        return true;
+    }
     // The dialog closes its log itself
     if (shared_dialog && shared_dialog->isVisible() && shared_dialog->isLogOpen())
         return true;
@@ -561,6 +567,7 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "game.save",          { "[name]",       "Save the game values (game.vars) in saves/<name>.json, default: save" } },
     { "game.load",          { "[name]",       "Load the game values of saves/<name>.json, default: save" } },
     { "game.reset",         { "",             "Erase every game value (game.vars)" } },
+    { "list_assets",        { "folder",       "Sorted file names in resources/assets/<folder>, empty if missing" } },
     { "console_set_env",    { "scene_name", "Run console commands in a running scene's env" } },
     { "console_reset_env",  { "",           "Run console commands in the global env" } },
     // Depth of field of every SceneRenderer of the window, distances from the camera
@@ -570,6 +577,58 @@ static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "focus_far",          { "distance",               "Far end of the sharp band (pushes the near one if needed). focus_near(0) focus_far(math.huge): all sharp" } },
     { "focus_move",         { "delta",                  "Move the sharp band, away from the camera if positive" } },
 };
+
+// Sorted names of the files in assets/<folder>, empty if it doesn't exist
+static std::vector<std::string> mylua_list_assets(std::string const& folder)
+{
+    std::vector<std::string> names;
+    std::error_code ec;
+    for (auto const& entry : std::filesystem::directory_iterator(g->assets_folder + folder, ec)) {
+        if (entry.is_regular_file(ec))
+            names.push_back(entry.path().filename().string());
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+// Gradient of stops { t, 0xRRGGBB | vec3 (sRGB), [alpha = 1], [ease = "Linear"] },
+// the ease applying from that stop to the next
+static SSS::Math::Gradient<glm::vec4> lua_to_gradient(sol::table const& stops)
+{
+    using SSS::Math::EaseType;
+    static std::map<std::string, EaseType> const eases{
+        { "Linear", EaseType::Linear },
+        { "SineEaseIn", EaseType::SineEaseIn },
+        { "SineEaseOut", EaseType::SineEaseOut },
+        { "SineEaseInOut", EaseType::SineEaseInOut },
+        { "QuadEaseIn", EaseType::QuadEaseIn },
+        { "QuadEaseOut", EaseType::QuadEaseOut },
+        { "QuadEaseInOut", EaseType::QuadEaseInOut },
+        { "CubicEaseIn", EaseType::CubicEaseIn },
+        { "CubicEaseOut", EaseType::CubicEaseOut },
+        { "CubicEaseInOut", EaseType::CubicEaseInOut },
+    };
+    SSS::Math::Gradient<glm::vec4> gradient;
+    for (size_t i = 1; i <= stops.size(); ++i) {
+        sol::optional<sol::table> const stop = stops[i];
+        if (!stop)
+            continue;
+        float const t = stop->get_or(1, 0.f);
+        glm::vec3 rgb(1.f);
+        sol::object const color = (*stop)[2];
+        if (color.is<glm::vec3>())
+            rgb = color.as<glm::vec3>();
+        else if (color.get_type() == sol::type::number) {
+            uint32_t const hex = color.as<uint32_t>();
+            rgb = glm::vec3((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff) / 255.f;
+        }
+        float const alpha = stop->get_or(3, 1.f);
+        auto const ease = eases.find(stop->get_or<std::string>(4, "Linear"));
+        gradient.push({ t, glm::vec4(rgb, alpha) },
+            ease == eases.cend() ? EaseType::Linear : ease->second);
+    }
+    return gradient;
+}
 
 // Applies func to every SceneRenderer of the window, then prints their focus band
 template <typename Func>
@@ -691,6 +750,9 @@ bool setup_lua()
         return watch_scenes;
     };
     lua["list_scenes"] = mylua_list_scenes;
+    lua["list_assets"] = [](std::string const& folder) {
+        return sol::as_table(mylua_list_assets(folder));
+    };
     lua["menu"] = []() {
         return !mylua_return_to_menu();
     };
@@ -781,6 +843,9 @@ bool setup_lua()
     ), sol::base_classes, sol::bases<GL::PlaneRenderer, GL::RendererBase, Base>());
     scene_renderer["addPlane"] = [](SceneRenderer& ren, GL::Plane* plane) {
         ren.addPlane(GL::Plane::get(plane));
+    };
+    scene_renderer["removePlane"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        ren.removePlane(GL::Plane::get(plane));
     };
     scene_renderer["addScrollLayer"] = [](SceneRenderer& ren, std::vector<GL::Plane*> planes) {
         std::vector<GL::Plane::Shared> vec;
@@ -887,6 +952,70 @@ bool setup_lua()
     scene_renderer["getEmissiveIntensity"] = [](SceneRenderer& ren, GL::Plane* plane) {
         return ren.getEmissiveIntensity(GL::Plane::get(plane));
     };
+    // Gradient maps: addGradient({ { t, 0xRRGGBB | vec3, [alpha], [ease] }, ... })
+    // returns the gradient's index (-1: atlas full), given to setGradient
+    scene_renderer["addGradient"] = [](SceneRenderer& ren, sol::table const& stops) {
+        return ren.addGradient(lua_to_gradient(stops));
+    };
+    scene_renderer["setGradientStops"] = [](SceneRenderer& ren, int index, sol::table const& stops) {
+        ren.setGradientStops(index, lua_to_gradient(stops));
+    };
+    scene_renderer["clearGradients"] = &SceneRenderer::clearGradients;
+    scene_renderer["gradient_count"] = sol::property(&SceneRenderer::getGradientCount);
+    // setGradient(plane, index | nil)
+    scene_renderer["setGradient"] = sol::overload(
+        [](SceneRenderer& ren, GL::Plane* plane, int index) {
+            ren.setGradient(GL::Plane::get(plane), index);
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, sol::lua_nil_t) {
+            ren.setGradient(GL::Plane::get(plane), -1);
+        }
+    );
+    scene_renderer["getGradient"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getGradient(GL::Plane::get(plane));
+    };
+    // setCausticsMap(plane, texture | path in the assets folder | nil)
+    scene_renderer["setCausticsMap"] = sol::overload(
+        [](SceneRenderer& ren, GL::Plane* plane, GL::Texture* texture) {
+            ren.setCausticsMap(GL::Plane::get(plane), texture ? GL::Texture::get(texture) : nullptr);
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, std::string const& path) {
+            ren.setCausticsMap(GL::Plane::get(plane), GL::Texture::create(std::filesystem::path{ path }));
+        },
+        [](SceneRenderer& ren, GL::Plane* plane, sol::lua_nil_t) {
+            ren.setCausticsMap(GL::Plane::get(plane), nullptr);
+        }
+    );
+    scene_renderer["getCausticsMap"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getCausticsMap(GL::Plane::get(plane));
+    };
+    scene_renderer["setCausticsColor"] = [](SceneRenderer& ren, GL::Plane* plane, glm::vec3 const& color) {
+        ren.setCausticsColor(GL::Plane::get(plane), color);
+    };
+    scene_renderer["getCausticsColor"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getCausticsColor(GL::Plane::get(plane));
+    };
+    scene_renderer["setCausticsIntensity"] = [](SceneRenderer& ren, GL::Plane* plane, float intensity) {
+        ren.setCausticsIntensity(GL::Plane::get(plane), intensity);
+    };
+    scene_renderer["getCausticsIntensity"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getCausticsIntensity(GL::Plane::get(plane));
+    };
+    scene_renderer["setCausticsTile"] = [](SceneRenderer& ren, GL::Plane* plane, float tile) {
+        ren.setCausticsTile(GL::Plane::get(plane), tile);
+    };
+    scene_renderer["getCausticsTile"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        return ren.getCausticsTile(GL::Plane::get(plane));
+    };
+    scene_renderer["setCausticsWaterline"] = [](SceneRenderer& ren, GL::Plane* plane, float water_y, float fade) {
+        ren.setCausticsWaterline(GL::Plane::get(plane), water_y, fade);
+    };
+    // Returns water_y, fade
+    scene_renderer["getCausticsWaterline"] = [](SceneRenderer& ren, GL::Plane* plane) {
+        glm::vec2 const waterline = ren.getCausticsWaterline(GL::Plane::get(plane));
+        return std::make_tuple(waterline.x, waterline.y);
+    };
+    scene_renderer["caustics_speed"] = &SceneRenderer::caustics_speed;
 
     // See PointLight in SceneRenderer.hpp
     auto point_light = lua.new_usertype<PointLight>("PointLight",
@@ -915,6 +1044,51 @@ bool setup_lua()
     point_light["shadow_softness"] = &PointLight::shadow_softness;
     point_light["shadow_ambient"] = &PointLight::shadow_ambient;
     point_light["size"] = &PointLight::size;
+
+    // Folding paper map mesh, see FoldingMap.hpp
+    // FoldingMap.new(front, back, width, height): textures (back can be nil:
+    // the front one mirrored) or image paths in the assets folder
+    auto folding_map = lua.new_usertype<FoldingMap>("FoldingMap", sol::factories(
+        [](GL::Texture* front, GL::Texture* back, float width, float height) {
+            return FoldingMap::create(front ? GL::Texture::get(front) : nullptr,
+                back ? GL::Texture::get(back) : nullptr, width, height);
+        },
+        [](std::string const& front, std::string const& back, float width, float height) {
+            return FoldingMap::create(GL::Texture::create(std::filesystem::path{ front }),
+                GL::Texture::create(std::filesystem::path{ back }), width, height);
+        }
+    ), sol::base_classes, sol::bases<GL::ModelBase>());
+    folding_map["half_fold"] = sol::property(&FoldingMap::getHalfFold, &FoldingMap::setHalfFold);
+    folding_map["flap"] = sol::property(&FoldingMap::getFlap, &FoldingMap::setFlap);
+    folding_map["accordion"] = sol::property(&FoldingMap::getAccordion, &FoldingMap::setAccordion);
+    folding_map["thickness"] = sol::property(&FoldingMap::getThickness, &FoldingMap::setThickness);
+    folding_map["crease_radius"] = sol::property(&FoldingMap::getCreaseRadius, &FoldingMap::setCreaseRadius);
+    folding_map["width"] = sol::readonly_property(&FoldingMap::getWidth);
+    folding_map["height"] = sol::readonly_property(&FoldingMap::getHeight);
+    folding_map["front"] = &FoldingMap::front;
+    folding_map["back"] = &FoldingMap::back;
+    folding_map["hidden"] = &FoldingMap::hidden;
+    folding_map["cast_shadow"] = &FoldingMap::cast_shadow;
+    // Returns min, max (vec3): local bounding box of the current shape
+    folding_map["getBounds"] = [](FoldingMap& map) {
+        map.update();
+        return std::make_tuple(map.getBoundsMin(), map.getBoundsMax());
+    };
+    scene_renderer["addMesh"] = [](SceneRenderer& ren, std::shared_ptr<FoldingMap> mesh) {
+        ren.addMesh(std::move(mesh));
+    };
+    scene_renderer["removeMesh"] = [](SceneRenderer& ren, std::shared_ptr<FoldingMap> const& mesh) {
+        ren.removeMesh(mesh);
+    };
+
+    // City map over the scene (M key), see MapOverlay.hpp
+    sol::table map_overlay = lua.create_named_table("map_overlay");
+    map_overlay["open"] = &MapOverlay::open;
+    map_overlay["close"] = &MapOverlay::close;
+    map_overlay["toggle"] = &MapOverlay::toggle;
+    map_overlay["hide"] = &MapOverlay::hide;
+    map_overlay["is_open"] = &MapOverlay::isOpen;
+    map_overlay["is_shown"] = &MapOverlay::isShown;
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once
