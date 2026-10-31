@@ -45,6 +45,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\SceneRenderer.cpp" />
     <ClCompile Include="src\FoldingMap.cpp" />
+    <ClCompile Include="src\MapContent.cpp" />
     <ClCompile Include="src\MapOverlay.cpp" />
     <ClCompile Include="src\renpy\RenpyParser.cpp" />
     <ClCompile Include="src\setup_lua.cpp" />
@@ -65,6 +66,7 @@
     <ClInclude Include="inc\mylua.hpp" />
     <ClInclude Include="inc\SceneRenderer.hpp" />
     <ClInclude Include="inc\FoldingMap.hpp" />
+    <ClInclude Include="inc\MapContent.hpp" />
     <ClInclude Include="inc\MapOverlay.hpp" />
     <ClInclude Include="src\renpy\RenpyParser.h" />
   </ItemGroup>

@@ -47,6 +47,15 @@ public:
 
     SSS::GL::Texture::Shared front;
     SSS::GL::Texture::Shared back;
+    // Printed over the front texture, in order, with the same uv (front
+    // faces only): e.g. the map's roads, monuments & pins (see MapContent).
+    // Each one can be rebaked alone.
+    std::array<SSS::GL::Texture::Shared, 3> layers;
+    // Over each layer: a small texture printed on the uv rect (u0, v0, u1,
+    // v1) of the paper, none if the rect is empty. E.g. what animates on the
+    // map, baked every frame without rebaking the whole layer.
+    std::array<SSS::GL::Texture::Shared, 3> overlays;
+    std::array<glm::vec4, 3> overlay_rects{};
     bool hidden{ false };
     bool cast_shadow{ true };
 
@@ -94,6 +103,10 @@ public:
 
     // Recomputes the mesh if a fold or the paper changed
     void update();
+    // Texture uv (v = 0 at the top) of the paper seen at local x & y, from
+    // the front (+z): the nearest one, as shaped by the last update(). None
+    // off the paper. Ignores pinch.
+    std::optional<glm::vec2> uvAt(glm::vec2 xy) const;
     // Uploads the mesh if update changed it, binds the VAO and draws the
     // triangles with the shader in use, then unbinds the VAO. Needs the GL
     // context.
@@ -130,6 +143,7 @@ private:
     int _index_count{ 0 };
 
     std::vector<Vertex> _vertices;
+    std::vector<uint32_t> _indices;
     glm::vec3 _bounds_min{ 0.f }, _bounds_max{ 0.f };
 
     SSS::GL::Basic::VAO _vao;

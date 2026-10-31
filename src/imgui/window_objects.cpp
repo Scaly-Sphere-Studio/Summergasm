@@ -426,6 +426,8 @@ static void print_object(SceneRenderer& renderer)
     ImGui::Checkbox("Shadows", &renderer.shadows);
     ImGui::InputInt("Shadow map size", &renderer.shadow_map_size, 256, 1024);
     ImGui::DragFloat("Shadow fit margin", &renderer.shadow_fit_margin, 0.01f, 0.f, 2.f);
+    ImGui::Text("Gradients: %d / %d", renderer.getGradientCount(), SceneRenderer::max_gradients);
+    ImGui::DragFloat("Caustics speed (tiles/s)", &renderer.caustics_speed, 0.001f, -2.f, 2.f);
 
     ImGui::SeparatorText("Depth of field");
     ImGui::Checkbox("Depth of field", &renderer.depth_of_field);

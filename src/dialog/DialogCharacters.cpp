@@ -103,7 +103,7 @@ void DialogCharacters::_animate()
             _sprites[i].set(_sprites[i].tex, s.to.foot, s.to.height, s.to.mirror);
             continue;
         }
-        float const e = t * t * (3.f - 2.f * t);                    // smoothstep
+        float const e = SSS::Math::easeInOutSine(t);
         Pose const& a = *s.from;
         float const dir = s.to.foot.x < a.foot.x ? -1.f : 1.f;
         // Turns around to face its new side: narrows to nothing, then widens mirrored

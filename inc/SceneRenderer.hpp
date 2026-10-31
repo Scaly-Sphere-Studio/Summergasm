@@ -311,6 +311,8 @@ private:
         std::chrono::steady_clock::time_point last_check;
         // Returns whether the shaders are usable
         bool update();
+        // The driver's compile & link messages of these sources
+        static std::string _diagnose(std::string const& vert, std::string const& frag);
     };
     HotShaders _lit_shaders{ "lit_plane" };
     HotShaders _shadow_shaders{ "shadow_plane" };
@@ -320,7 +322,7 @@ private:
     std::vector<FoldingMap::Shared> _meshes;
     // Instances of the drawn meshes, after the planes' (-1: none). Their
     // front texture is bound to unit 0, their back one to unit 1, their
-    // front layers to units 2 to 4.
+    // front layers to units 2 to 4, their overlays to units 5 to 7.
     struct MeshDraw {
         FoldingMap* mesh;
         GLint front_instance;
@@ -368,6 +370,11 @@ private:
         // Meshes' front layers (see FoldingMap::layers), composited over the
         // texture in order, -1: none
         GLint layer_units[3]{ -1, -1, -1 };
+        // Their overlays (see FoldingMap::overlays), each over its layer, on
+        // its uv rect, -1: none
+        GLint overlay_units[3]{ -1, -1, -1 };
+        GLint _padding0{ 0 };
+        glm::vec4 overlay_rects[3]{};
     };
     struct GPULight {
         glm::vec4 position_radius;
@@ -379,7 +386,7 @@ private:
         // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
         glm::vec4 shadow_frustum;
     };
-    static_assert(sizeof(GPUInstance) == 112 && sizeof(GPULight) == 160);
+    static_assert(sizeof(GPUInstance) == 176 && sizeof(GPULight) == 160);
 
     // Instanced draw: instances [first, first + count) and their textures,
     // bound to units [0, textures.size())

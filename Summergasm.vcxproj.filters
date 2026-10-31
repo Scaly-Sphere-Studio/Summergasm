@@ -67,6 +67,9 @@
     <ClCompile Include="src\FoldingMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\MapContent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\MapOverlay.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -136,6 +139,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="inc\FoldingMap.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\MapContent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="inc\MapOverlay.hpp">

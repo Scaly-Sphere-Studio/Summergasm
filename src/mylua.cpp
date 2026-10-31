@@ -1,6 +1,7 @@
 #include "mylua.hpp"
 #include "Dialog.hpp"
 #include "MapOverlay.hpp"
+#include "MapContent.hpp"
 #include "GameState.hpp"
 #include "Settings.hpp"
 #include "SignalManager.hpp"
@@ -1089,6 +1090,50 @@ bool setup_lua()
     map_overlay["hide"] = &MapOverlay::hide;
     map_overlay["is_open"] = &MapOverlay::isOpen;
     map_overlay["is_shown"] = &MapOverlay::isShown;
+    // What's printed on it (see MapContent.hpp): the state is kept in the
+    // game's values, so saved with it
+    map_overlay["unlock_location"] = [](std::string const& id) { map_content::setLocationUnlocked(id, true); };
+    map_overlay["lock_location"] = [](std::string const& id) { map_content::setLocationUnlocked(id, false); };
+    map_overlay["is_location_unlocked"] = &map_content::isLocationUnlocked;
+    map_overlay["unlock_road"] = [](std::string const& id) { map_content::setRoadUnlocked(id, true); };
+    map_overlay["lock_road"] = [](std::string const& id) { map_content::setRoadUnlocked(id, false); };
+    map_overlay["is_road_unlocked"] = &map_content::isRoadUnlocked;
+    map_overlay["show_character"] = [](std::string const& id) { map_content::setCharacterShown(id, true); };
+    map_overlay["hide_character"] = [](std::string const& id) { map_content::setCharacterShown(id, false); };
+    map_overlay["is_character_shown"] = &map_content::isCharacterShown;
+    map_overlay["move_character"] = &map_content::moveCharacter;
+    map_overlay["character_location"] = &map_content::characterLocation;
+    // { id = { name = ..., scene = ... }, ... }
+    map_overlay["locations"] = [](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        for (auto const& loc : map_content::data().locations)
+            out[loc.id] = lua.create_table_with("name", loc.name, "scene", loc.scene);
+        return out;
+    };
+    map_overlay["clear"] = &map_content::clear;
+    // Ordered as in the JSON: { { id = ..., ... }, ... }
+    map_overlay["all_locations"] = [](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        for (auto const& loc : map_content::data().locations)
+            out.add(lua.create_table_with("id", loc.id, "name", loc.name, "scene", loc.scene));
+        return out;
+    };
+    map_overlay["all_roads"] = [](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        for (auto const& road : map_content::data().roads)
+            out.add(lua.create_table_with("id", road.id, "from", road.from, "to", road.to));
+        return out;
+    };
+    map_overlay["all_characters"] = [](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        for (auto const& ch : map_content::data().characters)
+            out.add(lua.create_table_with("id", ch.id, "location", ch.location));
+        return out;
+    };
 
     // Ren'Py dialog node, see Dialog.hpp & dialog.lua
     // Dialog.new() is idle, Dialog.new(name) starts the conversation at once

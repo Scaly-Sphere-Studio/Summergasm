@@ -465,6 +465,47 @@ static std::string read_file(std::filesystem::path const& path)
 // Loads the shaders, and reloads them when their files are edited (checked
 // twice per second). Shaders failing to compile are logged by SSS::GL and the
 // previous ones are kept.
+// SSS::GL::Shaders logs compile errors but swallows link errors: compiles &
+// links again to return the driver's messages
+std::string SceneRenderer::HotShaders::_diagnose(std::string const& vert, std::string const& frag)
+{
+    std::string out;
+    GLuint const program = glCreateProgram();
+    auto const compile = [&](GLenum type, std::string const& source, char const* label) {
+        GLuint const id = glCreateShader(type);
+        char const* c_str = source.c_str();
+        glShaderSource(id, 1, &c_str, nullptr);
+        glCompileShader(id);
+        GLint ok = GL_FALSE, length = 0;
+        glGetShaderiv(id, GL_COMPILE_STATUS, &ok);
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        if (!ok && length > 1) {
+            std::string msg(static_cast<size_t>(length), '\0');
+            glGetShaderInfoLog(id, length, nullptr, msg.data());
+            out += std::string("\n") + label + " compile: " + msg.c_str();
+        }
+        glAttachShader(program, id);
+        return id;
+    };
+    GLuint const v = compile(GL_VERTEX_SHADER, vert, "vertex");
+    GLuint const f = compile(GL_FRAGMENT_SHADER, frag, "fragment");
+    glLinkProgram(program);
+    GLint ok = GL_FALSE, length = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &ok);
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+    if (!ok && length > 1) {
+        std::string msg(static_cast<size_t>(length), '\0');
+        glGetProgramInfoLog(program, length, nullptr, msg.data());
+        out += std::string("\nlink: ") + msg.c_str();
+    }
+    glDetachShader(program, v);
+    glDetachShader(program, f);
+    glDeleteShader(v);
+    glDeleteShader(f);
+    glDeleteProgram(program);
+    return out.empty() ? "no message from the driver" : out;
+}
+
 bool SceneRenderer::HotShaders::update()
 {
     auto const now = std::chrono::steady_clock::now();
@@ -490,7 +531,7 @@ bool SceneRenderer::HotShaders::update()
     new_shaders->loadFromStrings(read_file(vert), read_file(frag));
     // Failed programs stay at id 0, which has no uniform
     if (new_shaders->getUniformLocation("u_VP") == -1) {
-        LOG_ERR("SceneRenderer: " + name + " shaders failed to load, see the log above");
+        LOG_ERR("SceneRenderer: " + name + " shaders failed to load: " + _diagnose(read_file(vert), read_file(frag)));
         return shaders != nullptr;
     }
     shaders = std::move(new_shaders);
@@ -926,6 +967,17 @@ void SceneRenderer::_buildBatches()
             if (w != 0 && h != 0)
                 _gpu_instances[draw.front_instance].layer_units[i] = static_cast<GLint>(2 + i);
         }
+        // Their overlays on units 5 to 7, once baked, on a rect
+        for (size_t i = 0; i < mesh->overlays.size(); ++i) {
+            glm::vec4 const rect = mesh->overlay_rects[i];
+            int w = 0, h = 0;
+            if (mesh->overlays[i] && rect.z > rect.x && rect.w > rect.y)
+                mesh->overlays[i]->getCurrentDimensions(w, h);
+            if (w == 0 || h == 0)
+                continue;
+            _gpu_instances[draw.front_instance].overlay_units[i] = static_cast<GLint>(5 + i);
+            _gpu_instances[draw.front_instance].overlay_rects[i] = rect;
+        }
         _mesh_draws.push_back(draw);
     }
 }
@@ -961,6 +1013,12 @@ void SceneRenderer::_drawMeshes(SSS::GL::Shaders& shader, bool shadow) const
                     continue;
                 glActiveTexture(GL_TEXTURE2 + static_cast<GLenum>(i));
                 mesh.layers[i]->bind();
+            }
+            for (size_t i = 0; i < mesh.overlays.size(); ++i) {
+                if (!mesh.overlays[i])
+                    continue;
+                glActiveTexture(GL_TEXTURE5 + static_cast<GLenum>(i));
+                mesh.overlays[i]->bind();
             }
         }
         if (shadow) {

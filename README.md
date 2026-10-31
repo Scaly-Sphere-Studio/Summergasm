@@ -3,6 +3,35 @@
 Scenes are Lua scripts (`resources/lua/*.lua`) driving the SSS libraries
 (`GL`, `TR`, `Audio`) plus the game's own bindings, listed below.
 
+## Resources folder setup
+
+`resources/` is not part of this repository: it lives on the shared folder
+`\\192.168.1.242\Summergasm_res` (mapped as `Z:`) and is reached through a
+directory symlink at the repo root. The game loads everything from
+`<repo>/resources/` at runtime (see [src/main.cpp](src/main.cpp)), and the
+`.vcxproj` items point there too, so the link must exist before building or
+running.
+
+From an **elevated** `cmd` (or with Windows Developer Mode on), in the repo root:
+
+```bat
+mklink /D resources \\192.168.1.242\Summergasm_res
+```
+
+- Target the UNC path, not `Z:\`: mapped drives are per logon session, so an
+  elevated prompt doesn't see `Z:`, and a link to `Z:\` breaks for any
+  process that doesn't have the mapping.
+- A junction (`mklink /J`) can't point to a network share, use `/D`.
+- Windows must allow local → remote symlinks. Check with
+  `fsutil behavior query SymlinkEvaluation`, and if disabled enable it (admin):
+  `fsutil behavior set SymlinkEvaluation L2R:1`.
+- The share must grant read/write access to your Windows account (edit assets,
+  Lua and shaders in place). Mount it with saved credentials so it is
+  available after a reboot:
+  `net use Z: \\192.168.1.242\Summergasm_res /persistent:yes`.
+- `resources` is git-ignored: changes to resources are shared through the
+  network folder, not committed.
+
 ## Where things are declared
 
 | What | Where | How to add / edit |

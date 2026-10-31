@@ -1,7 +1,9 @@
 #include "MapOverlay.hpp"
 #include "Dialog.hpp"
 #include "FoldingMap.hpp"
+#include "MapContent.hpp"
 #include "SceneRenderer.hpp"
+#include "lua_include.hpp"
 
 #include <chrono>
 #include <string_view>
@@ -46,6 +48,11 @@ namespace {
     // map's plane is drawn at d / (d + this) of its size. Subtle: a column
     // folded edge-on reaches ~0.7.
     constexpr float pinch_distance = 800.f;
+    // Open, the map isn't flat: its vertical folds stay a little closed
+    // (0 -> 1), columns 0 & 2 tilted by accordion_rest * 180 degrees, the
+    // creases showing. The horizontal fold opens flat (half_rest = 0).
+    constexpr float accordion_rest = 0.1f;
+    constexpr float half_rest = 0.f;
 
     using Clock = std::chrono::steady_clock;
 
@@ -53,6 +60,8 @@ namespace {
         SSS::GL::Camera::Shared camera;
         SceneRenderer::Shared renderer;
         FoldingMap::Shared map;
+        // Printed on it: roads, monuments, characters' pins
+        std::unique_ptr<map_content::Layers> layers;
         // Local center of the map's current shape, kept on the screen's
         // center while opening, kept as is while closing
         glm::vec2 center{ 0.f };
@@ -72,30 +81,10 @@ namespace {
     };
     std::unique_ptr<State> state;
 
-    // Easings, 0 -> 1 over t = 0 -> 1 (clamped)
-    // Slow start & end, sharper than a cubic: the cover's flip
-    float ease_in_out_quart(float t)
+    // Easings' t, 0 -> 1 (SSS::Math's don't clamp)
+    float unit(float t)
     {
-        t = std::clamp(t, 0.f, 1.f);
-        if (t < 0.5f)
-            return 8.f * t * t * t * t;
-        float const f = -2.f * t + 2.f;
-        return 1.f - f * f * f * f / 2.f;
-    }
-
-    // Fast start, quick stop: the accordion pulled open
-    float ease_out_cubic(float t)
-    {
-        t = std::clamp(t, 0.f, 1.f);
-        float const f = 1.f - t;
-        return 1.f - f * f * f;
-    }
-
-    // Slow start, fast end: the map thrown out of the screen
-    float ease_in_cubic(float t)
-    {
-        t = std::clamp(t, 0.f, 1.f);
-        return t * t * t;
+        return std::clamp(t, 0.f, 1.f);
     }
 
     // Needs the window's context (FoldingMap's & SceneRenderer's GL objects)
@@ -124,7 +113,54 @@ namespace {
         state->map->cast_shadow = false;
         // Turned 180 degrees in its plane, centered on the origin
         state->map->setRotation(glm::vec3(0.f, 0.f, 180.f));
+        state->layers = std::make_unique<map_content::Layers>(map_w, map_h);
+        state->map->layers = state->layers->textures();
+        state->map->overlays = state->layers->overlays();
         state->renderer->addMesh(state->map);
+    }
+
+    // Open, flat & still: what's printed on it can be clicked, & animated
+    bool fullyOpen()
+    {
+        return state->shown && !state->closing && state->closing_t <= 0.f && state->t >= end_time;
+    }
+
+    // The cursor on the flat map, in its pixels as seen on screen (from its
+    // top left), if over it
+    std::optional<glm::vec2> cursorOnMap()
+    {
+        auto const [w, h] = g->window->getDimensions();
+        if (w <= 0 || h <= 0)
+            return std::nullopt;
+        auto const [cx, cy] = g->window->getCursorPos();
+        // Orthographic, 1 world unit = zoom pixels, straight on (y up)
+        float const zoom = state->camera->getZoom();
+        glm::vec3 const cam = state->camera->getPosition();
+        glm::vec2 const world = glm::vec2(cam)
+            + glm::vec2(cx - w / 2.f, h / 2.f - cy) / zoom;
+        // Local: the paper, turned 180 degrees on screen (the model turns
+        // it), seen straight on: the folded shape's texel under the cursor
+        glm::vec4 const local = glm::inverse(state->map->getModelMat4()) * glm::vec4(world, 0.f, 1.f);
+        auto const uv = state->map->uvAt(glm::vec2(local));
+        if (!uv)
+            return std::nullopt;
+        // Image pixels from its top left, then turned as seen on screen
+        return glm::vec2(map_w, map_h) - *uv * glm::vec2(map_w, map_h);
+    }
+
+    // map_overlay.on_location_clicked(id, scene), see global_setup.lua
+    void callLocationHook(std::string const& id)
+    {
+        map_content::Location const* loc = map_content::data().location(id);
+        sol::object const hook = g->lua()["map_overlay"]["on_location_clicked"];
+        if (!loc || hook.get_type() != sol::type::function)
+            return;
+        sol::protected_function const f = hook;
+        sol::protected_function_result const result = f(id, loc->scene);
+        if (!result.valid()) {
+            sol::error const err = result;
+            LOG_CTX_ERR("map_overlay.on_location_clicked", err.what());
+        }
     }
 
     // Folds & frames the map at the current time. The map is turned 180
@@ -141,18 +177,22 @@ namespace {
     {
         FoldingMap& map = *state->map;
         float const t = state->t;
-        float half = 1.f - ease_in_out_quart((t - half_start) / half_time);
-        float const opened = ease_out_cubic((t - accordion_start) / accordion_time);
-        float accordion = 1.f - opened;
+        // Folded (1) to open, a little folded still (rest)
+        // Slow start & end, sharper than a cubic: the cover's flip
+        float half = glm::mix(half_rest, 1.f, 1.f - SSS::Math::easeInOutQuart(unit((t - half_start) / half_time)));
+        // Fast start, quick stop: the accordion pulled open
+        float const opened = SSS::Math::easeOutCubic(unit((t - accordion_start) / accordion_time));
+        float accordion = glm::mix(accordion_rest, 1.f, 1.f - opened);
         // Opening: scaled up, back to its size with the accordion
         float scale = glm::mix(opening_scale, 1.f, opened);
         float slide = 0.f;
         if (state->closing_t > 0.f) {
-            float const c = ease_in_out_quart(state->closing_t);
+            float const c = SSS::Math::easeInOutQuart(unit(state->closing_t));
             half = glm::mix(state->from_half, 1.f, c);
             accordion = glm::mix(state->from_accordion, 1.f, c);
             scale *= glm::mix(1.f, closing_scale, c);
-            slide = ease_in_cubic(state->closing_t);
+            // Slow start, fast end: the map thrown out of the screen
+            slide = SSS::Math::easeInCubic(unit(state->closing_t));
         }
         map.setHalfFold(half);
         map.setFlap(accordion);
@@ -227,13 +267,17 @@ void MapOverlay::open()
         // Closing backward, from closed to open
         state->t = end_time;
         state->closing_t = 1.f;
-        state->from_half = 0.f;
-        state->from_accordion = 0.f;
+        state->from_half = half_rest;
+        state->from_accordion = accordion_rest;
         state->center = glm::vec2(0.f);
     }
     state->opened_once = true;
     state->last_update = Clock::now();
     pose();
+    state->layers->setHovered(std::nullopt);
+    state->layers->update(0.f, false);
+    state->map->overlays = state->layers->overlays();
+    state->map->overlay_rects = state->layers->overlayRects();
     g->window->addRenderer(state->renderer);
 }
 
@@ -304,6 +348,26 @@ void MapOverlay::update()
     else
         state->t = std::min(state->t + dt, end_time);
     pose();
+
+    // What's printed on it: hovered & clicked when open, flat & still
+    bool const open = fullyOpen() && !Dialog::anyVisible();
+    std::optional<std::string> hovered;
+    if (open) {
+        if (auto const pos = cursorOnMap())
+            hovered = state->layers->locationAt(*pos);
+    }
+    state->layers->setHovered(hovered);
+    {
+        SSS::GL::Context const context = g->window->setContext();
+        state->layers->update(dt, open);
+    }
+    // A sprite's texture when one thing pops: changes with what animates
+    state->map->overlays = state->layers->overlays();
+    state->map->overlay_rects = state->layers->overlayRects();
+    if (hovered && g->window->getClickInputs()[GLFW_MOUSE_BUTTON_LEFT].is_pressed()) {
+        close();
+        callLocationHook(*hovered);
+    }
 }
 
 void MapOverlay::free()

@@ -17,6 +17,9 @@
 // bottom right, then removes the renderer. That full opening is played the
 // first time only: opening again plays closing backward.
 // The scenes are blurred behind it (see SceneRenderer::dialog_blur).
+// Roads, monuments & characters' pins are printed on it (see MapContent.hpp).
+// Open, flat & still, its monuments are hovered & clicked: a click closes it
+// and calls map_overlay.on_location_clicked(id, scene) (see global_setup.lua).
 //
 //   M         open (not while a dialog is shown) / close
 //   Escape    close

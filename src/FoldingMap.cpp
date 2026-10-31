@@ -115,7 +115,8 @@ void FoldingMap::_buildRows()
 // between consecutive rows. Counter clockwise seen from the front.
 void FoldingMap::_buildIndices()
 {
-    std::vector<uint32_t> indices;
+    std::vector<uint32_t>& indices = _indices;
+    indices.clear();
     auto const row_count = static_cast<uint32_t>(_rows.size());
     auto const stride = static_cast<uint32_t>(_grid_columns);
     uint32_t start = 0;
@@ -251,6 +252,34 @@ void FoldingMap::_rebuild()
             _bounds_max = glm::max(_bounds_max, v.position);
         }
     }
+}
+
+std::optional<glm::vec2> FoldingMap::uvAt(glm::vec2 xy) const
+{
+    std::optional<glm::vec2> uv;
+    float nearest = -FLT_MAX;
+    for (size_t i = 0; i + 2 < _indices.size(); i += 3) {
+        Vertex const& a = _vertices[_indices[i]];
+        Vertex const& b = _vertices[_indices[i + 1]];
+        Vertex const& c = _vertices[_indices[i + 2]];
+        // Barycentric coordinates in the xy plane
+        glm::vec2 const ab = glm::vec2(b.position - a.position);
+        glm::vec2 const ac = glm::vec2(c.position - a.position);
+        float const det = ab.x * ac.y - ab.y * ac.x;
+        if (std::abs(det) < 1e-6f)
+            continue;
+        glm::vec2 const ap = xy - glm::vec2(a.position);
+        float const v = (ap.x * ac.y - ap.y * ac.x) / det;
+        float const w = (ab.x * ap.y - ab.y * ap.x) / det;
+        if (v < 0.f || w < 0.f || v + w > 1.f)
+            continue;
+        float const z = a.position.z + v * (b.position.z - a.position.z) + w * (c.position.z - a.position.z);
+        if (z <= nearest)
+            continue;
+        nearest = z;
+        uv = a.uv + v * (b.uv - a.uv) + w * (c.uv - a.uv);
+    }
+    return uv;
 }
 
 void FoldingMap::draw()
