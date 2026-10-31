@@ -1,7 +1,0 @@
-{
-    "name": "Camille",
-    "color": "#f2b632",
-    "expressions": {
-        "neutral": { "mouth": [0.57, 0.185], "mouth_dir": [-0.6, 0.8], "tail": "straight", "intensity": 0.0 }
-    }
-}
