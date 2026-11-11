@@ -5,6 +5,7 @@
 #include "GameState.hpp"
 #include "Settings.hpp"
 #include "SignalManager.hpp"
+#include "Transition.hpp"
 #include "renpy/RenpyParser.h"
 
 #include <algorithm>
@@ -555,12 +556,18 @@ struct LuaCommandHelp {
 static std::map<std::string, LuaCommandHelp> const lua_commands_help{
     { "help",               { "[filter]",   "List commands & functions (aliases: h, ? [filter])" } },
     { "file_script",        { "path",       "Run resources/lua/<path>.lua once" } },
-    { "load_scene",         { "scene_name",   "Load & run a scene, unloads the menu (alias: ls <scene>)" } },
+    { "load_scene",         { "scene_name, [options]", "Load & run a scene, unloads the menu (alias: ls <scene>). options.transition: see transition()" } },
     { "unload_scene",       { "[scene_name]", "Unload a scene, default: current one (alias: us [scene])" } },
     { "reload_scene",       { "[scene_name]", "Reload a scene if its script compiles, default: current one (alias: rs [scene])" } },
     { "auto_reload",        { "[on]",         "Reload the current scene when its file changes (if it compiles), toggles without argument. On by default" } },
     { "list_scenes",       { "",             "List scenes & which are running (alias: ls)" } },
-    { "menu",               { "",             "Unload every scene & return to the menu (alias: m, key: Escape)" } },
+    { "menu",               { "[options]",    "Unload every scene & return to the menu (alias: m, key: Escape). options: see load_scene()" } },
+    { "transition",         { "name, [duration, options]", "Screen transition, see list_transitions(). options: color, on_midpoint, on_done; shader transitions also take palette, strips, softness, angle, mask. Single: covers the screen then reveals it, on_midpoint at the midpoint. Dual: fades the previous frame into the new scene" } },
+    { "transition_stop",    { "",             "Stop the running transition, its callbacks are not called" } },
+    { "list_transitions",   { "",             "List the transitions, with their kind" } },
+    { "transition_cover",   { "x",            "Cover-then-reveal curve of a single transition layer, 0 to 1 then 0 (for layer functions of x)" } },
+    { "transition_smooth",  { "x",            "Smoothstep of x clamped to [0, 1], the easing of the dual transitions" } },
+    { "corner_radius",      { "aspect",       "Radius reaching the farthest corner of the screen (screen height 1), for transition layers" } },
     { "dialog",             { "name",         "Play resources/dialogs/<name>[.rpy|.txt] (or a direct path) over the current scene, replacing the previous one. Returns the Dialog" } },
     { "debug_mouths",       { "[on]",         "Show each character's mouth (circle) & direction (line) used by the speech bubble tails, toggles without argument. Reloads resources/characters/*.json" } },
     { "dialog_tails",       { "[on]",         "Draw the speech bubble tails, toggles without argument. Saved in settings.ini" } },
@@ -724,6 +731,331 @@ static void mylua_help(sol::optional<std::string> filter)
     print("Libraries: GL, TR, Audio, SceneRenderer, vec3... (Tab to autocomplete, e.g. GL.Plane.)");
 }
 
+// 0xRRGGBB to sRGB
+static glm::vec3 lua_rgb(int hex)
+{
+    return glm::vec3((hex >> 16) & 0xFF, (hex >> 8) & 0xFF, hex & 0xFF) / 255.f;
+}
+
+// Lua function as a callback: its errors are logged, not thrown
+static std::function<void()> lua_callback(sol::protected_function fn, std::string const& what)
+{
+    return [fn, what]() {
+        sol::protected_function_result const result = fn();
+        if (!result.valid()) {
+            sol::error const err = result;
+            LOG_CTX_ERR(what, err.what());
+        }
+    };
+}
+
+// Options of transition() and of the scene switches, see lua_commands_help
+static transition::Options lua_transition_options(sol::table const& t)
+{
+    transition::Options options;
+    if (auto const hex = t.get<sol::optional<int>>("color"))
+        options.color = lua_rgb(*hex);
+    if (auto const palette = t.get<sol::optional<sol::table>>("palette")) {
+        for (auto const& [unused_key, value] : *palette) {
+            if (value.is<int>())
+                options.palette.push_back(lua_rgb(value.as<int>()));
+        }
+    }
+    if (auto const mask = t.get<sol::optional<std::string>>("mask"))
+        options.mask = *mask;
+    if (auto const strips = t.get<sol::optional<int>>("strips"))
+        options.strips = *strips;
+    if (auto const softness = t.get<sol::optional<float>>("softness"))
+        options.softness = *softness;
+    if (auto const angle = t.get<sol::optional<float>>("angle"))
+        options.angle = *angle;
+    if (auto const fn = t.get<sol::optional<sol::protected_function>>("on_midpoint"))
+        options.on_midpoint = lua_callback(*fn, "transition on_midpoint");
+    if (auto const fn = t.get<sol::optional<sol::protected_function>>("on_done"))
+        options.on_done = lua_callback(*fn, "transition on_done");
+    return options;
+}
+
+// Scene switch of load_scene() & menu(): with options.transition, it runs at the
+// midpoint of that transition (the screen is covered, or the frame is kept for
+// dual ones). Returns true on error
+static bool lua_switch_scene(sol::optional<sol::table> const& opts, std::function<bool()> const& switch_scene)
+{
+    if (!opts)
+        return switch_scene();
+    std::string const name = opts->get_or<std::string>("transition", "");
+    if (name.empty())
+        return switch_scene();
+    transition::Options options = lua_transition_options(*opts);
+    options.on_midpoint = [switch_scene, user = std::move(options.on_midpoint)]() {
+        switch_scene();
+        if (user)
+            user();
+    };
+    // Unknown transition: the scene is switched without it
+    sol::optional<float> const seconds = opts->get<sol::optional<float>>("duration");
+    std::optional<float> const duration = seconds ? std::optional<float>(*seconds) : std::nullopt;
+    if (transition::start(name, duration, std::move(options)))
+        return switch_scene();
+    return false;
+}
+
+// A number of a layer: a constant, or a function of the progress (0 to 1).
+// Errors are thrown, see mylua_load_transition()
+static transition::Curve lua_curve(sol::object const& value, std::string const& what)
+{
+    if (value.get_type() == sol::type::number) {
+        float const v = value.as<float>();
+        return [v](float, float) { return v; };
+    }
+    if (value.get_type() == sol::type::function) {
+        sol::protected_function const fn = value;
+        // Logged once, then the parameter stays at 0
+        auto reported = std::make_shared<bool>(false);
+        return [fn, what, reported](float x, float aspect) -> float {
+            sol::protected_function_result const result = fn(x, aspect);
+            if (!result.valid()) {
+                if (!*reported) {
+                    *reported = true;
+                    sol::error const err = result;
+                    LOG_CTX_ERR(what, err.what());
+                }
+                return 0.f;
+            }
+            return result.get_type() == sol::type::number ? result.get<float>() : 0.f;
+        };
+    }
+    throw std::runtime_error(what + ": expected a number or a function");
+}
+
+// A color of a layer: 0xRRGGBB, or a function of the progress returning it
+static transition::ColorCurve lua_color(sol::object const& value, std::string const& what)
+{
+    if (value.get_type() == sol::type::number) {
+        glm::vec3 const rgb = lua_rgb(value.as<int>());
+        return [rgb](float, float) { return rgb; };
+    }
+    if (value.get_type() == sol::type::function) {
+        sol::protected_function const fn = value;
+        auto reported = std::make_shared<bool>(false);
+        return [fn, what, reported](float x, float aspect) -> glm::vec3 {
+            sol::protected_function_result const result = fn(x, aspect);
+            if (!result.valid()) {
+                if (!*reported) {
+                    *reported = true;
+                    sol::error const err = result;
+                    LOG_CTX_ERR(what, err.what());
+                }
+                return glm::vec3(0.f);
+            }
+            return result.get_type() == sol::type::number ? lua_rgb(result.get<int>()) : glm::vec3(0.f);
+        };
+    }
+    throw std::runtime_error(what + ": expected a color or a function");
+}
+
+// Index of a texture file in the transition's list, added if new
+static int lua_texture_slot(std::string const& file, std::vector<std::string>& textures)
+{
+    auto const it = std::find(textures.begin(), textures.end(), file);
+    if (it != textures.end())
+        return static_cast<int>(it - textures.begin());
+    if (textures.size() >= transition::max_textures)
+        throw std::runtime_error("at most " + std::to_string(transition::max_textures) + " textures per transition");
+    textures.push_back(file);
+    return static_cast<int>(textures.size() - 1);
+}
+
+// A field: shape, its parameters, invert and texture. Used by layers and masks
+static transition::Field lua_field(sol::table const& t, std::string const& what, std::vector<std::string>& textures)
+{
+    static std::map<std::string, transition::Shape> const shapes{
+        { "full", transition::Shape::Full },
+        { "circle", transition::Shape::Circle },
+        { "box", transition::Shape::Box },
+        { "ring", transition::Shape::Ring },
+        { "diamond", transition::Shape::Diamond },
+        { "heart", transition::Shape::Heart },
+        { "ramp", transition::Shape::Ramp },
+        { "noise", transition::Shape::Noise },
+        { "texture", transition::Shape::Texture },
+    };
+    std::string const name = t.get<sol::optional<std::string>>("shape").value_or("full");
+    auto const it = shapes.find(name);
+    if (it == shapes.end())
+        throw std::runtime_error(what + ": unknown shape '" + name + "'");
+
+    transition::Field field;
+    field.shape = it->second;
+    field.invert = t.get<sol::optional<bool>>("invert").value_or(false);
+    if (auto const file = t.get<sol::optional<std::string>>("texture"))
+        field.texture = lua_texture_slot(*file, textures);
+    if (field.shape == transition::Shape::Texture && field.texture < 0)
+        throw std::runtime_error(what + ": the texture shape needs a texture");
+
+    static constexpr std::array<char const*, transition::param_count> names{
+        "x", "y", "radius", "width", "height", "rotation", "round", "thickness", "angle", "offset", "threshold", "softness",
+    };
+    for (size_t k = 0; k != names.size(); ++k) {
+        sol::object const value = t.get<sol::object>(names[k]);
+        if (value.get_type() != sol::type::nil)
+            field.params[k] = lua_curve(value, what + "." + names[k]);
+    }
+    return field;
+}
+
+// The fill of a layer: a texture, a gradient, or a solid color (the cover color if unset)
+static transition::Fill lua_fill(sol::optional<sol::table> const& t, std::string const& what, std::vector<std::string>& textures)
+{
+    transition::Fill fill;
+    if (!t)
+        return fill;
+    if (auto const file = t->get<sol::optional<std::string>>("texture")) {
+        fill.kind = transition::Fill::Kind::Texture;
+        fill.texture = lua_texture_slot(*file, textures);
+        return fill;
+    }
+    if (t->get<sol::optional<bool>>("previous").value_or(false)) {
+        fill.kind = transition::Fill::Kind::Previous;
+        sol::object const shift_x = t->get<sol::object>("shift_x");
+        if (shift_x.get_type() != sol::type::nil)
+            fill.shift_x = lua_curve(shift_x, what + ".fill.shift_x");
+        sol::object const shift_y = t->get<sol::object>("shift_y");
+        if (shift_y.get_type() != sol::type::nil)
+            fill.shift_y = lua_curve(shift_y, what + ".fill.shift_y");
+        return fill;
+    }
+    if (auto const gradient = t->get<sol::optional<sol::table>>("gradient")) {
+        for (size_t i = 1; i <= gradient->size(); ++i)
+            fill.stops.push_back(lua_rgb(gradient->get<int>(static_cast<int>(i))));
+        if (fill.stops.empty() || fill.stops.size() > 4)
+            throw std::runtime_error(what + ": a gradient needs 1 to 4 colors");
+        sol::object const angle = t->get<sol::object>("angle");
+        if (angle.get_type() != sol::type::nil)
+            fill.angle = lua_curve(angle, what + ".fill.angle");
+        if (fill.stops.size() == 1) {
+            glm::vec3 const rgb = fill.stops.front();
+            fill.stops.clear();
+            fill.color = [rgb](float, float) { return rgb; };
+        }
+        else {
+            fill.kind = transition::Fill::Kind::Gradient;
+        }
+        return fill;
+    }
+    sol::object const color = t->get<sol::object>("color");
+    if (color.get_type() != sol::type::nil)
+        fill.color = lua_color(color, what + ".fill.color");
+    return fill;
+}
+
+// The layers of a single transition, drawn in order (the first is the lowest)
+static std::vector<transition::Layer> lua_layers(sol::table const& layers, std::vector<std::string>& textures)
+{
+    std::vector<transition::Layer> out;
+    for (size_t i = 1; i <= layers.size(); ++i) {
+        std::string const what = "layers[" + std::to_string(i) + "]";
+        sol::optional<sol::table> const layer = layers.get<sol::optional<sol::table>>(static_cast<int>(i));
+        if (!layer)
+            throw std::runtime_error(what + ": expected a table");
+        transition::Layer item;
+        item.field = lua_field(*layer, what, textures);
+        if (auto const mask = layer->get<sol::optional<sol::table>>("mask"))
+            item.mask = lua_field(*mask, what + ".mask", textures);
+        item.fill = lua_fill(layer->get<sol::optional<sol::table>>("fill"), what, textures);
+        sol::object const opacity = layer->get<sol::object>("opacity");
+        if (opacity.get_type() != sol::type::nil)
+            item.opacity = lua_curve(opacity, what + ".opacity");
+        out.push_back(std::move(item));
+    }
+    if (out.empty())
+        throw std::runtime_error("layers is empty");
+    if (out.size() > transition::max_layers)
+        throw std::runtime_error("at most " + std::to_string(transition::max_layers) + " layers per transition");
+    return out;
+}
+
+// resources/lua/transitions/<name>.lua: returns a table, see the README. Returns true on error
+static bool mylua_load_transition(std::filesystem::path const& file)
+{
+    std::string const name = file.stem().string();
+    try {
+        auto result = g->lua().safe_script_file(file.string(), sol::script_pass_on_error);
+        if (!result.valid()) {
+            sol::error const err = result;
+            LOG_CTX_ERR(name, err.what());
+            return true;
+        }
+        if (result.get_type() != sol::type::table)
+            throw std::runtime_error("the script must return a table");
+        sol::table const t = result.get<sol::table>();
+        std::string const kind = t.get<sol::optional<std::string>>("kind").value_or("single");
+        if (kind != "single" && kind != "dual")
+            throw std::runtime_error("kind must be 'single' or 'dual'");
+
+        transition::Script script;
+        script.name = name;
+        script.label = t.get<sol::optional<std::string>>("label").value_or(name);
+        script.kind = kind == "dual" ? transition::Kind::Dual : transition::Kind::Single;
+        script.duration = t.get<sol::optional<float>>("duration").value_or(1.f);
+        script.midpoint = std::clamp(t.get<sol::optional<float>>("midpoint").value_or(0.5f), 0.01f, 0.99f);
+        script.defaults = lua_transition_options(t);
+        script.path = file;
+        // Motion of the scene behind the layers, optional
+        auto const scene_curve = [&](char const* key) {
+            sol::object const value = t.get<sol::object>(key);
+            return value.get_type() == sol::type::nil ? transition::Curve{} : lua_curve(value, name + "." + key);
+        };
+        script.scene_x = scene_curve("scene_x");
+        script.scene_y = scene_curve("scene_y");
+        script.wave = scene_curve("wave");
+
+        auto const shader = t.get<sol::optional<std::string>>("shader");
+        auto const layers = t.get<sol::optional<sol::table>>("layers");
+        if (shader && layers)
+            throw std::runtime_error("use shader or layers, not both");
+        if (layers)
+            script.layers = lua_layers(*layers, script.textures);
+        else if (shader)
+            script.shader = *shader;
+        else
+            throw std::runtime_error("missing shader or layers");
+
+        if (transition::define(std::move(script)))
+            return true;
+        LOG_CTX_MSG("Transition loaded", name);
+        return false;
+    }
+    catch (std::exception const& e) {
+        LOG_CTX_ERR(name, e.what());
+        return true;
+    }
+}
+
+// Loads the transitions when their file is new or saved, checked twice per second
+void mylua_watch_transitions()
+{
+    using clock = std::chrono::steady_clock;
+    static auto next_check = clock::now();
+    static std::map<std::string, std::filesystem::file_time_type> times;
+    auto const now = clock::now();
+    if (now < next_check)
+        return;
+    next_check = now + std::chrono::milliseconds(500);
+
+    std::error_code ec;
+    for (auto const& entry : std::filesystem::directory_iterator(g->lua_folder + "transitions/", ec)) {
+        if (!entry.is_regular_file(ec) || entry.path().extension() != ".lua")
+            continue;
+        auto const time = std::filesystem::last_write_time(entry.path(), ec);
+        auto const [it, is_new] = times.try_emplace(entry.path().stem().string());
+        if (!is_new && it->second == time)
+            continue;
+        it->second = time;
+        mylua_load_transition(entry.path());
+    }
+}
+
 bool setup_lua()
 {
     mylua_register_scripts();
@@ -737,8 +1069,8 @@ bool setup_lua()
     lua["time"] = 0.0;
     lua["file_script"] = mylua_file_script;
     // C++ functions return true on error, Lua ones return true on success
-    lua["load_scene"] = [](std::string const& scene_name) {
-        return !mylua_load_scene(scene_name);
+    lua["load_scene"] = [](std::string const& scene_name, sol::optional<sol::table> opts) {
+        return !lua_switch_scene(opts, [scene_name]() { return mylua_load_scene(scene_name); });
     };
     lua["unload_scene"] = [](sol::optional<std::string> scene_name) {
         return !mylua_unload_scene(scene_name.value_or(""));
@@ -754,8 +1086,40 @@ bool setup_lua()
     lua["list_assets"] = [](std::string const& folder) {
         return sol::as_table(mylua_list_assets(folder));
     };
-    lua["menu"] = []() {
-        return !mylua_return_to_menu();
+    lua["menu"] = [](sol::optional<sol::table> opts) {
+        return !lua_switch_scene(opts, []() { return mylua_return_to_menu(); });
+    };
+    // Screen transitions, see transition.hpp. Returns true on success
+    lua["transition"] = [](std::string const& name, sol::optional<float> duration, sol::optional<sol::table> opts) {
+        transition::Options options = opts ? lua_transition_options(*opts) : transition::Options{};
+        std::optional<float> const seconds = duration ? std::optional<float>(*duration) : std::nullopt;
+        return !transition::start(name, seconds, std::move(options));
+    };
+    lua["transition_stop"] = []() {
+        transition::stop();
+    };
+    // Easing of the transitions (see the README): smoothstep of x, clamped to [0, 1]
+    auto const smooth = [](float x) {
+        float const v = std::clamp(x, 0.f, 1.f);
+        return v * v * (3.f - 2.f * v);
+    };
+    lua["transition_smooth"] = smooth;
+    // Radius that reaches the farthest corner of the screen (screen height 1, see the README)
+    lua["corner_radius"] = [](float aspect) {
+        return 0.5f * std::sqrt(aspect * aspect + 1.f) * 1.02f;
+    };
+    // Cover then reveal of a single transition (see the README): 0 at the start, 1 at the midpoint, 0 at the end
+    lua["transition_cover"] = [smooth](float x) {
+        float const t = std::clamp(x, 0.f, 1.f);
+        return t < 0.5f ? smooth(2.f * t) : 1.f - smooth(2.f * t - 1.f);
+    };
+    lua["list_transitions"] = []() {
+        std::string names;
+        for (auto const& def : transition::list()) {
+            names += (names.empty() ? "" : ", ") + def.name
+                + (def.kind == transition::Kind::Dual ? " (dual)" : "");
+        }
+        g->lua()["print"]("Transitions: " + names);
     };
     // Sounds overlap freely, only one music plays at a time (crossfaded).
     // Like scene requests, they are run by the main loop (see defer_request()).
@@ -1062,12 +1426,14 @@ bool setup_lua()
     folding_map["half_fold"] = sol::property(&FoldingMap::getHalfFold, &FoldingMap::setHalfFold);
     folding_map["flap"] = sol::property(&FoldingMap::getFlap, &FoldingMap::setFlap);
     folding_map["accordion"] = sol::property(&FoldingMap::getAccordion, &FoldingMap::setAccordion);
-    folding_map["thickness"] = sol::property(&FoldingMap::getThickness, &FoldingMap::setThickness);
+    folding_map["bend"] = sol::property(&FoldingMap::getBend, &FoldingMap::setBend);    folding_map["thickness"] = sol::property(&FoldingMap::getThickness, &FoldingMap::setThickness);
     folding_map["crease_radius"] = sol::property(&FoldingMap::getCreaseRadius, &FoldingMap::setCreaseRadius);
     folding_map["width"] = sol::readonly_property(&FoldingMap::getWidth);
     folding_map["height"] = sol::readonly_property(&FoldingMap::getHeight);
     folding_map["front"] = &FoldingMap::front;
     folding_map["back"] = &FoldingMap::back;
+    folding_map["shade"] = &FoldingMap::shade;
+    folding_map["mask"] = &FoldingMap::mask;
     folding_map["hidden"] = &FoldingMap::hidden;
     folding_map["cast_shadow"] = &FoldingMap::cast_shadow;
     // Returns min, max (vec3): local bounding box of the current shape
@@ -1117,7 +1483,7 @@ bool setup_lua()
         sol::state_view lua(ts);
         sol::table out = lua.create_table();
         for (auto const& loc : map_content::data().locations)
-            out.add(lua.create_table_with("id", loc.id, "name", loc.name, "scene", loc.scene));
+            out.add(lua.create_table_with("id", loc.id, "name", loc.name, "scene", loc.scene, "transition", loc.transition));
         return out;
     };
     map_overlay["all_roads"] = [](sol::this_state ts) {

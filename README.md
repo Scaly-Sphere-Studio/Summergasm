@@ -84,15 +84,126 @@ Typed in the in-game console. Quotes around the argument are optional.
 |---|---|---|
 | `help` | `[filter]` | List commands & Lua functions whose name contains `filter` |
 | `file_script` | `path` | Run `resources/lua/<path>.lua` once |
-| `load_scene` | `scene_name` | Load & run a scene, unloads the menu |
+| `load_scene` | `scene_name, [options]` | Load & run a scene, unloads the menu. `options.transition`: see [Transitions](#transitions) |
 | `unload_scene` | `[scene_name]` | Unload a scene, default: the current one |
 | `reload_scene` | `[scene_name]` | Reload a scene if its script compiles, default: the current one |
 | `auto_reload` | `[on]` | Reload the current scene when its file changes (if it compiles). On by default |
 | `list_scenes` | | List scenes & which are running |
 | `list_assets` | `folder` | Sorted file names in `resources/assets/<folder>`, empty if missing |
-| `menu` | | Unload every scene & return to the menu |
+| `menu` | `[options]` | Unload every scene & return to the menu (same options as `load_scene`) |
 | `console_set_env` | `scene_name` | Run console commands in a running scene's environment |
 | `console_reset_env` | | Run console commands in the global environment |
+
+### Transitions
+
+Each transition is a Lua script in [resources/lua/transitions/](resources/lua/transitions/), named after its file (`circle_out.lua` → `"circle_out"`). Scripts are loaded when they are new or saved (hot reload; a script that fails keeps its previous version). The engine is [src/Transition.cpp](src/Transition.cpp). The **Transitions** section of the settings (ImGui) launches and scrubs each one, without switching scene.
+
+A script returns a table. Its `kind` decides how it plays:
+- **single**: the scene is drawn behind, the transition covers the screen in front of it. The scene switch (`on_midpoint`) happens at `midpoint` (default `0.5`), while covered, then the screen is revealed. Written as **layers** (below), or as a GLSL **shader** for effects the layers can't express.
+- **dual**: the new scene is drawn, the previous frame is available to the layers (`fill = { previous = true }`) or to a shader. `on_midpoint` runs at the first frame.
+
+```lua
+-- resources/lua/transitions/circle_out.lua
+return {
+    label = "Circle out",          -- name in the panel (default: file name)
+    kind = "single",               -- "single" or "dual"
+    duration = 1.2,                -- seconds, default 1
+    midpoint = 0.5,                -- single: progress of the scene switch
+    color = 0x000000,              -- default cover color, the call's color overrides it
+    layers = {
+        { shape = "circle", radius = function(x) return 1.3 * transition_cover(x) end },
+    },
+}
+```
+
+#### Layers
+
+Layers are drawn in order over the scene. A layer is a **field** (its coverage, 0 to 1) × its optional **mask** (another field), filled with its **fill**.
+
+Units: the screen's height is `1`, the origin is its center (`x` in `[-aspect/2, aspect/2]`, `y` in `[-0.5, 0.5]`). Every number can be a constant or a `function(x, aspect)`, where `x` in `[0, 1]` is the progress of the transition (the slider) and `aspect` the screen's width / height. Helpers: `transition_cover(x)` is the cover-then-reveal curve (0, then 1 at the midpoint, then 0), `transition_smooth(x)` is a smoothstep, `corner_radius(aspect)` the radius reaching the screen's farthest corner.
+
+| `shape` | Coverage | Parameters |
+|---|---|---|
+| `"full"` (default) | everywhere | |
+| `"circle"` | SDF circle | `x`, `y`, `radius` |
+| `"box"` | SDF box, rounded | `x`, `y`, `width`, `height`, `round` (corner radius), `rotation` |
+| `"ring"` | SDF ring | `x`, `y`, `radius`, `thickness` |
+| `"diamond"` | SDF diamond (`abs(x) + abs(y)`) | `x`, `y`, `radius` |
+| `"heart"` | implicit heart | `x`, `y`, `radius` (scale) |
+| `"ramp"` | gradient wipe: covered before `offset`, along `angle` (`0`: from the left) | `angle`, `offset` |
+| `"noise"` | random cells (1/256 of the screen), covered below `threshold` | `threshold` |
+| `"texture"` | luma of `texture`, covered below `threshold` | `texture`, `threshold` |
+
+All fields also take `softness` (edge width, default `0.05`), `invert = true` (covers the outside), and `rotation` for the SDFs. `threshold` is in `[0, 1]`. Layers take `shape`, the parameters and `invert` directly, and `mask = { ... }` (a field) multiplies their coverage. Their fill:
+
+| Key | Description |
+|---|---|
+| `fill = { color = ... }` | `0xRRGGBB`, or a `function(x)` returning one. Default: the cover color |
+| `fill = { gradient = { 0x..., 0x... }, angle = ... }` | 2 to 4 colors, spread evenly along `angle` across the screen |
+| `fill = { texture = "file.png" }` | File of `resources/assets/transitions/`, stretched over the screen (its alpha counts) |
+| `fill = { previous = true, shift_x = ..., shift_y = ... }` | Dual transitions: the previous frame (the old scene), shifted by a uv offset. Not for single ones |
+| `opacity` | Number or `function(x, aspect)`, default `1` |
+
+Scene motion, script keys (uv units, applied to the scene drawn behind the layers): `scene_x`, `scene_y` shift it, `wave` is the amplitude of a horizontal wobble.
+
+Limits: 16 layers, 4 distinct textures per transition.
+
+```lua
+-- Texture revealed by a gradient wipe, the texture is a mask-affected fill
+layers = {
+    {
+        fill = { texture = "clouds.png" },
+        mask = { shape = "ramp", angle = 0, offset = function(x) return -1.0 + 2.0 * x end, softness = 0.1 },
+    },
+}
+-- Dissolve: random cells, the threshold follows the cover
+layers = { { shape = "noise", threshold = function(x) return 1.1 * transition_cover(x) - 0.05 end } }
+```
+
+All the scripts in the repository are layered, see each file for an example (`anime_slash`, `pokemon_lines` and `seam_slide` show per-band timing, texture-free layers and scene motion).
+
+#### Shaders
+
+For what layers can't express, a script can give a `shader` instead of `layers`. It defines `vec3 transition(vec2 uv, vec2 p)` (`uv` in [0,1], `p` centered and aspect corrected). It can use:
+
+| Name | Description |
+|---|---|
+| `scene(uv)`, `old(uv)` | Color of the new frame, of the previous frame (the dual ones) |
+| `covered(base, color, m)` | Single: mixes `color` over `base` with coverage `m` (1: covered). Full cover at the end of the cover phase |
+| `maskValue(uv)`, `u_HasMask` | Mask file of the options, `1` when it is loaded |
+| `u_Cover` | Single: coverage (cover then reveal). Dual: progress (0 old, 1 new) |
+| `u_Color`, `u_Palette[4]`, `u_PaletteCount`, `u_Strips`, `u_Softness`, `u_Angle`, `u_Aspect` | Options of the call, or the script's defaults |
+| `maxRadius()`, `stripeProgress(i, cover)`, `hash1`, `hash2`, `smooth01`, `PI` | Helpers |
+
+No script uses a shader anymore. A script gives either `layers` or `shader`, not both.
+
+#### Playing
+
+| Function | Arguments | Description |
+|---|---|---|
+| `transition` | `name, [duration, options]` | Play a transition (default 1 s). Returns `true` if it exists |
+| `transition_stop` | | Stop the running transition, its callbacks are not called |
+| `list_transitions` | | List the transitions, dual ones marked `(dual)` |
+| `transition_cover` | `x` | Cover-then-reveal curve for layers, see above |
+| `transition_smooth` | `x` | Smoothstep of `x`, clamped to `[0, 1]` |
+
+`options` table of `transition()`, `load_scene()` and `menu()` (all optional):
+
+| Key | Used by | Description |
+|---|---|---|
+| `color` | all | `0xRRGGBB`, the cover color (default: the script's) |
+| `on_midpoint`, `on_done` | all | Functions called at the midpoint & at the end |
+| `palette` | shaders | Up to 4 `0xRRGGBB` colors, anime transitions |
+| `strips` | shaders | Number of strips (`pokemon_lines`, `anime_slash`), default 12 |
+| `softness` | shaders | Edge softness, default `0.05` |
+| `angle` | shaders | Radians, seams & slashes (`0`: vertical seam) |
+| `mask` | shaders | File of `resources/assets/transitions/` |
+
+```lua
+transition("circle_out", 0.8, { color = 0x000000 })
+load_scene("beach", { transition = "anime_rings", duration = 1.2, palette = { 0xff5a5a, 0xffd23f } })
+load_scene("train", { transition = "crossfade", duration = 0.6 })
+```
 
 ### Audio
 
@@ -228,7 +339,7 @@ Colors are sRGB `vec3`.
 
 ### `FoldingMap`
 
-Paper map mesh, 4 columns by 2 rows, folded like a city map: accordion folded
+Paper map mesh, 5 columns by 2 rows, folded like a city map: accordion folded
 along its vertical lines, then in half along the center line (top half behind,
 around a rounded crease). Column 0 stays in place: folded, the bottom left
 panel's front is on top. Lies in its local xy plane, centered on the origin,
@@ -240,10 +351,11 @@ front toward +z. See [inc/FoldingMap.hpp](inc/FoldingMap.hpp). Also has
 | `FoldingMap.new` | `front, back, width, height` | Textures (`back` can be `nil`: the front one, mirrored) or image paths in the assets folder |
 | `.half_fold` | number | 0 flat .. 1 folded in half. Fold it only with the accordion closed |
 | `.accordion` | number | 0 flat .. 1 closed |
-| `.thickness` | number | Distance between the folded layers (1.5) |
+| `.bend` | number | Bulge of the paper, toward the front, in local units (0 flat). Most at the center line || `.thickness` | number | Distance between the folded layers (1.5) |
 | `.crease_radius` | number | Innermost layer's radius around the crease (3) |
 | `.width`, `.height` | *read-only* | Local size |
 | `.front`, `.back` | `GL.Texture` | Back faces show the back texture mirrored along x (the sheet turned over) |
+| `.shade` | `GL.Texture` | Multiplied over the front texture only, under the layers (e.g. shadows: white is none). Layers and characters stay unshaded |
 | `.hidden`, `.cast_shadow` | bool | |
 | `:getBounds` | | `min, max` (`vec3`): local bounding box of the current shape |
 

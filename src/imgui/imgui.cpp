@@ -1,4 +1,5 @@
 #include "imgui.hpp"
+#include "Transition.hpp"
 
 SSS::GL::Window* ui_window = nullptr;
 static constexpr bool print_demo = false;
@@ -270,6 +271,8 @@ void print_imgui()
             if (ImGui::CollapsingHeader("Audio")) {
                 print_audio();
             }
+            // Screen transitions: launched & previewed without switching scene
+            transition::printPanel();
             ImGui::Unindent();
         }
         ImGui::End();

@@ -3,6 +3,7 @@
 #include "MapOverlay.hpp"
 #include "SignalManager.hpp"
 #include "Settings.hpp"
+#include "Transition.hpp"
 
 GlobalData::GlobalData() : _lua(std::make_unique<sol::state>()) {}
 GlobalData::~GlobalData() = default;
@@ -23,6 +24,7 @@ void exitSummergasm(int status)
     free_imgui_objects();
     mylua_free_dialog();
     MapOverlay::free();
+    transition::free();
     // Lua handlers must go before the Lua state does
     signals::clear();
     g->lua_scenes.clear();
@@ -93,6 +95,8 @@ int main(void) try
     g->ui_window->setCallback(glfwSetKeyCallback, key_callback);
     g->ui_window->setCallback(glfwSetWindowCloseCallback, close_callback);
 
+    MapOverlay::preload();
+
     // Main loop
     while (!g->window->shouldClose()) {
         SSS::GL::pollEverything();
@@ -100,6 +104,7 @@ int main(void) try
         if (std::exchange(g->escape_pressed, false) && !mylua_on_escape())
             glfwSetWindowShouldClose(g->window->getGLFWwindow(), GLFW_TRUE);
         mylua_watch_scenes();
+        mylua_watch_transitions();
         mylua_run_active_scenes();
         // Started by the scenes, before scroll_y is reset (scrolls their log)
         Dialog::updateAll();
@@ -107,9 +112,14 @@ int main(void) try
         MapOverlay::update();
         // Music fades & audio events, after the scenes' play_music() requests
         SSS::Audio::update();
+        // After the scenes' requests: a transition's midpoint switches the scene
+        transition::update();
         g->scroll_y = 0.0;
         update_watermark();
+        // The frame is drawn offscreen, then transitioned to the back buffer
+        transition::beginFrame();
         g->window->drawObjects();
+        transition::endFrame();
         if (g->console_display)
             print_console();
         if (g->settings_display)

@@ -105,6 +105,10 @@ public:
     inline size_t getScrollLayerCount() const noexcept { return _scroll_layers.size(); };
 
     void play();
+    // Compiles the shared shaders now (all renderers use them), rather than at
+    // the first draw of each scene (a spike). Called at launch. Needs the GL
+    // context.
+    void warmUpShaders();
     void pause();
     void toggle();
     inline bool isPlaying() const noexcept { return _play; };
@@ -302,12 +306,12 @@ private:
     std::unordered_map<SSS::GL::PlaneBase const*, PlaneLighting> _plane_lighting;
 
     // <name>.vert & <frag_name>.frag (<name>.frag if empty) of
-    // shaders_folder, reloaded when edited
+    // shaders_folder, reloaded when edited. Programs are shared between the
+    // renderers (see SceneRenderer.cpp).
     struct HotShaders {
         std::string name;
         std::string frag_name;
         SSS::GL::Shaders::Shared shaders;
-        std::filesystem::file_time_type vert_time, frag_time;
         std::chrono::steady_clock::time_point last_check;
         // Returns whether the shaders are usable
         bool update();
@@ -373,7 +377,11 @@ private:
         // Their overlays (see FoldingMap::overlays), each over its layer, on
         // its uv rect, -1: none
         GLint overlay_units[3]{ -1, -1, -1 };
-        GLint _padding0{ 0 };
+        // Meshes' shade & mask (see FoldingMap::shade & mask), multiplied
+        // over the texture before the layers, -1: none
+        GLint shade_unit{ -1 };
+        GLint mask_unit{ -1 };
+        GLint _padding_shade[3]{};
         glm::vec4 overlay_rects[3]{};
     };
     struct GPULight {
@@ -386,7 +394,7 @@ private:
         // Shadow map's z_near, z_far, and light size in uv * depth (x, y)
         glm::vec4 shadow_frustum;
     };
-    static_assert(sizeof(GPUInstance) == 176 && sizeof(GPULight) == 160);
+    static_assert(sizeof(GPUInstance) == 192 && sizeof(GPULight) == 160);
 
     // Instanced draw: instances [first, first + count) and their textures,
     // bound to units [0, textures.size())

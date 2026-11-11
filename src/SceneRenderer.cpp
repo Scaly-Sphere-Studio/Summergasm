@@ -506,6 +506,22 @@ std::string SceneRenderer::HotShaders::_diagnose(std::string const& vert, std::s
     return out.empty() ? "no message from the driver" : out;
 }
 
+namespace {
+    // One program per pair of files, shared by every renderer: compiled once
+    // (at launch, see SceneRenderer::warmUpShaders), not per renderer at its
+    // first draw. Kept until the end (never freed: its GL objects go with the
+    // context, not while the statics are destroyed).
+    struct SharedProgram {
+        SSS::GL::Shaders::Shared shaders;
+        std::filesystem::file_time_type vert_time, frag_time;
+    };
+    std::map<std::string, SharedProgram>& sharedPrograms()
+    {
+        static auto* const programs = new std::map<std::string, SharedProgram>;
+        return *programs;
+    }
+}
+
 bool SceneRenderer::HotShaders::update()
 {
     auto const now = std::chrono::steady_clock::now();
@@ -521,21 +537,25 @@ bool SceneRenderer::HotShaders::update()
     // Missing files (or mid-save): keep the current state
     if (ec_v || ec_f)
         return shaders != nullptr;
-    // Unchanged files: keep the current state (even a failed one)
-    if (new_vert_time == vert_time && new_frag_time == frag_time)
-        return shaders != nullptr;
-    vert_time = new_vert_time;
-    frag_time = new_frag_time;
 
-    auto new_shaders = SSS::GL::Shaders::create();
-    new_shaders->loadFromStrings(read_file(vert), read_file(frag));
-    // Failed programs stay at id 0, which has no uniform
-    if (new_shaders->getUniformLocation("u_VP") == -1) {
-        LOG_ERR("SceneRenderer: " + name + " shaders failed to load: " + _diagnose(read_file(vert), read_file(frag)));
-        return shaders != nullptr;
+    SharedProgram& program = sharedPrograms()[vert.string() + '|' + frag.string()];
+    // Unchanged files: keep the current state (even a failed one)
+    if (new_vert_time != program.vert_time || new_frag_time != program.frag_time) {
+        program.vert_time = new_vert_time;
+        program.frag_time = new_frag_time;
+
+        auto new_shaders = SSS::GL::Shaders::create();
+        new_shaders->loadFromStrings(read_file(vert), read_file(frag));
+        // Failed programs stay at id 0, which has no uniform: the previous ones are kept
+        if (new_shaders->getUniformLocation("u_VP") == -1) {
+            LOG_ERR("SceneRenderer: " + name + " shaders failed to load: " + _diagnose(read_file(vert), read_file(frag)));
+        }
+        else {
+            program.shaders = std::move(new_shaders);
+        }
     }
-    shaders = std::move(new_shaders);
-    return true;
+    shaders = program.shaders;
+    return shaders != nullptr;
 }
 
 // sRGB color to linear, times intensity
@@ -967,6 +987,19 @@ void SceneRenderer::_buildBatches()
             if (w != 0 && h != 0)
                 _gpu_instances[draw.front_instance].layer_units[i] = static_cast<GLint>(2 + i);
         }
+        // Shade on unit 8 & mask on unit 9, once loaded
+        if (mesh->shade) {
+            int w = 0, h = 0;
+            mesh->shade->getCurrentDimensions(w, h);
+            if (w != 0 && h != 0)
+                _gpu_instances[draw.front_instance].shade_unit = 8;
+        }
+        if (mesh->mask) {
+            int w = 0, h = 0;
+            mesh->mask->getCurrentDimensions(w, h);
+            if (w != 0 && h != 0)
+                _gpu_instances[draw.front_instance].mask_unit = 9;
+        }
         // Their overlays on units 5 to 7, once baked, on a rect
         for (size_t i = 0; i < mesh->overlays.size(); ++i) {
             glm::vec4 const rect = mesh->overlay_rects[i];
@@ -1008,6 +1041,14 @@ void SceneRenderer::_drawMeshes(SSS::GL::Shaders& shader, bool shadow) const
             mesh.back->bind();
         }
         if (!shadow) {
+            if (mesh.shade) {
+                glActiveTexture(GL_TEXTURE8);
+                mesh.shade->bind();
+            }
+            if (mesh.mask) {
+                glActiveTexture(GL_TEXTURE9);
+                mesh.mask->bind();
+            }
             for (size_t i = 0; i < mesh.layers.size(); ++i) {
                 if (!mesh.layers[i])
                     continue;
@@ -1365,6 +1406,15 @@ void SceneRenderer::_renderLit(SSS::GL::Shaders& shader)
     glDepthMask(GL_FALSE);
     glUniform1i(loc_pass, 1);
     _drawBatches(shader);
+    // Meshes' partial coverage (see the masks in lit_plane.frag), blended
+    if (!_mesh_draws.empty() && _lit_mesh_shaders.update()) {
+        SSS::GL::Shaders& mesh_shader = *_lit_mesh_shaders.shaders;
+        mesh_shader.use();
+        set_uniforms(mesh_shader);
+        glUniform1i(mesh_shader.getUniformLocation("u_Pass"), 1);
+        _drawMeshes(mesh_shader, false);
+        glUniform1i(mesh_shader.getUniformLocation("u_Pass"), 0);
+    }
     // Window's default state (see SSS::GL::Window)
     glDepthMask(GL_TRUE);
     glBindSampler(shadow_unit + 2, 0);
@@ -1389,6 +1439,14 @@ void SceneRenderer::render()
         _renderLit(*_lit_shaders.shaders);
     else
         SSS::GL::PlaneRenderer::render();
+}
+
+void SceneRenderer::warmUpShaders()
+{
+    _lit_shaders.update();
+    _shadow_shaders.update();
+    _lit_mesh_shaders.update();
+    _shadow_mesh_shaders.update();
 }
 
 void SceneRenderer::pause()
