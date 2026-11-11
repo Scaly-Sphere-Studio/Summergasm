@@ -32,6 +32,8 @@ struct Location {
     // Width of the monument, in map pixels (height: the image's ratio)
     float size{ 100.f };
     std::string scene;
+    // Transition played when the location is clicked, see transition.hpp. Empty: none
+    std::string transition;
     bool unlocked{ false };
     // Distance of the characters' pins from pos, style's pin_ring if < 0
     float pin_ring{ -1.f };
@@ -129,6 +131,10 @@ public:
     // they appear) only play when animate is
     // true: the map open, flat. Needs the GL context.
     void update(float dt, bool animate);
+    // Bakes the monuments' sprites whose images are loaded (the costly part,
+    // on the CPU), ahead of the opening. True once every monument is baked.
+    // Needs the GL context.
+    bool prepare();
 
     // Unlocked location whose monument is at that point (map pixels), if any
     std::optional<std::string> locationAt(glm::vec2 pos) const;

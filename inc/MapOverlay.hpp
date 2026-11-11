@@ -38,6 +38,9 @@ public:
     static bool isShown() noexcept;
     // Opening or open: blurs the scenes behind it
     static bool isOpen() noexcept;
+    // Creates its GL objects & starts loading its images now (not shown), so
+    // the first opening doesn't wait for them. Needs the window's context.
+    static void preload();
 
     // Inputs & animation, called by the main loop once the dialogs updated
     static void update();

@@ -107,6 +107,7 @@ namespace {
             loc.pos = parseVec2(l.at("pos"));
             loc.size = l.value("size", loc.size);
             loc.scene = l.value("scene", "");
+            loc.transition = l.value("transition", "");
             loc.unlocked = l.value("unlocked", false);
             loc.pin_ring = l.value("pin_ring", -1.f);
             d.locations.push_back(std::move(loc));
@@ -655,6 +656,18 @@ SSS::GL::Texture const* Layers::_loadedImage(std::string const& path) const
 {
     auto const it = _images.find(path);
     return it != _images.end() && isLoaded(*it->second) ? it->second.get() : nullptr;
+}
+
+bool Layers::prepare()
+{
+    bool all = true;
+    for (Location const& loc : data().locations) {
+        if (loc.image.empty())
+            continue;
+        if (!_monumentSprite(loc))
+            all = false;
+    }
+    return all;
 }
 
 void Layers::update(float dt, bool animate)

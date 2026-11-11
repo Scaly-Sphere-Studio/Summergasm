@@ -14,10 +14,14 @@ namespace {
     constexpr float map_h = 744.f;
     constexpr char const* front_image = "map/map_front.png";
     constexpr char const* back_image = "map/map_back.png";
+    // Multiplied over the front, under the layers (see FoldingMap::shade &
+    // mask): the shadows, then the triangle facets
+    constexpr char const* shade_image = "map/map_shadows.png";
+    constexpr char const* mask_image = "map/map_mask.png";
 
     // Creases on the images, in pixels: the vertical ones' x, the
     // horizontal one's y
-    constexpr float crease_x[3]{ 272.f, 614.f, 965.f };
+    constexpr float crease_x[4]{ 252.f, 504.f, 756.f, 1008.f };
     constexpr float crease_y = 375.f;
 
     // Opening timeline, in seconds: hold on the folded map, open the half
@@ -51,8 +55,13 @@ namespace {
     // Open, the map isn't flat: its vertical folds stay a little closed
     // (0 -> 1), columns 0 & 2 tilted by accordion_rest * 180 degrees, the
     // creases showing. The horizontal fold opens flat (half_rest = 0).
-    constexpr float accordion_rest = 0.1f;
+    constexpr float accordion_rest = 0.f;
     constexpr float half_rest = 0.f;
+    // Closed, the map isn't folded flat: its accordion stays a little open
+    // (0 -> 1, see accordion_rest), and its paper bulges (see
+    // FoldingMap::setBend), the bulge fading as it opens.
+    constexpr float closed_accordion = 0.93f;
+    constexpr float closed_bend = 40.f;
 
     using Clock = std::chrono::steady_clock;
 
@@ -73,6 +82,8 @@ namespace {
         float from_half{ 0.f };
         float from_accordion{ 0.f };
         bool shown{ false };
+        // Monuments' sprites all baked (see Layers::prepare)
+        bool prepared{ false };
         // The full opening is played once, then opening plays closing
         // backward
         bool opened_once{ false };
@@ -107,9 +118,11 @@ namespace {
         state->map = FoldingMap::create(
             SSS::GL::Texture::create(std::filesystem::path{ front_image }),
             SSS::GL::Texture::create(std::filesystem::path{ back_image }), map_w, map_h);
-        state->map->setCreases({ crease_x[0] / map_w, crease_x[1] / map_w, crease_x[2] / map_w },
+        state->map->setCreases({ crease_x[0] / map_w, crease_x[1] / map_w, crease_x[2] / map_w, crease_x[3] / map_w },
             crease_y / map_h);
         state->map->setDepthScale(depth_scale);
+        state->map->shade = SSS::GL::Texture::create(std::filesystem::path{ shade_image });
+        state->map->mask = SSS::GL::Texture::create(std::filesystem::path{ mask_image });
         state->map->cast_shadow = false;
         // Turned 180 degrees in its plane, centered on the origin
         state->map->setRotation(glm::vec3(0.f, 0.f, 180.f));
@@ -148,7 +161,7 @@ namespace {
         return glm::vec2(map_w, map_h) - *uv * glm::vec2(map_w, map_h);
     }
 
-    // map_overlay.on_location_clicked(id, scene), see global_setup.lua
+    // map_overlay.on_location_clicked(id, scene, transition), see global_setup.lua
     void callLocationHook(std::string const& id)
     {
         map_content::Location const* loc = map_content::data().location(id);
@@ -156,7 +169,7 @@ namespace {
         if (!loc || hook.get_type() != sol::type::function)
             return;
         sol::protected_function const f = hook;
-        sol::protected_function_result const result = f(id, loc->scene);
+        sol::protected_function_result const result = f(id, loc->scene, loc->transition);
         if (!result.valid()) {
             sol::error const err = result;
             LOG_CTX_ERR("map_overlay.on_location_clicked", err.what());
@@ -182,14 +195,14 @@ namespace {
         float half = glm::mix(half_rest, 1.f, 1.f - SSS::Math::easeInOutQuart(unit((t - half_start) / half_time)));
         // Fast start, quick stop: the accordion pulled open
         float const opened = SSS::Math::easeOutCubic(unit((t - accordion_start) / accordion_time));
-        float accordion = glm::mix(accordion_rest, 1.f, 1.f - opened);
+        float accordion = glm::mix(accordion_rest, closed_accordion, 1.f - opened);
         // Opening: scaled up, back to its size with the accordion
         float scale = glm::mix(opening_scale, 1.f, opened);
         float slide = 0.f;
         if (state->closing_t > 0.f) {
             float const c = SSS::Math::easeInOutQuart(unit(state->closing_t));
             half = glm::mix(state->from_half, 1.f, c);
-            accordion = glm::mix(state->from_accordion, 1.f, c);
+            accordion = glm::mix(state->from_accordion, closed_accordion, c);
             scale *= glm::mix(1.f, closing_scale, c);
             // Slow start, fast end: the map thrown out of the screen
             slide = SSS::Math::easeInCubic(unit(state->closing_t));
@@ -197,6 +210,11 @@ namespace {
         map.setHalfFold(half);
         map.setFlap(accordion);
         map.setAccordion(accordion);
+        // Bulge with the folds: full when closed, gone when open flat. It
+        // also goes before the cover flips up (half), so the layers never
+        // pass through each other with the bulge on them.
+        float const closed = std::clamp((accordion - accordion_rest) / (closed_accordion - accordion_rest), 0.f, 1.f);
+        map.setBend(closed_bend * std::min(closed, half));
         map.update();
         if (state->closing_t <= 0.f)
             state->center = (glm::vec2(map.getBoundsMin()) + glm::vec2(map.getBoundsMax())) / 2.f;
@@ -249,6 +267,17 @@ namespace {
         state->t = 0.f;
         state->closing_t = 0.f;
     }
+}
+
+void MapOverlay::preload()
+{
+    SSS::GL::Context const context = g->window->setContext();
+    if (!state)
+        create();
+    // Shaders compiled now, not at the first draw (the first opening)
+    state->renderer->warmUpShaders();
+    // Requests the places' & icons' images (loaded in the background)
+    state->layers->update(0.f, false);
 }
 
 void MapOverlay::open()
@@ -325,6 +354,12 @@ void MapOverlay::update()
     // mylua_on_escape)
     if (g->window->getKeyInputs()[toggleKey()].is_pressed())
         toggle();
+    // Hidden: the monuments' sprites are baked ahead, so opening doesn't stall
+    // on the CPU work (once all are baked, nothing more to do here)
+    if (state && !state->shown && !state->prepared) {
+        SSS::GL::Context const context = g->window->setContext();
+        state->prepared = state->layers->prepare();
+    }
     if (!isShown())
         return;
     if (Dialog::anyVisible())

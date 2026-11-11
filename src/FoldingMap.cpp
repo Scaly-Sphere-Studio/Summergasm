@@ -2,9 +2,13 @@
 
 #include <glm/gtc/constants.hpp>
 
+#include <numeric>
+
 // Segments of each accordion hinge's arc, and rows of the horizontal crease
 static constexpr int hinge_segments = 6;
 static constexpr int crease_rows = 32;
+// Strips each flat panel is split into along its length (see setBend)
+static constexpr int panel_segments = 8;
 
 FoldingMap::Shared FoldingMap::create(SSS::GL::Texture::Shared front, SSS::GL::Texture::Shared back,
     float width, float height)
@@ -20,7 +24,7 @@ FoldingMap::FoldingMap(SSS::GL::Texture::Shared front_tex, SSS::GL::Texture::Sha
     // Column 0 is a flat panel, the others start with their hinge's arc
     _grid_columns = 0;
     for (int c = 0; c < columns; ++c) {
-        _grid_widths[c] = (c == 0 ? 0 : hinge_segments) + 2;
+        _grid_widths[c] = (c == 0 ? 0 : hinge_segments) + panel_segments + 1;
         _grid_columns += _grid_widths[c];
     }
     _buildRows();
@@ -79,6 +83,11 @@ void FoldingMap::setCreases(std::array<float, columns - 1> const& u, float v)
     _dirty = true;
 }
 
+void FoldingMap::setBend(float bend)
+{
+    _bend = bend;
+    _dirty = true;
+}
 void FoldingMap::setThickness(float thickness)
 {
     _thickness = std::max(thickness, 0.f);
@@ -113,10 +122,12 @@ void FoldingMap::_buildRows()
 // Quads between consecutive vertex columns of each paper column (not across
 // the columns: the hinge arcs start where the previous column ends), and
 // between consecutive rows. Counter clockwise seen from the front.
+// The quads are split along one diagonal each, alternating like a checker
+// board (the facets then read as a faceted relief, see _rebuild). Each
+// triangle gets its own vertices, so the index buffer is the identity.
 void FoldingMap::_buildIndices()
 {
-    std::vector<uint32_t>& indices = _indices;
-    indices.clear();
+    _grid_indices.clear();
     auto const row_count = static_cast<uint32_t>(_rows.size());
     auto const stride = static_cast<uint32_t>(_grid_columns);
     uint32_t start = 0;
@@ -128,13 +139,18 @@ void FoldingMap::_buildIndices()
                 uint32_t const v10 = v00 + 1;
                 uint32_t const v01 = v00 + stride;
                 uint32_t const v11 = v01 + 1;
-                indices.insert(indices.end(), { v00, v10, v11, v11, v01, v00 });
+                if ((j + g) % 2 == 0)
+                    _grid_indices.insert(_grid_indices.end(), { v00, v10, v11, v11, v01, v00 });
+                else
+                    _grid_indices.insert(_grid_indices.end(), { v00, v10, v01, v10, v11, v01 });
             }
         }
         start += width;
     }
-    _index_count = static_cast<int>(indices.size());
-    _ibo.edit(static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)), indices.data(), GL_STATIC_DRAW);
+    _indices.resize(_grid_indices.size());
+    std::iota(_indices.begin(), _indices.end(), 0u);
+    _index_count = static_cast<int>(_indices.size());
+    _ibo.edit(static_cast<GLsizeiptr>(_indices.size() * sizeof(uint32_t)), _indices.data(), GL_STATIC_DRAW);
 }
 
 void FoldingMap::update()
@@ -148,7 +164,7 @@ void FoldingMap::update()
 
 // 1. Accordion, in the xz plane: each column goes along direction psi
 //    (around y), chained from x = -width / 2: flap * -pi for column 0,
-//    accordion * -pi for column 2, 0 for columns 1 & 3 (column 3 turns back
+//    accordion * -pi for columns 2 & 4, 0 for columns 1 & 3 (each turns back
 //    by as much as column 2 turned). Each hinge is an arc of radius
 //    thickness / 2 turning from one direction to the next, centered on the
 //    side it folds to: the stacked panels sit thickness apart. The chain is
@@ -167,7 +183,11 @@ void FoldingMap::_rebuild()
     float const pi = glm::pi<float>();
     float const R = _crease_radius;
     float const hinge_radius = _thickness / 2.f;
-    std::array<float, columns> const psis{ -_flap * pi, 0.f, -_accordion * pi, 0.f };
+    // Column 0 flap, then the accordion's zigzag: even columns fold by
+    // accordion, odd ones turn back
+    std::array<float, columns> psis{};
+    for (int c = 0; c < columns; ++c)
+        psis[c] = c == 0 ? -_flap * pi : (c % 2 == 0 ? -_accordion * pi : 0.f);
     // Column edges, flat
     std::array<float, columns + 1> edges{};
     edges[0] = -_width / 2.f;
@@ -202,10 +222,19 @@ void FoldingMap::_rebuild()
             }
             p = center + rot_y(p - center, delta);
         }
-        grid.push_back({ u0, p, nrm(psi), dir(psi) });
-        p += dir(psi) * (edges[c + 1] - edges[c]);
-        grid.push_back({ u1, p, nrm(psi), dir(psi) });
+        // Panel, split along its length: the bulge curves it
+        float const length = edges[c + 1] - edges[c];
+        for (int k = 0; k <= panel_segments; ++k) {
+            float const f = static_cast<float>(k) / panel_segments;
+            grid.push_back({ glm::mix(u0, u1, f), p + dir(psi) * (length * f), nrm(psi), dir(psi) });
+        }
+        p += dir(psi) * length;
         prev_psi = psi;
+    }
+    // Bulge, pushed out along each front: most on the paper's center line
+    for (auto& g : grid) {
+        float const s = 2.f * g.u - 1.f;
+        g.xz += g.normal * (_bend * (1.f - s * s));
     }
     float left = FLT_MAX;
     for (auto const& g : grid)
@@ -221,7 +250,8 @@ void FoldingMap::_rebuild()
     float const crease_y = _height * (0.5f - _crease_v);
     float const axis_z = front_z + R;
 
-    _vertices.resize(_rows.size() * grid.size());
+    // Grid vertices, then expanded to the triangles below
+    std::vector<Vertex> verts(_rows.size() * grid.size());
     _bounds_min = glm::vec3(FLT_MAX);
     _bounds_max = glm::vec3(-FLT_MAX);
     size_t i = 0;
@@ -231,7 +261,7 @@ void FoldingMap::_rebuild()
         // Below the crease, straight
         float const straight = crease_y - y;
         for (auto const& g : grid) {
-            Vertex& v = _vertices[i++];
+            Vertex& v = verts[i++];
             if (phi > 0.f) {
                 // Around the axis, from (-straight, w) (yz, from the axis)
                 float const w = g.xz.y - axis_z;
@@ -250,6 +280,28 @@ void FoldingMap::_rebuild()
             v.uv = glm::vec2(g.u, 0.5f - y / _height);
             _bounds_min = glm::min(_bounds_min, v.position);
             _bounds_max = glm::max(_bounds_max, v.position);
+        }
+    }
+
+    // Flat facets: each triangle's corners get its own normal, the triangle's
+    // (the grid's front side), so the split between quads' triangles shows as
+    // a crease in the light: a faceted relief, faking depth
+    _vertices.resize(_grid_indices.size());
+    for (size_t t = 0; t < _grid_indices.size(); t += 3) {
+        Vertex corners[3]{ verts[_grid_indices[t]], verts[_grid_indices[t + 1]], verts[_grid_indices[t + 2]] };
+        glm::vec3 n = glm::cross(corners[1].position - corners[0].position,
+            corners[2].position - corners[0].position);
+        float const length = glm::length(n);
+        if (length > 1e-9f)
+            n /= length;
+        else
+            n = corners[0].normal;
+        glm::vec3 const grid_normal = corners[0].normal + corners[1].normal + corners[2].normal;
+        if (glm::dot(n, grid_normal) < 0.f)
+            n = -n;
+        for (int k = 0; k < 3; ++k) {
+            corners[k].normal = n;
+            _vertices[t + k] = corners[k];
         }
     }
 }

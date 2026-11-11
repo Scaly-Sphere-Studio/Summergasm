@@ -2,7 +2,7 @@
 
 #include "includes.hpp"
 
-// Paper map of 4 columns by 2 rows, folded like a city map: first as an
+// Paper map of 5 columns by 2 rows, folded like a city map: first as an
 // accordion along the 3 vertical creases, /\/\ in a cross section seen from
 // below, the front up: column 0 (the left one) behind column 1, back to
 // back, column 2 in front of column 1, face to face, column 3 in front of
@@ -36,7 +36,7 @@ public:
     static Shared create(SSS::GL::Texture::Shared front, SSS::GL::Texture::Shared back,
         float width, float height);
 
-    static constexpr int columns = 4;
+    static constexpr int columns = 5;
 
     struct Vertex {
         glm::vec3 position;
@@ -47,6 +47,13 @@ public:
 
     SSS::GL::Texture::Shared front;
     SSS::GL::Texture::Shared back;
+    // Multiplied over the front texture (front faces only), before the layers:
+    // the shadows, so that what's printed over it (e.g. the characters) isn't
+    // shaded. White: none. Null: none.
+    SSS::GL::Texture::Shared shade;
+    // Multiplied over the front texture after the shade (e.g. the facets of
+    // the paper's triangles). White: none. Null: none.
+    SSS::GL::Texture::Shared mask;
     // Printed over the front texture, in order, with the same uv (front
     // faces only): e.g. the map's roads, monuments & pins (see MapContent).
     // Each one can be rebaked alone.
@@ -81,6 +88,12 @@ public:
     // spaced.
     void setCreases(std::array<float, columns - 1> const& u, float v);
 
+    // Bulge of the paper, in local units: each vertex is pushed out along its
+    // front by bend * (1 - s^2), s = 2u - 1 from the paper's center line (u =
+    // 0.5, the most) to its edges (none). The panels are split along their
+    // length so the surface can curve. 0: flat.
+    void setBend(float bend);
+    inline float getBend() const noexcept { return _bend; };
     // Gap between the panels stacked by the accordion, in local units
     void setThickness(float thickness);
     inline float getThickness() const noexcept { return _thickness; };
@@ -118,10 +131,11 @@ private:
     float _flap{ 0.f };
     float _accordion{ 0.f };
     float _thickness{ 2.f };
-    std::array<float, columns - 1> _creases_u{ 0.25f, 0.5f, 0.75f };
+    std::array<float, columns - 1> _creases_u{ 0.2f, 0.4f, 0.6f, 0.8f };
     float _crease_v{ 0.5f };
     float _depth_scale{ 1.f };
     float _crease_radius{ 3.f };
+    float _bend{ 0.f };
     bool _dirty{ true };
 
     // Vertex columns of the grid along x (u), shared by every row
@@ -143,6 +157,9 @@ private:
     int _index_count{ 0 };
 
     std::vector<Vertex> _vertices;
+    // Quads of the grid, 2 triangles each, over _vertices of the grid
+    std::vector<uint32_t> _grid_indices;
+    // Identity: every triangle has its own 3 vertices (flat facets)
     std::vector<uint32_t> _indices;
     glm::vec3 _bounds_min{ 0.f }, _bounds_max{ 0.f };
 
