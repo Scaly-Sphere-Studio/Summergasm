@@ -1,5 +1,6 @@
 #include "Transition.hpp"
 #include "includes.hpp"
+#include "mylua.hpp"
 
 namespace transition {
 namespace {
@@ -115,7 +116,8 @@ uniform float u_Wave;
 uniform vec4 u_Field[16 * 2 * 4];
 // Six vec4 per layer: [rgb, opacity], 4 gradient stops [rgb, -],
 // [fill kind, stop count, texture, gradient angle]. Previous: the stop block
-// holds the uv shift of the sampled frame in its xy
+// holds the uv shift of the sampled frame in its xy. The w of the last stop is the
+// blend: 0 paint, 1 subtract, 2 intersect
 uniform vec4 u_Fill[16 * 6];
 
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -210,9 +212,24 @@ void main()
     // The scene, moved and wobbled as a whole
     vec2 suv = uv + u_SceneShift;
     suv.x += sin(uv.y * 30.0 + u_Progress * 12.0) * u_Wave;
-    vec3 color = texture(u_Scene, clamp(suv, 0.0, 1.0)).rgb;
+    vec3 scene_color = texture(u_Scene, clamp(suv, 0.0, 1.0)).rgb;
+    // The paint of the layers so far, premultiplied. Subtract & intersect layers scale
+    // it by their coverage, which cuts or keeps the paint below them
+    vec3 paint = vec3(0.0);
+    float paint_alpha = 0.0;
     for (int i = 0; i < u_Count; ++i) {
-        float cov = fieldCoverage(2 * i, p, uv) * fieldCoverage(2 * i + 1, p, uv);
+        float cov = clamp(fieldCoverage(2 * i, p, uv) * fieldCoverage(2 * i + 1, p, uv), 0.0, 1.0);
+        int blend = int(u_Fill[i * 6 + 4].w + 0.5);
+        if (blend == 1) {
+            paint *= 1.0 - cov;
+            paint_alpha *= 1.0 - cov;
+            continue;
+        }
+        if (blend == 2) {
+            paint *= cov;
+            paint_alpha *= cov;
+            continue;
+        }
         vec4 base = u_Fill[i * 6];
         vec4 info = u_Fill[i * 6 + 5];
         int kind = int(info.x + 0.5);
@@ -229,9 +246,12 @@ void main()
         else if (kind == 3) {
             src = texture(u_Old, clamp(uv - u_Fill[i * 6 + 1].xy, 0.0, 1.0)).rgb;
         }
-        color = mix(color, src, clamp(alpha, 0.0, 1.0));
+        alpha = clamp(alpha, 0.0, 1.0);
+        // Over the paint so far
+        paint = src * alpha + paint * (1.0 - alpha);
+        paint_alpha = alpha + paint_alpha * (1.0 - alpha);
     }
-    o_Color = vec4(color, 1.0);
+    o_Color = vec4(paint + scene_color * (1.0 - paint_alpha), 1.0);
 }
 )GLSL";
 
@@ -339,6 +359,8 @@ void packFill(Layer const& layer, float progress, float aspect, glm::vec4* out)
     if (fill.kind == Fill::Kind::Previous) {
         out[1] = { fill.shift_x ? fill.shift_x(progress, aspect) : 0.f, fill.shift_y ? fill.shift_y(progress, aspect) : 0.f, 0.f, 0.f };
     }
+    // The blend mode goes in the w of the last stop (unused by the shader there)
+    out[4].w = static_cast<float>(static_cast<int>(layer.blend));
     float const angle = fill.angle ? fill.angle(progress, aspect) : 0.f;
     int kind = 2;
     if (fill.kind == Fill::Kind::Solid)
@@ -814,6 +836,9 @@ void printPanel()
     }
     if (ImGui::Button("Stop"))
         stop();
+    ImGui::SameLine();
+    if (ImGui::Button("Reload"))
+        mylua_reload_transitions();
 
     bool first = true;
     Kind kind = Kind::Single;

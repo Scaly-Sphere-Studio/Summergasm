@@ -134,7 +134,7 @@ Units: the screen's height is `1`, the origin is its center (`x` in `[-aspect/2,
 | `"noise"` | random cells (1/256 of the screen), covered below `threshold` | `threshold` |
 | `"texture"` | luma of `texture`, covered below `threshold` | `texture`, `threshold` |
 
-All fields also take `softness` (edge width, default `0.05`), `invert = true` (covers the outside), and `rotation` for the SDFs. `threshold` is in `[0, 1]`. Layers take `shape`, the parameters and `invert` directly, and `mask = { ... }` (a field) multiplies their coverage. Their fill:
+All fields also take `softness` (edge width, default `0.05`), `invert = true` (covers the outside), and `rotation` for the SDFs. `threshold` is in `[0, 1]`. Layers take `shape`, the parameters and `invert` directly, and `mask = { ... }` (a field) multiplies their coverage. `blend` (layer key): `"paint"` (default) fills the coverage; `"subtract"` cuts the paint of the layers below it, and `"intersect"` keeps only the paint inside its coverage (both paint nothing themselves, so their fill is unused). Their fill:
 
 | Key | Description |
 |---|---|

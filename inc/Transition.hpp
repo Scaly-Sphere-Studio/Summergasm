@@ -72,11 +72,16 @@ struct Fill {
     Curve shift_y;
 };
 
+// How a layer combines with the layers below it. Subtract & intersect cut or keep
+// their paint with the layer's coverage, and paint nothing themselves
+enum class Blend { Paint, Subtract, Intersect };
+
 // Coverage of the field, multiplied by the mask's (if any), filled with the fill
 struct Layer {
     Field field;
     std::optional<Field> mask;
     Fill fill;
+    Blend blend{ Blend::Paint };
     // Alpha of the layer, 1 if unset
     Curve opacity;
 };

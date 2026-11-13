@@ -963,6 +963,15 @@ static std::vector<transition::Layer> lua_layers(sol::table const& layers, std::
         if (auto const mask = layer->get<sol::optional<sol::table>>("mask"))
             item.mask = lua_field(*mask, what + ".mask", textures);
         item.fill = lua_fill(layer->get<sol::optional<sol::table>>("fill"), what, textures);
+        std::string const blend = layer->get<sol::optional<std::string>>("blend").value_or("paint");
+        if (blend == "paint")
+            item.blend = transition::Blend::Paint;
+        else if (blend == "subtract")
+            item.blend = transition::Blend::Subtract;
+        else if (blend == "intersect")
+            item.blend = transition::Blend::Intersect;
+        else
+            throw std::runtime_error(what + ": unknown blend '" + blend + "' (paint, subtract or intersect)");
         sol::object const opacity = layer->get<sol::object>("opacity");
         if (opacity.get_type() != sol::type::nil)
             item.opacity = lua_curve(opacity, what + ".opacity");
@@ -1032,28 +1041,38 @@ static bool mylua_load_transition(std::filesystem::path const& file)
     }
 }
 
-// Loads the transitions when their file is new or saved, checked twice per second
-void mylua_watch_transitions()
+// Loads the transitions whose file is new or saved (all of them if force)
+static void mylua_scan_transitions(bool force)
 {
-    using clock = std::chrono::steady_clock;
-    static auto next_check = clock::now();
     static std::map<std::string, std::filesystem::file_time_type> times;
-    auto const now = clock::now();
-    if (now < next_check)
-        return;
-    next_check = now + std::chrono::milliseconds(500);
-
     std::error_code ec;
     for (auto const& entry : std::filesystem::directory_iterator(g->lua_folder + "transitions/", ec)) {
         if (!entry.is_regular_file(ec) || entry.path().extension() != ".lua")
             continue;
         auto const time = std::filesystem::last_write_time(entry.path(), ec);
         auto const [it, is_new] = times.try_emplace(entry.path().stem().string());
-        if (!is_new && it->second == time)
+        if (!force && !is_new && it->second == time)
             continue;
         it->second = time;
         mylua_load_transition(entry.path());
     }
+}
+
+// Loads the transitions when their file is new or saved, checked twice per second
+void mylua_watch_transitions()
+{
+    using clock = std::chrono::steady_clock;
+    static auto next_check = clock::now();
+    auto const now = clock::now();
+    if (now < next_check)
+        return;
+    next_check = now + std::chrono::milliseconds(500);
+    mylua_scan_transitions(false);
+}
+
+void mylua_reload_transitions()
+{
+    mylua_scan_transitions(true);
 }
 
 bool setup_lua()

@@ -69,6 +69,8 @@ bool mylua_reload_scene(std::string const& scene_name);
 void mylua_watch_scenes();
 // Loads resources/lua/transitions/*.lua when they are new or saved
 void mylua_watch_transitions();
+// Reloads every resources/lua/transitions/*.lua now, whether or not it changed
+void mylua_reload_transitions();
 bool mylua_return_to_menu();
 bool mylua_on_escape();
 // Destroys the node of dialog(name), before the window is closed
